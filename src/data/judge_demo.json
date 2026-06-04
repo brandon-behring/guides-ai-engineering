@@ -1,0 +1,78 @@
+{
+  "pairs": [
+    {
+      "label": "Concise correct answer",
+      "a": {
+        "id": "A0",
+        "text": "Yes \u2014 use a cross-encoder reranker.",
+        "quality": 0.78,
+        "len": 35
+      },
+      "b": {
+        "id": "B0",
+        "text": "It depends; there are many factors to weigh here, and ultimately the best choice will come down to your specific latency and cost budget, the size of your candidate set, and how much retrieval quality matters.",
+        "quality": 0.7,
+        "len": 209
+      },
+      "truth": "A0",
+      "position": {
+        "order_ab": "A0",
+        "order_ba": "A0",
+        "debiased": "A0"
+      },
+      "verbosity": {
+        "order_ab": "B0"
+      }
+    },
+    {
+      "label": "Right call, terse",
+      "a": {
+        "id": "A1",
+        "text": "Cache the embeddings.",
+        "quality": 0.81,
+        "len": 21
+      },
+      "b": {
+        "id": "B1",
+        "text": "You could consider caching the embeddings, which is generally a good idea because recomputing them is expensive and the inputs rarely change.",
+        "quality": 0.74,
+        "len": 141
+      },
+      "truth": "A1",
+      "position": {
+        "order_ab": "A1",
+        "order_ba": "A1",
+        "debiased": "A1"
+      },
+      "verbosity": {
+        "order_ab": "B1"
+      }
+    },
+    {
+      "label": "Correct + short",
+      "a": {
+        "id": "A2",
+        "text": "Add a guardrail metric.",
+        "quality": 0.66,
+        "len": 23
+      },
+      "b": {
+        "id": "B2",
+        "text": "Adding a guardrail metric is one option among several; you might also track latency, cost, and a few business KPIs depending on the product.",
+        "quality": 0.61,
+        "len": 140
+      },
+      "truth": "A2",
+      "position": {
+        "order_ab": "A2",
+        "order_ba": "B2",
+        "debiased": "tie"
+      },
+      "verbosity": {
+        "order_ab": "B2"
+      }
+    }
+  ],
+  "position_flip_rate": 0.333,
+  "note": "A is the higher-quality answer in every pair. Watch the verdict."
+}

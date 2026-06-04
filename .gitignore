@@ -1,0 +1,23 @@
+# Node + Astro build artifacts
+node_modules/
+dist/
+dist-pdf/
+.astro/
+.env.local
+
+# Scaffold-generated data (rebuilt by build-bib / build-labels). NOTE: the demo
+# JSON (threshold_demo.json, judge_demo.json) IS committed — it's the "dump" half
+# of dump->JSON->island and the build needs it.
+src/data/labels.json
+src/data/references.json
+
+# Python
+__pycache__/
+*.pyc
+
+# Pagefind index
+public/pagefind/
+
+# OS / editor
+.DS_Store
+*.swp

@@ -1,0 +1,131 @@
+---
+title: "Why evaluation is the scarce skill"
+slug: why-evaluation
+description: "Model training is commoditizing; knowing whether a system actually works is not. Why evaluation is the highest-leverage AI-engineering skill of 2025–26, what interviews test, and the four-dimension lens this guide grades you against."
+freshness: literature-survey
+last_verified: 2026-06-03
+tags: [orientation, evaluation, scope]
+sources: []
+draft: false
+mode: explanation
+target: transfer
+ordering: concept-first
+commitment: long-lived
+paradigms: [default]
+research_debt_addressed: |
+  Most public material on LLM evaluation is a metric catalogue (BLEU, ROUGE,
+  faithfulness, an LLM-as-judge prompt) divorced from the decision the metric
+  serves. Interview demand research (2025–26) is consistent: candidates fail not
+  for missing a metric name but for failing to reason about *what* to measure,
+  *why*, and *how it breaks* — and for never naming a monitoring failure mode.
+  This chapter reframes evaluation as a decision discipline and sets the
+  four-dimension rubric the rest of the guide grades against.
+task_classes: [orientation]
+companion_modules: [mini-eval]
+los:
+  - id: EVAL-0.1
+    bloom: explain
+    statement: "Explain why evaluation is high-leverage as model training commoditizes, and why 'how did you measure it?' has become a gating interview question."
+    anchor: eval-why-scarce
+    threshold: true
+  - id: EVAL-0.2
+    bloom: explain
+    statement: "Explain the error-taxonomy-before-metrics principle: define the failures you care about before choosing a number."
+    anchor: eval-error-taxonomy-first
+    threshold: true
+  - id: EVAL-0.3
+    bloom: define
+    statement: "Name the four evaluation-competency dimensions (Technical Correctness, Trade-off Awareness, Evaluation Rigor, Communication) used as the assessment spine throughout the guide."
+    anchor: eval-four-dim-rubric
+    threshold: false
+---
+
+# Why evaluation is the scarce skill
+
+You can rent a frontier model with a single API call. You cannot rent the
+judgment to know whether the system you built around it actually works. As
+model *training* commoditizes, the scarce, durable, and — increasingly —
+*interview-gating* skill is **evaluation**: deciding what "good" means for a
+real system, measuring it honestly, and knowing how the measurement itself can
+lie.
+
+This guide treats evaluation as a **decision discipline**, not a metric
+catalogue. That framing is deliberate, and it is what the rest of the guide is
+built to teach. {/* anchor: eval-why-scarce */}
+
+## "I built a RAG bot" is no longer an answer
+
+A recurring pattern in 2025–26 AI-engineering interviews: a candidate describes
+a retrieval-augmented system in fluent detail — chunking, embeddings, a vector
+store, a reranker — and the interviewer asks one question that ends the loop:
+
+> "How did you know it was good?"
+
+The strong answers are not longer metric lists. They are a *diagnosis*: which
+failures matter for this product, which offline metric and which online signal
+track each one, which guardrail catches the expensive mistake, and what you
+would monitor in production to catch the metric drifting out from under you. The
+weak answers name a tool ("LLM-as-judge") and stop.
+
+That gap — naming a measurement vs. reasoning about it — is the single most
+common reason otherwise-strong candidates fail these rounds. This guide is
+organized to close it.
+
+## Error taxonomy before metrics
+
+The first move in evaluation is **not** choosing a metric. It is naming the
+failures you care about. A fraud classifier that is "99% accurate" can be
+worthless if 99% of transactions are legitimate and it never catches fraud. An
+LLM summarizer with a high overlap score can be confidently, fluently wrong. A
+RAG system with excellent retrieval recall can still hallucinate when the
+retrieved context is irrelevant.
+
+In each case the metric was not the problem — the *unexamined choice* of metric
+was. So the discipline starts here: {/* anchor: eval-error-taxonomy-first */}
+
+1. **Enumerate the failures that would actually hurt** — for this system, for
+   this user, for this business.
+2. **Then** pick the offline metric, online signal, and guardrail that make each
+   failure visible.
+3. **Then** decide how you will know the measurement has stopped being valid.
+
+Every chapter that follows applies this order to a different evaluation surface:
+classification metrics and the threshold trade-off, calibration, data integrity
+and benchmark contamination, reference-free evaluation, LLM-as-judge and its
+biases, benchmark literacy, RAG evaluation, agentic/task evaluation, and
+production monitoring.
+
+## The four-dimension rubric
+
+Interview demand research across many companies converges on a small set of
+dimensions that distinguish strong answers from weak ones — and they map almost
+one-to-one onto how this guide grades you. We use them as the **assessment
+spine** of every chapter: {/* anchor: eval-four-dim-rubric */}
+
+- **Technical Correctness** — the mechanism is stated precisely; terms are not
+  confused; edge cases are handled.
+- **Trade-off Awareness** — you name costs *and* benefits, know when *not* to
+  use a technique, and compare to alternatives.
+- **Evaluation Rigor** — you pair an offline metric with an online signal, a
+  guardrail, *and* a named failure mode to monitor. (This is the dimension most
+  candidates under-serve, and the one this guide weights most heavily.)
+- **Communication** — structured (problem → approach → trade-off → eval),
+  within a time budget, using precise vocabulary, asking clarifying questions.
+
+Each chapter ends by checking your answer against these four. Master them on
+evaluation and they transfer: they are the same four dimensions that decide
+LLM-application, production, and system-design rounds.
+
+## How to read this guide
+
+You will build a small evaluation library — `mini-eval` — chapter by chapter:
+metrics, confidence intervals, calibration, a mock-model LLM-as-judge harness,
+and a tiny RAG evaluator. It is deliberately minimal and clearly labelled *for
+learning, not production*; each chapter closes by bridging what you built to the
+production tools (`eval-toolkit`, RAGAS). You learn the mechanism by building it,
+so you can explain it cold — which is exactly what Technical Correctness and
+Evaluation Rigor demand under interview pressure.
+
+Next: **Chapter 1 — The evaluation mindset**, where we turn "error taxonomy
+before metrics" into a repeatable habit on three contrasting systems that all
+look fine and fail differently.

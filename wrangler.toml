@@ -1,0 +1,15 @@
+# Cloudflare Pages config — guides-ai-engineering.
+#
+# Not yet deployed. This Pages project will be created when the guide goes live
+# and proxied from the hub repo's wrangler.toml at /ai-engineering/*.
+#
+# Dashboard config:
+#   Framework preset: Astro
+#   Build command:    npm run build
+#   Build output:     dist
+#   Root directory:   /
+#   Node version:     22
+
+name = "guides-ai-engineering"
+compatibility_date = "2026-06-03"
+pages_build_output_dir = "./dist"

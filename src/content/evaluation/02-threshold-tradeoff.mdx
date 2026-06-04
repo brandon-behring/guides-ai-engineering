@@ -1,0 +1,198 @@
+---
+title: "Offline metrics and the threshold trade-off"
+slug: threshold-tradeoff
+description: "Precision, recall, F1, and the operating point — why a single accuracy number lies on imbalanced data, and how to choose a threshold from the business cost of each error. You build the metrics in mini_eval and feel the trade-off in an interactive demo."
+freshness: literature-survey
+last_verified: 2026-06-03
+tags: [evaluation, classification, metrics, threshold]
+sources: []
+draft: false
+mode: tutorial
+target: transfer
+ordering: problem-first
+commitment: long-lived
+paradigms: [default]
+research_debt_addressed: |
+  Most metric explainers define precision and recall and stop. The skill that
+  actually transfers to an interview — and to production — is reasoning about the
+  *operating point*: which error is more expensive here, and where to put the
+  threshold because of it. This chapter makes the threshold a thing you move and
+  watch, not a default of 0.5 you never question.
+task_classes: [metric-selection, threshold-choice]
+companion_modules: [mini-eval]
+provenance:
+  ai_tools: ["Claude Opus 4.8 (Anthropic)"]
+  audit_history:
+    - date: 2026-06-03
+      type: authored
+      file: src/content/evaluation/02-threshold-tradeoff.mdx
+  citation_backstop: manual
+los:
+  - id: EVAL-2.1
+    bloom: explain
+    statement: "Explain why accuracy is misleading on imbalanced data and name the failure it hides."
+    anchor: threshold-accuracy-paradox
+    threshold: true
+  - id: EVAL-2.2
+    bloom: calculate
+    statement: "Compute precision, recall, and F1 from a confusion matrix, and state how each moves as the threshold rises."
+    anchor: threshold-precision-recall
+    threshold: true
+  - id: EVAL-2.3
+    bloom: design
+    statement: "Choose a decision threshold from the relative business cost of false positives vs. false negatives, and justify it."
+    anchor: threshold-operating-point
+    threshold: true
+---
+
+import YouWillLearn from '@brandon_m_behring/book-scaffold-astro/components/YouWillLearn.astro';
+import Pitfall from '@brandon_m_behring/book-scaffold-astro/components/Pitfall.astro';
+import WorkedExample from '@brandon_m_behring/book-scaffold-astro/components/WorkedExample.astro';
+import Practice from '@brandon_m_behring/book-scaffold-astro/components/Practice.astro';
+import NoteBox from '@brandon_m_behring/book-scaffold-astro/components/NoteBox.astro';
+import ThresholdExplorer from '../../components/ThresholdExplorer.tsx';
+import thresholdData from '../../data/threshold_demo.json';
+
+# Offline metrics and the threshold trade-off
+
+<YouWillLearn prerequisites="Binary classification basics; a classifier outputs a score in [0, 1].">
+- Why a single **accuracy** number can be near-useless — and what it hides.
+- **Precision, recall, F1** as functions of *where you put the threshold*.
+- How to choose an **operating point** from the cost of each error, and defend it.
+</YouWillLearn>
+
+## Would you ship it?
+
+Your team trained a fraud classifier on last quarter's transactions. The
+notebook reports **99.2% accuracy**. A PM asks, in the interview you're
+half-imagining, "Great — ship it?"
+
+Sit with that for a second before reading on. *What would you ask before
+answering?* Write down one number you'd want to see.
+
+<Pitfall title="The accuracy paradox">
+If 99% of transactions are legitimate, a model that flags **nothing** as fraud is
+99% accurate — and catches zero fraud. On imbalanced data, accuracy mostly
+measures the base rate, not the model. The number you'd want is **recall**: of
+the fraud that happened, how much did we catch?
+</Pitfall>
+
+That move — *refuse the single number, ask which error matters* — is the whole
+chapter. {/* anchor: threshold-accuracy-paradox */}
+
+## The confusion matrix is the ground truth
+
+Every classification metric is a summary of four counts at a chosen threshold
+$t$ (predict positive when $\text{score} \ge t$):
+
+|              | predicted + | predicted − |
+| ------------ | ----------- | ----------- |
+| **actual +** | TP          | FN          |
+| **actual −** | FP          | TN          |
+
+In `mini_eval` you build this directly — no library, so you can explain every
+line cold:
+
+```python
+from mini_eval import confusion_counts, precision, recall, f1
+
+c = confusion_counts(y_true, y_score, threshold=0.5)
+precision(c)  # TP / (TP + FP) — of what we flagged, how much was right
+recall(c)     # TP / (TP + FN) — of the real positives, how much we caught
+f1(c)         # harmonic mean — punishes a lopsided trade-off
+```
+
+The three headline metrics, in symbols: {/* anchor: threshold-precision-recall */}
+
+$$
+\text{precision}=\frac{TP}{TP+FP},\quad
+\text{recall}=\frac{TP}{TP+FN},\quad
+F_1=\frac{2\,PR}{P+R}.
+$$
+
+<WorkedExample id="threshold-pr-by-hand" title="Precision and recall by hand">
+Six examples, scores `[0.9, 0.4, 0.8, 0.2, 0.6, 0.1]`, labels `[1, 1, 0, 0, 1, 0]`,
+threshold `0.5`. Predicted positive: `0.9, 0.8, 0.6`.
+
+- TP = `0.9, 0.6` (label 1) = **2**; FP = `0.8` (label 0) = **1**.
+- FN = `0.4` (label 1, scored low) = **1**; TN = `0.2, 0.1` = **2**.
+- Precision = 2 / (2+1) = **0.67**; Recall = 2 / (2+1) = **0.67**; F1 = **0.67**.
+
+Now raise the threshold to `0.7`: only `0.9, 0.8` predicted positive → you drop the
+`0.6` true positive. Recall falls; precision may rise. **Raising the threshold can
+only lower recall** — never raise it.
+</WorkedExample>
+
+## Feel the trade-off
+
+Here is the same imbalanced, fraud-like classifier from the opener — 2,000
+transactions, ~8% fraud. Before you touch the slider: **predict** what happens to
+precision and recall as you drag the threshold from 0.5 toward 0.9.
+
+<ThresholdExplorer client:visible data={thresholdData} />
+
+Now *explain* what you saw: the two score distributions **overlap**, so there is
+no threshold that cleanly separates them — every choice trades a false-positive
+rate against a miss rate. At $t=0.5$ recall is high but precision is ~22%: you'd
+flag four legitimate transactions for every real fraud. That may be exactly right
+(blocking fraud is worth annoying some customers) or exactly wrong (a declined
+legitimate transaction churns a customer) — **the data cannot tell you which.
+The business cost of each error does.** {/* anchor: threshold-operating-point */}
+
+<NoteBox title="Report a number with its operating point">
+"AUC 0.94" or "average precision 0.41" summarizes the whole curve, but a deployed
+system runs at *one* threshold. Always pair a threshold-free summary with a chosen
+operating point and the precision/recall it implies — `mini_eval.average_precision`
+gives you the former; the slider above is the latter.
+</NoteBox>
+
+<Practice id="threshold-choose-operating-point" difficulty={2}>
+For each system, say whether you'd push the threshold **up** (favor precision) or
+**down** (favor recall), and why:
+
+1. A medical pre-screen that flags scans for a radiologist to review.
+2. A content filter that auto-deletes posts with no human in the loop.
+3. A marketing model that picks the top 1% of users to receive a discount.
+
+<details>
+<summary>One defensible answer</summary>
+
+1. **Down** — a missed disease (FN) is far costlier than a false alarm a doctor
+   quickly clears. High recall.
+2. **Up** — auto-deleting a legitimate post (FP) is a visible harm with no
+   recovery; favor precision (and add a human-review tier for the middle).
+3. **Up** — the budget is tiny (1%), so precision of the selected set matters
+   more than catching every responsive user.
+</details>
+</Practice>
+
+## How this is graded
+
+Against the four-dimension rubric, a strong answer here shows:
+
+- **Technical Correctness** — precision ≠ recall ≠ accuracy; you state each
+  precisely and know recall = TPR.
+- **Trade-off Awareness** — you name *both* errors and tie the threshold to their
+  relative cost, rather than defaulting to 0.5 or "maximize F1".
+- **Evaluation Rigor** — you report a metric *with* an operating point and a
+  guardrail (e.g. "recall ≥ 0.9 subject to precision ≥ 0.3").
+- **Communication** — "I'd run at recall 0.9 because a missed fraud costs ~30× a
+  false alarm" beats "the F1 is 0.35".
+
+### Industry variation
+
+- **Fraud / risk** — recall-heavy, but a false-positive *budget* (declined-txn
+  rate) is a hard guardrail.
+- **Content moderation** — precision and recall both matter; the usual answer is
+  a *tiered* threshold (auto-act on the confident tails, human-review the middle).
+- **Healthcare** — recall-dominant on the screen, with calibrated probabilities
+  (Chapter 4) so a clinician can reason about the risk.
+
+## Stretch: when it isn't classification
+
+You're handed a **ranking** problem instead — a retriever returning the top-k
+documents for a query. Precision and recall still apply (precision@k, recall@k),
+but the *order* within the top-k now matters, which a threshold can't capture.
+What single number would you reach for, and what does it reward that F1 ignores?
+(We pick this up as **NDCG** and retrieval metrics in Chapter 9 — RAG
+evaluation.)

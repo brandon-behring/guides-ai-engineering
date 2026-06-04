@@ -1,0 +1,29 @@
+{
+  "name": "guides-ai-engineering",
+  "description": "The AI-native dimensions of AI engineering — company-agnostic, interview-prep-led guides (evaluation first; llm-app, production, craft, working-with-AI to follow). Deploys to guides.brandon-behring.dev/ai-engineering/. Multi-guide via content collections.",
+  "version": "0.1.0",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "predev": "npm run build:bib --if-present && npm run build:labels --if-present",
+    "prebuild": "npm run build:bib --if-present && npm run build:labels --if-present && npm run validate --if-present",
+    "build:bib": "book-scaffold build-bib",
+    "build:labels": "book-scaffold build-labels",
+    "build:figures": "book-scaffold build-figures",
+    "build:notebooks": "book-scaffold render-notebooks",
+    "validate": "book-scaffold validate",
+    "dev": "astro dev",
+    "build": "astro build && pagefind --site dist",
+    "preview": "astro preview"
+  },
+  "dependencies": {
+    "@astrojs/mdx": "^5.0.3",
+    "@astrojs/preact": "^5.1.1",
+    "@brandon_m_behring/book-scaffold-astro": "^4.14.2",
+    "astro": "^6.1.7",
+    "katex": "^0.16.11",
+    "preact": "^10.29.1",
+    "rehype-katex": "^7.0.1",
+    "remark-math": "^6.0.0"
+  }
+}

@@ -1,0 +1,179 @@
+---
+title: "LLM-as-judge and its biases"
+slug: llm-as-judge
+description: "Using a strong model to grade another model's outputs is the workhorse of modern evaluation — and it is biased in predictable, demonstrable ways. Position, verbosity, and self-preference bias, why they happen, and the swap-and-aggregate mitigation, built in mini_eval with no live model."
+freshness: literature-survey
+last_verified: 2026-06-03
+tags: [evaluation, llm-as-judge, bias, mitigation]
+sources: []
+draft: false
+mode: tutorial
+target: transfer
+ordering: problem-first
+commitment: long-lived
+paradigms: [default]
+research_debt_addressed: |
+  LLM-as-judge is taught as a recipe ("prompt a strong model to score on a
+  rubric") with a footnote that it "can be biased". Interviews probe exactly the
+  footnote: which biases, why, and how you'd catch and mitigate them. This
+  chapter makes the biases reproducible with a deterministic mock judge, so the
+  mitigation is something you've *seen* work, not memorized.
+task_classes: [judge-design, bias-mitigation]
+companion_modules: [mini-eval]
+provenance:
+  ai_tools: ["Claude Opus 4.8 (Anthropic)"]
+  audit_history:
+    - date: 2026-06-03
+      type: authored
+      file: src/content/evaluation/07-llm-as-judge.mdx
+  citation_backstop: manual
+los:
+  - id: EVAL-7.1
+    bloom: explain
+    statement: "Explain how an LLM judge produces a verdict and why position, verbosity, and self-preference biases arise."
+    anchor: judge-how-it-works
+    threshold: true
+  - id: EVAL-7.2
+    bloom: analyze
+    statement: "Diagnose position bias by swapping presentation order and measuring verdict flips."
+    anchor: judge-position-bias
+    threshold: true
+  - id: EVAL-7.3
+    bloom: design
+    statement: "Design a debiased judging protocol (order-swap + agreement, length control, reference anchoring) and name the failure it still cannot catch."
+    anchor: judge-mitigation
+    threshold: true
+---
+
+import YouWillLearn from '@brandon_m_behring/book-scaffold-astro/components/YouWillLearn.astro';
+import Pitfall from '@brandon_m_behring/book-scaffold-astro/components/Pitfall.astro';
+import Practice from '@brandon_m_behring/book-scaffold-astro/components/Practice.astro';
+import NoteBox from '@brandon_m_behring/book-scaffold-astro/components/NoteBox.astro';
+import JudgeBiasExplorer from '../../components/JudgeBiasExplorer.tsx';
+import judgeData from '../../data/judge_demo.json';
+
+# LLM-as-judge and its biases
+
+<YouWillLearn prerequisites="You can read a prompt; Chapter 6 (reference-free evaluation).">
+- How an LLM judge turns two responses into a verdict — and where the bias enters.
+- Diagnosing **position** and **verbosity** bias, and the **self-preference** trap.
+- A debiasing protocol you can defend, and the failure it *still* can't catch.
+</YouWillLearn>
+
+## "GPT says it's 95% good"
+
+You ship a feature and evaluate it by asking a strong model to grade your model's
+answers on a 1–5 rubric. It reports a mean of 4.6. In the interview, the follow-up
+is immediate: *"Where could that number be wrong?"*
+
+Pause and list the ways an LLM judge could be systematically — not randomly —
+wrong, **before** the model's actual answer quality even enters.
+
+<Pitfall title="A judge is a model, so it has model biases">
+An LLM judge is not an oracle; it is another forward pass with its own
+preferences. The well-documented ones: it tends to prefer whichever answer it
+sees **first** (position bias), the **longer** answer (verbosity bias), and
+answers written in its **own** family's style (self-preference). None of these
+track quality — and all of them are easy to provoke and easy to measure.
+</Pitfall>
+
+## How a pairwise judge works {/* anchor: judge-how-it-works */}
+
+The common setup is *pairwise*: show the judge a question and two answers, ask
+which is better. In `mini_eval` we strip it to the mechanism — a deterministic
+mock judge, so the biases are reproducible without a live model or an API bill:
+
+```python
+from mini_eval import Response, PairwiseJudge, position_flip_rate
+
+a = Response("A", "Use a cross-encoder reranker.", quality=0.78)  # better, shorter
+b = Response("B", "It depends; many factors weigh in here ...", quality=0.70)  # worse, longer
+
+judge = PairwiseJudge(position_bias=0.06)   # a mild preference for whoever is first
+judge.judge(a, b)            # 'A'  (A is better AND first)
+judge.judge(b, a)            # may flip to 'B' if the bias exceeds the quality gap
+judge.judge_debiased(a, b)   # 'A', or 'tie' when the order decided it
+```
+
+`position_bias` adds a bonus to whichever response is shown first; `verbosity_bias`
+adds a bonus per character. Real judges don't expose these knobs — but they
+*behave* as if they had them, which is the point: if you can reproduce the
+behavior, you can measure and mitigate it.
+
+| Bias | What it is | How to provoke it | Mitigation |
+| --- | --- | --- | --- |
+| **Position** | prefers the first (or last) answer | swap A/B order → verdict flips | judge **both** orders, only count order-independent wins |
+| **Verbosity** | prefers the longer answer | reward length → worse-but-longer wins | length-control the rubric; penalize unsupported length |
+| **Self-preference** | prefers its own style | judge ≈ generator family | use a *different* judge model; anchor to human labels |
+
+## Watch it flip {/* anchor: judge-position-bias */}
+
+In every pair below, **A is the better answer** but is shorter. **Predict**: will
+the naive judge's verdict depend on the order you present the answers in? Then
+toggle the order — and toggle the debias.
+
+<JudgeBiasExplorer client:visible data={judgeData} />
+
+What you should see: the *close* pair's verdict flips when you swap order — the
+judge is reporting **position, not quality**. The diagnostic is mechanical:
+swap the order on a sample of pairs and measure the **flip rate**
+(`mini_eval.position_flip_rate`); a well-behaved judge sits near zero. The
+**debias** toggle runs both orders and only declares a winner when they agree —
+turning the silent wrong answer into an honest "tie" you can route to a human.
+
+<NoteBox title="The mitigation has a ceiling">
+Order-swap + agreement kills *position* bias and length-control dents *verbosity*
+bias. Neither touches **self-preference** (a judge from the same family as the
+generator) or a judge that is simply wrong about the domain. That's why the
+strongest answer pairs an LLM judge with a small **human-labeled anchor set** and
+reports judge–human agreement — the subject of the stretch problem below.
+</NoteBox>
+
+<Practice id="judge-spot-the-bias" difficulty={2}>
+A teammate's eval harness prompts a judge: *"Here is the candidate answer and the
+reference answer. Score the candidate 1–5."* It scores your new, more concise
+model **lower** than the verbose baseline, even on questions both get right. Name
+two biases that could produce this and one change to test each.
+
+<details>
+<summary>One defensible answer</summary>
+
+- **Verbosity bias** — the verbose baseline reads as "more thorough". Test:
+  length-match the answers (or add "ignore length; judge correctness") and re-run.
+- **Position/anchoring on the reference** — if the reference is always shown in a
+  fixed slot, its phrasing anchors the judge. Test: randomize which answer is
+  presented first and measure the flip rate. (Self-preference is also live if the
+  judge and baseline share a model family.)
+</details>
+</Practice>
+
+## How this is graded
+
+- **Technical Correctness** — you name *specific* biases and the mechanism, not
+  "LLMs can be biased".
+- **Trade-off Awareness** — you know LLM-as-judge buys cheap, scalable grading at
+  the cost of these biases, and when a smaller human-labeled set is worth more.
+- **Evaluation Rigor** — you don't stop at "use a judge"; you give the **flip-rate
+  diagnostic**, the **swap-and-aggregate** mitigation, *and* a **monitoring** plan
+  (judge–human agreement over time). This is the exact gap the rubric weights
+  most: naming the tool but missing the bias-mitigation is the classic miss.
+- **Communication** — a crisp protocol ("swap order, require agreement, anchor to
+  50 human labels, alert if agreement drops below 0.8") beats a paragraph of caveats.
+
+### Industry variation
+
+- **Customer-facing** — judge for **faithfulness** to retrieved context first;
+  verbosity bias is dangerous because fluent length reads as trust.
+- **Code** — prefer an **executable** check (does it pass tests?) over a judge
+  where you can; reserve the judge for style/readability.
+- **Safety** — a judge for refusal/harm needs a human-anchored set and adversarial
+  review; never let an unaudited judge gate a safety metric.
+
+## Stretch: the judge disagrees with humans
+
+You build a 50-example human-labeled set and find your judge agrees with the
+humans only **68%** of the time. Is the judge bad, are the humans inconsistent, or
+is the rubric ambiguous — and how would you tell them apart? (This is
+**meta-evaluation**: evaluating the evaluator. Start by measuring human–human
+agreement on the same set; if *they* disagree, the rubric, not the judge, is the
+problem.)

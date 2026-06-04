@@ -1,0 +1,46 @@
+---
+slug: authors
+title: Authors
+order: 1
+description: Authorship, AI collaboration disclosure, and contribution norms for the AI Engineering guides.
+---
+
+import AICollaborationDisclosure from '@brandon_m_behring/book-scaffold-astro/components/AICollaborationDisclosure.astro';
+
+# Authors
+
+## Human author
+
+**Brandon Behring** — primary author; final responsibility for content, claims, and design.
+
+## AI collaboration
+
+<AICollaborationDisclosure
+  model="Claude Opus 4.8 (Anthropic)"
+  role="content drafting from human-led outline; schema extension design; structural review; citation lookup; ADR drafting; pair-programming on companion package code"
+  commit_attribution="Co-Authored-By: Claude <noreply@anthropic.com>"
+/>
+
+This guide follows the AI-collaboration disclosure norms set by [ACM 2023](https://www.acm.org/publications/policies/frequently-asked-questions), [Nature 2023](https://www.nature.com/nature-portfolio/editorial-policies/ai), and [COPE 2023](https://publicationethics.org/cope-position-statements/ai-author). AI tooling is not listed as an author; humans take final responsibility.
+
+For the full workflow disclosure — which skills, which prompts, which review steps — see the hub at [guides.brandon-behring.dev/methodology](https://guides.brandon-behring.dev/methodology/).
+
+## Companion + capstone
+
+- `companion/` (Python package, `mini_eval`) — the build-your-own evaluation library you construct chapter-by-chapter (metrics, a mock LLM-as-judge harness, ...), bridged to the production tools (`eval-toolkit`, RAGAS).
+- `capstone/` — per-guide capstone (the "design an evaluation strategy" mock); authored once the guide's chapters are complete.
+
+## Contributing
+
+PRs welcome for:
+
+- Factual corrections (link to source or counter-example)
+- Clarity improvements that don't change scope or claims
+- New examples or worked exercises in the existing chapter shape
+- Companion package bug fixes + type annotations
+
+Out of scope for PRs:
+
+- New chapters or major reorganization (open an issue first)
+- Style-guide changes (those live in the hub repo)
+- AI-tooling reconfiguration (the discipline is intentional)
