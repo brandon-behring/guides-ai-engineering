@@ -134,7 +134,7 @@ precision and recall as you drag the threshold from 0.5 toward 0.9.
 Now *explain* what you saw: the two score distributions **overlap**, so there is
 no threshold that cleanly separates them — every choice trades a false-positive
 rate against a miss rate. At $t=0.5$ recall is high but precision is ~22%: you'd
-flag four legitimate transactions for every real fraud. That may be exactly right
+flag about three or four legitimate transactions for every real fraud. That may be exactly right
 (blocking fraud is worth annoying some customers) or exactly wrong (a declined
 legitimate transaction churns a customer) — **the data cannot tell you which.
 The business cost of each error does.** {/* anchor: threshold-operating-point */}

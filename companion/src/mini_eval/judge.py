@@ -53,7 +53,9 @@ class PairwiseJudge:
         return s
 
     def judge(self, first: Response, second: Response) -> str:
-        """Verdict for the ordering (first, second). Returns the winner's id."""
+        """Verdict for the ordering (first, second). Returns the winner's id; an
+        exact score tie breaks to ``first`` (``position_flip_rate`` doesn't charge
+        that arbitrary tie-break as position bias)."""
         return first.id if self._score(first, 0) >= self._score(second, 1) else second.id
 
     def judge_debiased(self, a: Response, b: Response) -> str:
@@ -65,13 +67,31 @@ class PairwiseJudge:
         return v1 if v1 == v2 else "tie"
 
 
+def _decisive(judge: PairwiseJudge, first: Response, second: Response) -> str | None:
+    """Winner id for this ordering, or ``None`` if the two score *exactly* equal —
+    a genuine tie the judge can only break by position, not real evidence of bias."""
+    sf, ss = judge._score(first, 0), judge._score(second, 1)
+    if sf == ss:
+        return None
+    return first.id if sf > ss else second.id
+
+
 def position_flip_rate(judge: PairwiseJudge, pairs: list[tuple[Response, Response]]) -> float:
-    """Fraction of pairs whose verdict *flips* when you swap presentation order.
-    A judge with no position bias scores 0; this is the headline diagnostic."""
+    """Fraction of pairs whose *decisive* verdict flips when you swap presentation
+    order — the headline position-bias diagnostic. Exact ties (nothing but order to
+    decide on) are skipped, so a judge with no position bias scores 0 even on an
+    equal-quality, equal-length pair."""
     if not pairs:
         return 0.0
-    flips = sum(1 for a, b in pairs if judge.judge(a, b) != judge.judge(b, a))
-    return flips / len(pairs)
+    flips = considered = 0
+    for a, b in pairs:
+        v_ab, v_ba = _decisive(judge, a, b), _decisive(judge, b, a)
+        if v_ab is None or v_ba is None:
+            continue  # a true tie isn't evidence of position bias
+        considered += 1
+        if v_ab != v_ba:
+            flips += 1
+    return flips / considered if considered else 0.0
 
 
 def judge_accuracy(judge: PairwiseJudge, pairs: list[tuple[Response, Response]]) -> float:

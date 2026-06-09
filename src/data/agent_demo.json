@@ -1,0 +1,104 @@
+{
+  "name": "pass@k: attempts vs reliability",
+  "note": "pass@k rises with attempts; pass@1 is what a user gets on the first try.",
+  "scenarios": [
+    {
+      "label": "Flaky agent",
+      "K": 10,
+      "n_tasks": 40,
+      "pass1": 0.37,
+      "passK": 1.0,
+      "curve": [
+        {
+          "k": 1,
+          "pass": 0.37
+        },
+        {
+          "k": 2,
+          "pass": 0.6028
+        },
+        {
+          "k": 3,
+          "pass": 0.7517
+        },
+        {
+          "k": 4,
+          "pass": 0.8476
+        },
+        {
+          "k": 5,
+          "pass": 0.9092
+        },
+        {
+          "k": 6,
+          "pass": 0.9482
+        },
+        {
+          "k": 7,
+          "pass": 0.9723
+        },
+        {
+          "k": 8,
+          "pass": 0.9867
+        },
+        {
+          "k": 9,
+          "pass": 0.995
+        },
+        {
+          "k": 10,
+          "pass": 1.0
+        }
+      ]
+    },
+    {
+      "label": "Reliable agent",
+      "K": 10,
+      "n_tasks": 40,
+      "pass1": 0.79,
+      "passK": 1.0,
+      "curve": [
+        {
+          "k": 1,
+          "pass": 0.79
+        },
+        {
+          "k": 2,
+          "pass": 0.9517
+        },
+        {
+          "k": 3,
+          "pass": 0.9896
+        },
+        {
+          "k": 4,
+          "pass": 0.9982
+        },
+        {
+          "k": 5,
+          "pass": 0.9998
+        },
+        {
+          "k": 6,
+          "pass": 1.0
+        },
+        {
+          "k": 7,
+          "pass": 1.0
+        },
+        {
+          "k": 8,
+          "pass": 1.0
+        },
+        {
+          "k": 9,
+          "pass": 1.0
+        },
+        {
+          "k": 10,
+          "pass": 1.0
+        }
+      ]
+    }
+  ]
+}

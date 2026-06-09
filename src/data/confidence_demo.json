@@ -1,0 +1,150 @@
+{
+  "name": "Confidence intervals & A/B significance (synthetic)",
+  "note": "CIs shrink as the eval set grows; B leads A by a little \u2014 the test says whether that lead is real.",
+  "threshold": 0.5,
+  "ci_by_n": [
+    {
+      "n": 100,
+      "n_pos": 48,
+      "point": {
+        "precision": 0.6346,
+        "recall": 0.6875,
+        "f1": 0.66
+      },
+      "ci": {
+        "precision": [
+          0.5088,
+          0.7778
+        ],
+        "recall": [
+          0.5555,
+          0.8126
+        ],
+        "f1": [
+          0.5517,
+          0.7706
+        ]
+      }
+    },
+    {
+      "n": 200,
+      "n_pos": 84,
+      "point": {
+        "precision": 0.6176,
+        "recall": 0.75,
+        "f1": 0.6774
+      },
+      "ci": {
+        "precision": [
+          0.5147,
+          0.7091
+        ],
+        "recall": [
+          0.6506,
+          0.8472
+        ],
+        "f1": [
+          0.5862,
+          0.7538
+        ]
+      }
+    },
+    {
+      "n": 500,
+      "n_pos": 197,
+      "point": {
+        "precision": 0.596,
+        "recall": 0.7563,
+        "f1": 0.6667
+      },
+      "ci": {
+        "precision": [
+          0.5349,
+          0.6527
+        ],
+        "recall": [
+          0.7021,
+          0.8141
+        ],
+        "f1": [
+          0.6153,
+          0.714
+        ]
+      }
+    },
+    {
+      "n": 1000,
+      "n_pos": 393,
+      "point": {
+        "precision": 0.5773,
+        "recall": 0.7125,
+        "f1": 0.6378
+      },
+      "ci": {
+        "precision": [
+          0.5344,
+          0.6217
+        ],
+        "recall": [
+          0.6684,
+          0.7526
+        ],
+        "f1": [
+          0.6023,
+          0.6738
+        ]
+      }
+    }
+  ],
+  "ab": {
+    "metric": "F1",
+    "threshold": 0.5,
+    "n": 600,
+    "a_point": 0.5861,
+    "b_point": 0.6466,
+    "diff": 0.0605,
+    "ci": [
+      0.001,
+      0.1211
+    ],
+    "excludes_zero": true,
+    "p_value": 0.0487,
+    "hist": {
+      "lo": -0.0482,
+      "hi": 0.1575,
+      "bins": 30,
+      "counts": [
+        2,
+        0,
+        0,
+        7,
+        5,
+        9,
+        24,
+        28,
+        51,
+        60,
+        88,
+        101,
+        122,
+        136,
+        163,
+        162,
+        209,
+        178,
+        159,
+        135,
+        103,
+        75,
+        51,
+        54,
+        33,
+        25,
+        9,
+        6,
+        3,
+        2
+      ]
+    }
+  }
+}

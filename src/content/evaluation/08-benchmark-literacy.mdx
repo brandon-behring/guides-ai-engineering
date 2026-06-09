@@ -1,0 +1,180 @@
+---
+title: "Benchmark literacy"
+slug: benchmark-literacy
+description: "MMLU, GPQA, HumanEval, SWE-bench, GAIA, Chatbot Arena, HELM, LiveBench — what each actually measures, and the three threats that turn a headline score into a lie: saturation, contamination, and construct validity. How to read a leaderboard like an engineer, not a marketer."
+freshness: literature-survey
+last_verified: 2026-06-08
+tags: [evaluation, benchmarks, contamination, leaderboards]
+sources: []
+draft: false
+mode: tutorial
+target: transfer
+ordering: problem-first
+commitment: long-lived
+paradigms: [default]
+research_debt_addressed: |
+  Candidates rattle off benchmark names (MMLU, SWE-bench, Arena) without being able
+  to say what each measures or why a high score might be fake. The skill is reading a
+  benchmark claim critically — spotting saturation, contamination, and construct
+  validity — and knowing when a leaderboard should (and shouldn't) move a decision.
+  This chapter maps the landscape and drills the three threats.
+task_classes: [benchmark-selection, claim-critique]
+provenance:
+  ai_tools: ["Claude Opus 4.8 (Anthropic)"]
+  audit_history:
+    - date: 2026-06-08
+      type: authored
+      file: src/content/evaluation/08-benchmark-literacy.mdx
+  citation_backstop: manual
+los:
+  - id: EVAL-8.1
+    bloom: explain
+    statement: "Map the major LLM benchmarks to what they measure (knowledge, reasoning, code, agentic, preference) and distinguish a benchmark from a capability."
+    anchor: bench-landscape
+    threshold: true
+  - id: EVAL-8.2
+    bloom: analyze
+    statement: "Diagnose the three threats to a benchmark claim — saturation, contamination, and construct validity."
+    anchor: bench-threats
+    threshold: true
+  - id: EVAL-8.3
+    bloom: design
+    statement: "Decide whether a benchmark result should change a model decision, and what to verify first."
+    anchor: bench-read
+    threshold: true
+---
+
+import YouWillLearn from '@brandon_m_behring/book-scaffold-astro/components/YouWillLearn.astro';
+import Pitfall from '@brandon_m_behring/book-scaffold-astro/components/Pitfall.astro';
+import Practice from '@brandon_m_behring/book-scaffold-astro/components/Practice.astro';
+import NoteBox from '@brandon_m_behring/book-scaffold-astro/components/NoteBox.astro';
+import ScenarioQuiz from '../../components/ScenarioQuiz.tsx';
+import benchmarkData from '../../data/benchmark_demo.json';
+
+# Benchmark literacy
+
+<YouWillLearn prerequisites="Chapter 3 (confidence intervals); Chapter 1 (what a metric measures).">
+- What the major benchmarks — **MMLU, GPQA, HumanEval, SWE-bench, GAIA, Arena, HELM, LiveBench** — actually measure.
+- The three threats that fake a score: **saturation, contamination, construct validity**.
+- How to decide whether a leaderboard result should move *your* decision.
+</YouWillLearn>
+
+## "It's #1 on the leaderboard"
+
+A new model tops MMLU and your feed is full of charts. A stakeholder forwards one:
+"This is the best model now — should we switch?" The junior answer is "yes, it's
+#1." The senior answer starts with three questions about the benchmark itself.
+
+Predict: name one reason a chart-topping benchmark score might *not* mean the model
+is better for your product.
+
+<Pitfall title="A benchmark is a proxy, not the capability">
+A benchmark is a *sample* of tasks standing in for a capability — and like any
+sample it can be unrepresentative, stale, or gamed. "90% on MMLU" is a fact about
+MMLU, not a fact about reasoning. Treat every leaderboard number as a claim to
+audit, not a property of the model.
+</Pitfall>
+
+## The landscape {/* anchor: bench-landscape */}
+
+A rough map of what the headline benchmarks probe:
+
+| Benchmark | Measures | Format | Watch out for |
+| --- | --- | --- | --- |
+| **MMLU** | broad knowledge / exam reasoning | multiple choice | saturated; contaminated |
+| **GPQA** | hard graduate science reasoning | multiple choice | "Diamond" subset; small |
+| **HumanEval / MBPP** | function-level code | write-a-function | tiny; heavily contaminated |
+| **SWE-bench** | real repo bug-fixing | patch a GitHub issue | harder; closer to real work |
+| **GAIA / WebArena** | agentic, tool use, multi-step | task success | expensive; stochastic |
+| **Chatbot Arena** | human preference, head-to-head | Elo from votes | preference ≠ correctness |
+| **MT-Bench** | multi-turn quality | LLM-as-judge | judge biases (Chapter 7) |
+| **HELM** | holistic, many scenarios + metrics | battery | breadth over depth |
+| **LiveBench** | contamination-resistant, fresh | rotating, post-cutoff | newer; smaller community |
+
+The point isn't to memorize the table — it's to ask, for any claim, *which* of these
+a score comes from and whether that's the construct you care about. A coding agent
+for your monorepo cares about SWE-bench, not HumanEval; a chat product cares about
+Arena and your own preference data, not GPQA.
+
+## Three threats to a benchmark claim {/* anchor: bench-threats */}
+
+Almost every misleading leaderboard reduces to one of three:
+
+1. **Saturation.** When top models cluster at 89–90%, the remaining gap is label
+   noise and ambiguous items. A "0.3-point SOTA" near the ceiling is noise dressed
+   as progress (Chapter 3's CI would show the bars overlapping). *Fix:* move to a
+   harder or fresher benchmark.
+2. **Contamination.** A public test set older than the training cutoff has probably
+   leaked into pretraining, so the score measures memorization. *Fix:* post-cutoff or
+   rotating sets (LiveBench), canary strings, or perturbed/paraphrased items — if the
+   score craters under paraphrase, it was memorized.
+3. **Construct validity.** The benchmark is clean and unsaturated but measures the
+   *wrong thing* for your use — HumanEval puzzles vs your production codebase, exam
+   trivia vs your domain. *Fix:* pick (or build) a benchmark whose tasks resemble
+   yours; ultimately, your own eval set (Chapter 12).
+
+<NoteBox title="Goodhart's law on a leaderboard">
+"When a measure becomes a target, it ceases to be a good measure." The moment a
+benchmark matters for funding or marketing, the ecosystem optimizes *to the
+benchmark* — training on its style, tuning prompts to its format — and the score
+decouples from the capability. This is why labs rotate in fresh benchmarks and why
+your private held-out set is worth more than any public number.
+</NoteBox>
+
+## See it {/* anchor: bench-read */}
+
+Three real-sounding claims. **Predict** the sharpest reason to distrust each before
+you reveal it.
+
+<ScenarioQuiz client:visible data={benchmarkData} />
+
+Now *explain* the pattern: in each case the number was real but the *claim built on
+it* wasn't — because the benchmark was saturated, contaminated, or measuring the
+wrong construct. That triage (which of the three?) is the literacy.
+
+<Practice id="bench-critique" difficulty={2}>
+A vendor says their model "beats GPT-class models on MMLU and HumanEval by 4 points."
+You're choosing a model to power an agent that edits a large internal codebase. List
+two checks you'd run before believing it applies to you.
+
+<details>
+<summary>One defensible answer</summary>
+
+1. **Construct validity** — neither MMLU nor HumanEval resembles multi-file repo
+   edits; ask for **SWE-bench (verified)** or run your own held-out repo tasks. A
+   4-point MMLU lead may not transfer at all.
+2. **Contamination + variance** — both benchmarks are old and public; ask whether the
+   eval was on a contamination-controlled split, with **pass@1 over multiple runs and
+   a CI** (Chapter 3), not a single number. Then confirm on *your* tasks.
+</details>
+</Practice>
+
+## How this is graded
+
+- **Technical Correctness** — you know what the named benchmarks measure and their
+  format, not just the acronyms.
+- **Trade-off Awareness** — you weigh a public benchmark against your own eval and
+  know when each is the right evidence.
+- **Evaluation Rigor** — you reach for the three-threat checklist (saturation /
+  contamination / construct validity) and pair any score with a CI and a relevance
+  argument before acting on it.
+- **Communication** — "MMLU is saturated and probably contaminated; for our codebase
+  I trust SWE-bench-verified and a private set far more" is the senior answer.
+
+### Industry variation
+
+- **Frontier labs** — contamination control and fresh/held-out benchmarks are core;
+  saturation drives the constant push for harder evals.
+- **Applied teams** — public benchmarks are a *screen*; the real decision rides on a
+  domain eval set, because construct validity rarely holds for a niche product.
+- **Regulated domains** — benchmarks must map to documented requirements; a generic
+  leaderboard rarely satisfies an auditor.
+
+## Stretch: the benchmark you can trust
+
+If every public benchmark is saturating, contaminating, or off-construct, what do you
+actually trust to pick a model? (The answer threads the whole guide: a **private,
+held-out eval set** built from your own tasks, scored with metrics chosen from how
+the output is used — Chapter 1 — with confidence intervals — Chapter 3 — and
+refreshed so it can't leak. That's the Chapter 12 capstone: designing the eval, not
+borrowing one.)

@@ -1,0 +1,119 @@
+{
+  "name": "Calibration: reliable vs overconfident probabilities",
+  "note": "Both models rank risk the same way; only the overconfident one's probabilities are wrong. Watch the curve pull off the diagonal.",
+  "n": 2000,
+  "models": {
+    "calibrated": {
+      "curve": [
+        {
+          "confidence": 0.0472,
+          "accuracy": 0.0417,
+          "count": 192
+        },
+        {
+          "confidence": 0.1479,
+          "accuracy": 0.125,
+          "count": 192
+        },
+        {
+          "confidence": 0.2491,
+          "accuracy": 0.2603,
+          "count": 219
+        },
+        {
+          "confidence": 0.3527,
+          "accuracy": 0.3148,
+          "count": 216
+        },
+        {
+          "confidence": 0.4487,
+          "accuracy": 0.4764,
+          "count": 191
+        },
+        {
+          "confidence": 0.5504,
+          "accuracy": 0.5524,
+          "count": 210
+        },
+        {
+          "confidence": 0.65,
+          "accuracy": 0.6492,
+          "count": 191
+        },
+        {
+          "confidence": 0.7503,
+          "accuracy": 0.7767,
+          "count": 206
+        },
+        {
+          "confidence": 0.8531,
+          "accuracy": 0.8394,
+          "count": 193
+        },
+        {
+          "confidence": 0.9518,
+          "accuracy": 0.9632,
+          "count": 190
+        }
+      ],
+      "ece": 0.0161,
+      "brier": 0.1646
+    },
+    "overconfident": {
+      "curve": [
+        {
+          "confidence": 0.0287,
+          "accuracy": 0.1264,
+          "count": 554
+        },
+        {
+          "confidence": 0.1452,
+          "accuracy": 0.3243,
+          "count": 148
+        },
+        {
+          "confidence": 0.252,
+          "accuracy": 0.371,
+          "count": 124
+        },
+        {
+          "confidence": 0.3455,
+          "accuracy": 0.4,
+          "count": 95
+        },
+        {
+          "confidence": 0.4487,
+          "accuracy": 0.4639,
+          "count": 97
+        },
+        {
+          "confidence": 0.5557,
+          "accuracy": 0.5843,
+          "count": 89
+        },
+        {
+          "confidence": 0.6564,
+          "accuracy": 0.5269,
+          "count": 93
+        },
+        {
+          "confidence": 0.7553,
+          "accuracy": 0.6697,
+          "count": 109
+        },
+        {
+          "confidence": 0.8545,
+          "accuracy": 0.6438,
+          "count": 160
+        },
+        {
+          "confidence": 0.9725,
+          "accuracy": 0.8832,
+          "count": 531
+        }
+      ],
+      "ece": 0.1035,
+      "brier": 0.1754
+    }
+  }
+}

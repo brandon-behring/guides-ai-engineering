@@ -1,0 +1,202 @@
+---
+title: "Calibration and reliability"
+slug: calibration-reliability
+description: "A model can rank risk perfectly and still lie about probabilities — saying 90% on a batch it gets right 60% of the time. Discrimination vs calibration, reliability diagrams, ECE and Brier built in mini_eval, and why a calibrated probability is the product when a human acts on it."
+freshness: literature-survey
+last_verified: 2026-06-08
+tags: [evaluation, calibration, reliability, probability]
+sources: []
+draft: false
+mode: tutorial
+target: transfer
+ordering: problem-first
+commitment: long-lived
+paradigms: [default]
+research_debt_addressed: |
+  Calibration is taught as a footnote to classification — "also check your
+  probabilities are calibrated". But when the probability *is* the product (an
+  insurance price, a risk score a clinician acts on), miscalibration is the failure,
+  and ranking metrics like AUC are blind to it. This chapter makes the gap visible
+  on a reliability diagram and measurable with ECE and Brier, built in mini_eval.
+task_classes: [calibration, probability-quality]
+companion_modules: [mini-eval]
+provenance:
+  ai_tools: ["Claude Opus 4.8 (Anthropic)"]
+  audit_history:
+    - date: 2026-06-08
+      type: authored
+      file: src/content/evaluation/04-calibration-reliability.mdx
+  citation_backstop: manual
+los:
+  - id: EVAL-4.1
+    bloom: explain
+    statement: "Distinguish discrimination (ranking) from calibration, and identify when a wrong probability — not a wrong ranking — is the failure."
+    anchor: cal-rank-vs-calibrate
+    threshold: true
+  - id: EVAL-4.2
+    bloom: calculate
+    statement: "Read a reliability diagram and compute expected calibration error and Brier score from binned predictions."
+    anchor: cal-ece-brier
+    threshold: true
+  - id: EVAL-4.3
+    bloom: design
+    statement: "Diagnose overconfidence and name a fix (temperature/Platt scaling), and say when calibration matters more than accuracy."
+    anchor: cal-fix
+    threshold: true
+---
+
+import YouWillLearn from '@brandon_m_behring/book-scaffold-astro/components/YouWillLearn.astro';
+import Pitfall from '@brandon_m_behring/book-scaffold-astro/components/Pitfall.astro';
+import WorkedExample from '@brandon_m_behring/book-scaffold-astro/components/WorkedExample.astro';
+import Practice from '@brandon_m_behring/book-scaffold-astro/components/Practice.astro';
+import NoteBox from '@brandon_m_behring/book-scaffold-astro/components/NoteBox.astro';
+import ReliabilityExplorer from '../../components/ReliabilityExplorer.tsx';
+import calibrationData from '../../data/calibration_demo.json';
+
+# Calibration and reliability
+
+<YouWillLearn prerequisites="Chapter 2 (thresholds); Chapter 1's insurance-pricing case.">
+- The difference between **ranking** risk well and reporting an **honest probability**.
+- How to read a **reliability diagram** and compute **ECE** and **Brier score**.
+- When calibration is the metric that matters — and the standard fix for overconfidence.
+</YouWillLearn>
+
+## AUC 0.95 — ship it?
+
+Back to Chapter 1's insurance model: it outputs the probability a policy files a
+claim, and that probability is multiplied straight into the premium. The notebook
+reports **AUC 0.95** — it ranks risky policies above safe ones almost perfectly. A
+PM asks the now-familiar question: ship it?
+
+Predict before reading on: what could be badly wrong with this model that an AUC of
+0.95 would never reveal?
+
+<Pitfall title="Ranking well is not the same as being right">
+AUC only cares about *order* — does a riskier policy score higher than a safer one.
+It says nothing about whether "0.30" means a 30% claim rate. A model can rank
+perfectly and still be **miscalibrated**: predict 0.30 for a group that actually
+claims 60% of the time. When the number sets a price, that gap mis-prices every
+policy in the group — and AUC 0.95 is, as the saying goes, a marketing asset, not a
+production-ready model.
+</Pitfall>
+
+## Two different questions {/* anchor: cal-rank-vs-calibrate */}
+
+A probabilistic classifier is judged on two independent axes:
+
+- **Discrimination** — can it *order* outcomes? (AUC, average precision, Chapter 2.)
+- **Calibration** — when it says *p*, does the event happen a *p* fraction of the
+  time? (Reliability, ECE, Brier — this chapter.)
+
+They come apart constantly. A perfectly-calibrated coin-flipper (always says 0.5,
+right half the time) has zero discrimination. A perfect ranker run through a bad
+temperature is overconfident but still ranks flawlessly. **Which axis matters
+depends on how the output is used** (Chapter 1): a queue that only needs ordering
+can ignore calibration; a price, a risk a doctor acts on, or a confidence used to
+*route* (auto-resolve vs escalate) lives or dies by it.
+
+## Measuring the gap {/* anchor: cal-ece-brier */}
+
+Bin predictions by their stated probability; in each bin compare the **mean
+confidence** to the **empirical accuracy** (how often the event actually happened).
+Plotted, that's a reliability diagram; the diagonal is perfect calibration. Two
+summaries, both in `mini_eval`:
+
+```python
+from mini_eval import reliability_curve, expected_calibration_error, brier_score
+
+reliability_curve(y_true, y_prob, n_bins=10)   # per-bin confidence vs accuracy
+expected_calibration_error(y_true, y_prob)     # weighted mean gap (one number)
+brier_score(y_true, y_prob)                     # mean squared error of the probs
+```
+
+**Expected calibration error** is the bin-count-weighted average gap, and **Brier
+score** is just mean squared error on the probabilities:
+
+$$
+\text{ECE} = \sum_{b} \frac{n_b}{N}\,\big|\,\text{acc}(b) - \text{conf}(b)\,\big|,
+\qquad
+\text{BS} = \frac{1}{N}\sum_{i=1}^{N}\,(p_i - y_i)^2.
+$$
+
+<WorkedExample id="cal-ece-by-hand" title="One bin of an ECE by hand">
+Your model puts 200 predictions in the "0.9" bin — mean confidence 0.90 — but only
+135 of those 200 are positive, an accuracy of 0.675. That bin contributes
+$\frac{200}{N}\,|0.675 - 0.90| = \frac{200}{N}\times 0.225$ to the ECE. Across an
+overconfident model, every high-confidence bin contributes a gap like this in the
+same direction — which is exactly the shape you'll see below: the curve sagging
+*below* the diagonal on the right.
+</WorkedExample>
+
+## See it
+
+Two models on the same outcomes: one calibrated, one overconfident (same ranking,
+sharpened probabilities). **Predict**: for the overconfident model, will its 0.9-bin
+sit on the diagonal, above it, or below?
+
+<ReliabilityExplorer client:visible data={calibrationData} />
+
+Now *explain* the picture. The calibrated model's bins hug the diagonal (ECE near
+0.02); the overconfident model bows **below** the line at high confidence — when it
+says 0.9 the event happens far less often — and its ECE is several times worse,
+even though both models rank identically and have nearly the same Brier score.
+Brier blends calibration and discrimination; **ECE isolates the calibration gap**,
+which is why you report both.
+
+<NoteBox title="The fix is usually cheap">
+Overconfidence rarely means retraining. **Temperature scaling** (divide the logits
+by a single learned scalar $T$ — here $T>1$, softening an overconfident model) or **Platt scaling** fits one or
+two parameters on a held-out set and pulls the curve back to the diagonal — without
+touching the ranking. Calibrate *after* you're happy with discrimination, on data
+the model didn't train on.
+</NoteBox>
+
+<Practice id="cal-diagnose" difficulty={2}>
+A fraud model auto-declines any transaction it scores above 0.8 "fraud
+probability". Complaints spike: lots of legitimate declines. AUC is unchanged from
+last month. What single diagnostic do you run, and what are the two things it could
+reveal? {/* anchor: cal-fix */}
+
+<details>
+<summary>One defensible answer</summary>
+
+Plot the **reliability diagram** (or compute ECE) on recent data. Either (a) the
+model is **overconfident** at the top — 0.8 now means a true fraud rate well below
+80%, so the auto-decline cutoff is firing on too many legitimate users (fix:
+recalibrate with temperature scaling, or raise the threshold using Chapter 2's cost
+logic); or (b) the **input distribution shifted**, so the old calibration no longer
+holds (fix: recalibrate on fresh data, and monitor ECE over time — Chapter 11).
+Either way, AUC was the wrong place to look.
+</details>
+</Practice>
+
+## How this is graded
+
+- **Technical Correctness** — you separate discrimination from calibration and know
+  AUC says nothing about the latter; you can define ECE and Brier.
+- **Trade-off Awareness** — you tie *which* axis matters to how the output is used,
+  and you know calibration is a post-hoc fit, not a reason to retrain.
+- **Evaluation Rigor** — you reach for a reliability diagram + ECE, not a single
+  accuracy number, when a probability drives a decision; you check calibration on
+  held-out, not training, data.
+- **Communication** — "it ranks fine (AUC 0.95) but it's overconfident — ECE 0.10,
+  so 0.9 means ~0.7; I'd temperature-scale before we price on it" is the answer.
+
+### Industry variation
+
+- **Insurance / lending** — the probability *is* the price; calibration and fairness
+  are first-class, often audited, metrics.
+- **Healthcare** — a risk a clinician acts on must be calibrated *and* recall-heavy;
+  an overconfident screen is dangerous in both directions.
+- **Routing / agents** — a confidence used to auto-resolve vs escalate must be
+  calibrated, or the escalation rate drifts silently (cf. the Chapter 1 stretch).
+
+## Stretch: calibration doesn't survive a shift
+
+You temperature-scale your model in January and it's beautifully calibrated. By
+March the user mix has changed and ECE has crept back up, even though you changed
+nothing. Why does calibration decay under distribution shift, and what would you put
+in production to catch it before a PM does? (This is **calibration drift** — the fix
+that worked on January's distribution is wrong for March's. The production answer is
+to monitor ECE on a rolling labeled sample and re-fit the temperature on a schedule
+— evaluation as a *continuous* process, the subject of Chapter 11.)

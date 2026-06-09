@@ -1,0 +1,212 @@
+---
+title: "Confidence intervals and statistical rigor"
+slug: confidence-statistical-rigor
+description: "A metric from a finite eval set is a random quantity. Bootstrap confidence intervals, paired model comparison, and a permutation test — built in mini_eval — to answer the question behind every leaderboard: is B really better than A, or did it just win the sample?"
+freshness: literature-survey
+last_verified: 2026-06-08
+tags: [evaluation, statistics, confidence-intervals, significance]
+sources: []
+draft: false
+mode: tutorial
+target: transfer
+ordering: problem-first
+commitment: long-lived
+paradigms: [default]
+research_debt_addressed: |
+  Eval write-ups report a single number and move on. The skill interviews probe is
+  whether you treat that number as an estimate: can you put a confidence interval
+  on it, and decide whether B *really* beats A or just won this sample? This chapter
+  builds the bootstrap and a paired test in mini_eval, so "is the difference real?"
+  is something you compute, not something you assert.
+task_classes: [confidence-interval, significance-testing]
+companion_modules: [mini-eval]
+provenance:
+  ai_tools: ["Claude Opus 4.8 (Anthropic)"]
+  audit_history:
+    - date: 2026-06-08
+      type: authored
+      file: src/content/evaluation/03-confidence-statistical-rigor.mdx
+  citation_backstop: manual
+los:
+  - id: EVAL-3.1
+    bloom: explain
+    statement: "Explain why a metric computed on a finite eval set is a random quantity, and what a bootstrap confidence interval reports."
+    anchor: rigor-sampling-variability
+    threshold: true
+  - id: EVAL-3.2
+    bloom: calculate
+    statement: "Compute a percentile bootstrap CI for a metric and for the paired difference between two models, and read whether that difference excludes zero."
+    anchor: rigor-bootstrap-ci
+    threshold: true
+  - id: EVAL-3.3
+    bloom: design
+    statement: "Design a comparison that decides whether model B beats A: a paired test, an effect-size CI, and a guardrail beyond the p-value."
+    anchor: rigor-is-it-real
+    threshold: true
+---
+
+import YouWillLearn from '@brandon_m_behring/book-scaffold-astro/components/YouWillLearn.astro';
+import Pitfall from '@brandon_m_behring/book-scaffold-astro/components/Pitfall.astro';
+import WorkedExample from '@brandon_m_behring/book-scaffold-astro/components/WorkedExample.astro';
+import Practice from '@brandon_m_behring/book-scaffold-astro/components/Practice.astro';
+import NoteBox from '@brandon_m_behring/book-scaffold-astro/components/NoteBox.astro';
+import ConfidenceExplorer from '../../components/ConfidenceExplorer.tsx';
+import confidenceData from '../../data/confidence_demo.json';
+
+# Confidence intervals and statistical rigor
+
+<YouWillLearn prerequisites="Chapter 2 — precision, recall, and F1 at a threshold.">
+- Why a metric from a finite eval set is a **random quantity**, not a fact.
+- How to put a **bootstrap confidence interval** on any metric you can compute.
+- How to decide whether **model B really beats model A**, or just won the sample.
+</YouWillLearn>
+
+## Two points better — ship it?
+
+Model A scores **0.59 F1** on your 600-example eval set. You change the prompt,
+rerun, and model B scores **0.65**. Six points! In the interview you're
+half-imagining, the lead engineer asks: *"Nice — roll it out?"*
+
+Before you answer: how many of those six points would survive if you'd drawn a
+*different* 600 examples? Write down a yes/no — would you ship — and one number
+you'd want to see first.
+
+<Pitfall title="A single metric is a point estimate of a random thing">
+Run the same system on a fresh sample and the number moves. A metric computed on
+600 examples is an *estimate*, with a sampling distribution around it — and on
+small or imbalanced sets that distribution is wide. "0.65 vs 0.59" with no sense of
+that spread is, as the saying goes, a coin-flip dressed up as a number.
+</Pitfall>
+
+## A metric is a sample, so give it error bars {/* anchor: rigor-sampling-variability */}
+
+You usually can't collect a fresh eval set on demand — but you can *simulate*
+drawing new ones from the set you have. The **bootstrap**: resample your examples
+*with replacement* to the same size, recompute the metric, and repeat a thousand
+times. The spread of those thousand numbers estimates the metric's sampling
+distribution; its middle 95% is your confidence interval.
+
+In `mini_eval` it's a few lines on top of the Chapter 2 metrics — resample,
+recompute, take percentiles:
+
+```python
+from mini_eval import recall, bootstrap_ci
+
+lo, hi = bootstrap_ci(y_true, y_score, threshold=0.5,
+                      metric_fn=recall, n_boot=1000, ci=0.95)
+# recall = 0.80  (95% CI 0.71–0.88)
+```
+
+Formally, each resample gives an estimate $\widehat{\theta}^{*(b)}$, and the
+**percentile interval** is just the empirical quantiles of those $B$ values: {/* anchor: rigor-bootstrap-ci */}
+
+$$
+\text{CI}_{95\%} = \big[\, q_{2.5}\!\left(\widehat{\theta}^{*(1)},\dots,\widehat{\theta}^{*(B)}\right),\;
+q_{97.5}\!\left(\widehat{\theta}^{*(1)},\dots,\widehat{\theta}^{*(B)}\right) \big].
+$$
+
+The width is the whole point. It shrinks roughly with $1/\sqrt{n}$: quadruple the
+eval set, halve the interval. A recall of "0.80" from 50 examples and "0.80" from
+5,000 are *not the same claim* — and the CI is what makes the difference visible.
+
+## Is the difference real? {/* anchor: rigor-is-it-real */}
+
+Back to B vs A. The right comparison is **paired**: both models ran on the *same*
+examples, so a hard batch drags both scores down together. That shared difficulty
+is often the biggest source of variance, and pairing cancels it — compare
+within-example, not set-against-set. Bootstrap the *difference* and read whether
+its interval clears zero:
+
+```python
+from mini_eval import f1, paired_diff_ci, permutation_test
+
+res = paired_diff_ci(y_true, score_a, score_b, threshold=0.5, metric_fn=f1)
+res["diff"], (res["lo"], res["hi"]), res["excludes_zero"]
+# +0.06, (0.00, 0.12), True  — but only just
+
+p = permutation_test(y_true, score_a, score_b, threshold=0.5, metric_fn=f1)
+# p ≈ 0.05 — shuffle which model owns each example; how often does chance match the gap?
+```
+
+Two views of one question. The **effect-size CI** says *how big* the difference
+plausibly is; the **permutation test** says *how surprising* it would be under "no
+real difference." You want both — a p-value with no effect size hides whether a
+"significant" win is trivially small.
+
+<WorkedExample id="rigor-paired-vs-unpaired" title="Why paired beats unpaired here">
+Suppose 40% of your eval queries are simply hard — every model scores low on them.
+An **unpaired** test (model A's scores vs model B's scores as two independent piles)
+folds that query-difficulty spread into its noise and can wash out a real
+difference. The **paired** test takes each query's *B-minus-A*, where the shared
+difficulty has already cancelled, and asks whether those differences center above
+zero. Same data, far more power — which is why "did you pair?" is a fair interview
+follow-up.
+</WorkedExample>
+
+## See it
+
+The left tab is the bootstrap CI shrinking as the eval set grows; the right tab is
+B-vs-A. **Predict first**: on the right tab, B leads A by six F1 points on 600
+examples — do you expect the 95% CI on the *difference* to clear zero?
+
+<ConfidenceExplorer client:visible data={confidenceData} />
+
+Now *explain* what you saw. The difference is **barely** significant — the CI's
+lower edge sits just above zero and the permutation p is right at 0.05. That's the
+honest answer to "ship it?": the lead is probably real, but one unlucky resample
+would erase it, so you'd want a guardrail (Chapter 11's online check) or more data
+before betting the roadmap on it.
+
+<NoteBox title="This is inference, not experiment design">
+Sizing an A/B *experiment* up front — minimum detectable effect, power, traffic
+allocation — is the **experimentation** guide's territory. Here we do the back end:
+given the eval data you already have, what can you honestly claim? The two meet at
+sample size — a CI that won't clear zero is the after-the-fact face of "underpowered".
+</NoteBox>
+
+<Practice id="rigor-is-it-real-practice" difficulty={2}>
+A teammate reports: "the new model improves pass@1 from 71.2% to 73.0% on our
+200-question benchmark — ship it." What three things do you ask for before agreeing?
+
+<details>
+<summary>One defensible answer</summary>
+
+1. **A confidence interval on the gap** (paired bootstrap) — on n=200 a 1.8-point
+   move may have an interval that spans zero.
+2. **Was it paired?** Same questions for both models, compared per-question — not
+   two independent runs.
+3. **The per-question losses, not just the mean** — even with a positive average,
+   check the questions where the new model *regressed*; a few bad regressions can
+   outweigh a small average lift.
+</details>
+</Practice>
+
+## How this is graded
+
+- **Technical Correctness** — you treat a metric as an estimate with a sampling
+  distribution, and can describe the bootstrap and a paired test without hand-waving.
+- **Trade-off Awareness** — you weigh "collect more eval data" against shipping on a
+  thin lead, and know a p-value and an effect size answer *different* questions.
+- **Evaluation Rigor** — the rubric's weighted dimension here: you report a metric
+  **with a CI**, compare models **paired**, and don't call a 6-point lead a win
+  until its interval clears zero. A bare point estimate is the classic miss.
+- **Communication** — "B is up 6 F1, 95% CI [0.0, 0.12], p≈0.05 — likely real but
+  marginal, I'd gate it" beats both "B is better" and a wall of statistics.
+
+### Industry variation
+
+- **Agentic / code** — outputs are *stochastic*; report mean ± std over n≥5 runs
+  before any cross-model claim, then test the difference.
+- **Fraud / risk** — metrics ride on a few rare positives, so bootstrap CIs on small
+  holdouts are wide; decisions wait for tighter intervals or cost-weighting.
+- **Research / leaderboards** — many models compared at once means a single 0.05
+  threshold over-claims; correct for multiple comparisons (the stretch).
+
+## Stretch: you compared twenty prompts
+
+You bootstrap twenty prompt variants against the baseline and three clear the 0.05
+bar. How many "winners" would you expect from pure chance if *none* truly helped —
+and what changes about how you'd report the best one? (This is the
+**multiple-comparisons** problem: at $\alpha = 0.05$, twenty independent tests yield
+about one false positive on average — and a ~64% chance of *at least* one. A Bonferroni or Benjamini–Hochberg correction —
+or a held-out confirmation set — is how you keep from shipping noise.)

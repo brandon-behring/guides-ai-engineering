@@ -9,13 +9,21 @@ JSON is stable. Run: `python scripts/build_demo_data.py`.
 from __future__ import annotations
 
 import json
+import math
 import os
 import random
 import sys
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "companion", "src"))
 
-from mini_eval import threshold_sweep, Response, PairwiseJudge, position_flip_rate  # noqa: E402
+from mini_eval import (  # noqa: E402
+    threshold_sweep, confusion_counts, precision, recall, f1,
+    bootstrap_ci, paired_diff_ci, permutation_test,
+    reliability_curve, expected_calibration_error, brier_score,
+    precision_at_k, recall_at_k, ndcg_at_k,
+    mean_pass_at_k,
+    Response, PairwiseJudge, position_flip_rate,
+)
 
 OUT = os.path.join(os.path.dirname(__file__), "..", "src", "data")
 
@@ -109,9 +117,228 @@ def judge_demo() -> dict:
     }
 
 
+def confidence_demo() -> dict:
+    """Two lessons about eval uncertainty, precomputed for the Ch 3 island.
+
+    (1) ci_by_n — bootstrap 95% CIs on precision/recall/F1 at one threshold over a
+    *growing* eval set, so the reader watches the intervals tighten. (2) ab — two
+    models on the *same* eval set where B leads A by a hair: the bootstrap CI on
+    F1(B) − F1(A) plus a permutation p-value answer 'is the lead real, or noise?'"""
+    metric_fns = {"precision": precision, "recall": recall, "f1": f1}
+    threshold = 0.5
+
+    # (1) one dataset, evaluated at growing prefixes ---------------------------
+    rng = random.Random(13)
+    yt, ys = [], []
+    for _ in range(1000):
+        pos = rng.random() < 0.4
+        yt.append(1 if pos else 0)
+        ys.append(_clamp01(rng.gauss(0.60 if pos else 0.42, 0.18)))
+    ci_by_n = []
+    for n in (100, 200, 500, 1000):
+        yt_n, ys_n = yt[:n], ys[:n]
+        c = confusion_counts(yt_n, ys_n, threshold)
+        point = {name: round(fn(c), 4) for name, fn in metric_fns.items()}
+        ci = {
+            name: [round(v, 4) for v in bootstrap_ci(yt_n, ys_n, threshold, fn, n_boot=600, seed=100 + n)]
+            for name, fn in metric_fns.items()
+        }
+        ci_by_n.append({"n": n, "n_pos": sum(yt_n), "point": point, "ci": ci})
+
+    # (2) two models on the SAME eval set; B is a touch better — but is it real?
+    rng2 = random.Random(29)
+    n_ab = 600
+    yt2, sa, sb = [], [], []
+    for _ in range(n_ab):
+        pos = rng2.random() < 0.4
+        yt2.append(1 if pos else 0)
+        sa.append(_clamp01(rng2.gauss(0.58 if pos else 0.44, 0.18)))
+        sb.append(_clamp01(rng2.gauss(0.61 if pos else 0.41, 0.18)))
+    res = paired_diff_ci(yt2, sa, sb, threshold, f1, n_boot=2000, seed=2024, return_dist=True)
+    p = permutation_test(yt2, sa, sb, threshold, f1, n_perm=3000, seed=2024)
+    dist = res["dist"]
+    bins = 30
+    lo_d, hi_d = min(dist), max(dist)
+    span = (hi_d - lo_d) or 1.0
+    counts = [0] * bins
+    for d in dist:
+        counts[min(bins - 1, int((d - lo_d) / span * bins))] += 1
+    ab = {
+        "metric": "F1",
+        "threshold": threshold,
+        "n": n_ab,
+        "a_point": round(f1(confusion_counts(yt2, sa, threshold)), 4),
+        "b_point": round(f1(confusion_counts(yt2, sb, threshold)), 4),
+        "diff": round(res["diff"], 4),
+        "ci": [round(res["lo"], 4), round(res["hi"], 4)],
+        "excludes_zero": res["excludes_zero"],
+        "p_value": round(p, 4),
+        "hist": {"lo": round(lo_d, 4), "hi": round(hi_d, 4), "bins": bins, "counts": counts},
+    }
+
+    return {
+        "name": "Confidence intervals & A/B significance (synthetic)",
+        "note": "CIs shrink as the eval set grows; B leads A by a little — the test says whether that lead is real.",
+        "threshold": threshold,
+        "ci_by_n": ci_by_n,
+        "ab": ab,
+    }
+
+
+def calibration_demo() -> dict:
+    """A well-calibrated model vs an overconfident one on the same labels, for the
+    Ch 4 reliability-diagram island. Both rank risk by the same signal; only the
+    overconfident model's *probabilities* lie — high ECE, worse Brier."""
+    rng = random.Random(17)
+    n = 2000
+    yt, true_p = [], []
+    for _ in range(n):
+        p = rng.random()
+        true_p.append(p)
+        yt.append(1 if rng.random() < p else 0)
+
+    def sharpen(p: float, t: float = 0.45) -> float:
+        eps = 1e-6
+        p = min(1 - eps, max(eps, p))
+        logit = math.log(p / (1 - p)) / t  # t < 1 pushes probabilities toward 0/1
+        return 1.0 / (1.0 + math.exp(-logit))
+
+    calibrated = [_clamp01(p + rng.gauss(0, 0.04)) for p in true_p]
+    overconfident = [sharpen(p) for p in true_p]
+
+    models = {}
+    for name, probs in [("calibrated", calibrated), ("overconfident", overconfident)]:
+        curve = [
+            {"confidence": round(b["confidence"], 4), "accuracy": round(b["accuracy"], 4), "count": b["count"]}
+            for b in reliability_curve(yt, probs, n_bins=10) if b["count"]
+        ]
+        models[name] = {
+            "curve": curve,
+            "ece": round(expected_calibration_error(yt, probs, 10), 4),
+            "brier": round(brier_score(yt, probs), 4),
+        }
+    return {
+        "name": "Calibration: reliable vs overconfident probabilities",
+        "note": "Both models rank risk the same way; only the overconfident one's probabilities are wrong. Watch the curve pull off the diagonal.",
+        "n": n,
+        "models": models,
+    }
+
+
+def rag_demo() -> dict:
+    """RAG evaluation in two halves for the Ch 9 island: retrieval quality (a
+    ranked list with precision/recall/NDCG as k varies) and answer faithfulness
+    (claims grounded — or not — in the retrieved context). Retrieval metrics come
+    from mini_eval.retrieval; the grounding labels are authored."""
+    chunks_raw = [
+        ("d3", True, "Refunds are processed within 5 business days to the original payment method."),
+        ("d7", False, "Our customer-service hours are 9am–5pm, Monday to Friday."),
+        ("d1", True, "A refund can be requested within 30 days of purchase."),
+        ("d9", False, "The company was founded in 2012 in Berlin."),
+        ("d2", True, "Refund requests must include the original order number."),
+        ("d5", False, "Gift cards and final-sale items are non-refundable."),
+        ("d8", False, "Standard shipping is free on orders over $50."),
+        ("d4", False, "Returned items must be unopened and in original packaging."),
+        ("d6", False, "You can reach support through the in-app chat."),
+        ("d0", False, "The mobile app is available on iOS and Android."),
+    ]
+    retrieved = [c[0] for c in chunks_raw]
+    relevant = {c[0] for c in chunks_raw if c[1]}
+    sweep = [{
+        "k": k,
+        "precision": round(precision_at_k(retrieved, relevant, k), 4),
+        "recall": round(recall_at_k(retrieved, relevant, k), 4),
+        "ndcg": round(ndcg_at_k(retrieved, relevant, k), 4),
+    } for k in range(1, len(retrieved) + 1)]
+    chunks = [{"rank": i + 1, "id": c[0], "relevant": c[1], "snippet": c[2]} for i, c in enumerate(chunks_raw)]
+
+    claims = [
+        {"text": "You can request a refund within 30 days of purchase.", "supported": True, "note": "grounded in chunk d1"},
+        {"text": "Refunds go back to your original payment method in about 5 business days.", "supported": True, "note": "grounded in chunk d3"},
+        {"text": "You'll also receive a $10 credit for the inconvenience.", "supported": False,
+         "note": "Type-I hallucination: no retrieved chunk says this — the model invented it."},
+    ]
+    supported = sum(1 for c in claims if c["supported"])
+    return {
+        "name": "RAG evaluation: retrieval and faithfulness",
+        "note": "Retrieval finds the context; faithfulness checks that the answer only used it.",
+        "retrieval": {
+            "query": "How do I get a refund?",
+            "n_relevant": len(relevant),
+            "chunks": chunks,
+            "sweep": sweep,
+        },
+        "faithfulness": {
+            "answer": "You can request a refund within 30 days of purchase. Refunds go back to your original payment method in about 5 business days. You'll also receive a $10 credit for the inconvenience.",
+            "claims": claims,
+            "score": round(supported / len(claims), 4),
+            "note": "Two claims are grounded; the third is a Type-I hallucination — an unsupported addition. Faithfulness catches it; answer-vs-reference accuracy can miss it.",
+        },
+    }
+
+
+def agent_demo() -> dict:
+    """pass@k curves for a flaky vs a reliable agent, for the Ch 10 island. Each
+    suite is 40 tasks sampled K times; pass@k rises with attempts, but pass@1 (the
+    first-try success a user actually gets) tells the flaky agent's true story."""
+    rng = random.Random(31)
+    K = 10
+    scenarios = []
+    for label, p in [("Flaky agent", 0.35), ("Reliable agent", 0.80)]:
+        tasks = []
+        for _ in range(40):
+            tp = _clamp01(p + rng.gauss(0, 0.08))           # task-level jitter
+            c = sum(1 for _ in range(K) if rng.random() < tp)
+            tasks.append((K, c))
+        curve = [{"k": k, "pass": round(mean_pass_at_k(tasks, k), 4)} for k in range(1, K + 1)]
+        scenarios.append({
+            "label": label, "K": K, "n_tasks": len(tasks),
+            "pass1": curve[0]["pass"], "passK": curve[-1]["pass"], "curve": curve,
+        })
+    return {
+        "name": "pass@k: attempts vs reliability",
+        "note": "pass@k rises with attempts; pass@1 is what a user gets on the first try.",
+        "scenarios": scenarios,
+    }
+
+
+def monitoring_demo() -> dict:
+    """A frozen offline metric vs a live online signal over 30 days, for the Ch 11
+    island. The offline number stays flat and green (the eval set never changes);
+    the online signal drifts past its guardrail after the input mix shifts — the
+    failure only monitoring catches. Synthetic, seeded; no model involved."""
+    rng = random.Random(23)
+    days = 30
+    guardrail = 0.55  # max tolerable human-override rate
+    series = []
+    for d in range(days):
+        offline = _clamp01(0.30 + rng.gauss(0, 0.01))               # frozen set -> flat
+        drift = 0.0 if d < 12 else (d - 12) * 0.025                  # shift starts ~day 12
+        online = _clamp01(0.30 + drift + rng.gauss(0, 0.02))
+        series.append({"day": d, "offline": round(offline, 4), "online": round(online, 4)})
+    breach = next((p["day"] for p in series if p["online"] > guardrail), None)
+    return {
+        "name": "Offline looks fine; online drifts",
+        "note": "The frozen offline eval stays flat and green; the live signal drifts past the guardrail. Only monitoring catches it.",
+        "days": days,
+        "guardrail": guardrail,
+        "breach_day": breach,
+        "ylabel": "human-override rate",
+        "series": series,
+    }
+
+
 def main() -> None:
     os.makedirs(OUT, exist_ok=True)
-    for name, data in [("threshold_demo", threshold_demo()), ("judge_demo", judge_demo())]:
+    for name, data in [
+        ("threshold_demo", threshold_demo()),
+        ("judge_demo", judge_demo()),
+        ("confidence_demo", confidence_demo()),
+        ("calibration_demo", calibration_demo()),
+        ("rag_demo", rag_demo()),
+        ("agent_demo", agent_demo()),
+        ("monitoring_demo", monitoring_demo()),
+    ]:
         path = os.path.join(OUT, f"{name}.json")
         with open(path, "w") as f:
             json.dump(data, f, indent=2)

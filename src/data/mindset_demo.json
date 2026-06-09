@@ -1,0 +1,45 @@
+{
+  "name": "Match the system to its metric",
+  "note": "For each system, pick the metric that matches how the output is actually used. Then see what the tempting wrong choices quietly hide.",
+  "systems": [
+    {
+      "id": "fraud-queue",
+      "system": "A fraud model scores every transaction; investigators work the top ~200 flagged cases a day — no more, no less.",
+      "candidates": [
+        "Accuracy",
+        "ROC-AUC over all transactions",
+        "Precision@k (k = daily review capacity)",
+        "F1 at threshold 0.5"
+      ],
+      "correct": "Precision@k (k = daily review capacity)",
+      "failure": "Accuracy is ~99% just by calling everything legitimate. AUC grades the entire ranking, but investigators only ever see the top k — so the number that matches the real workload is the precision of those top k cases.",
+      "why": "The metric has to mirror how the output is used: a fixed-capacity review queue, not the whole ranked list."
+    },
+    {
+      "id": "insurance-pricing",
+      "system": "A model outputs the probability a policy files a claim, and that probability is multiplied into the premium customers pay.",
+      "candidates": [
+        "ROC-AUC",
+        "Accuracy at threshold 0.5",
+        "Calibration error (ECE) + Brier score",
+        "Recall"
+      ],
+      "correct": "Calibration error (ECE) + Brier score",
+      "failure": "A model can rank risk almost perfectly (AUC 0.95) and still be badly miscalibrated — saying 5% when the true rate is 20%. When the probability itself is the product, a ranking metric can look great while the prices are wrong.",
+      "why": "When the calibrated probability is the deliverable, you must evaluate the probability, not just the ordering."
+    },
+    {
+      "id": "rag-faithfulness",
+      "system": "A retrieval-augmented assistant answers from retrieved documents; some answers add confident facts the documents never stated.",
+      "candidates": [
+        "BLEU against a reference answer",
+        "Answer accuracy alone",
+        "Faithfulness (grounding) + context relevance",
+        "Average response latency"
+      ],
+      "correct": "Faithfulness (grounding) + context relevance",
+      "failure": "A fluent answer can match a reference yet be unfaithful to the retrieved context (unsupported additions), or be faithful but built on the wrong context. A single overall score hides which failure is happening — and the two have opposite fixes.",
+      "why": "Generation-with-sources needs a metric that separates 'is it grounded?' from 'is it grounded in the right thing?'."
+    }
+  ]
+}

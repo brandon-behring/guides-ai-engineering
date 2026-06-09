@@ -1,0 +1,45 @@
+{
+  "name": "Diagnose the incomplete eval plan",
+  "note": "Each plan sounds reasonable but has one critical gap that the guide already taught you to catch. Find it.",
+  "items": [
+    {
+      "id": "no-ci",
+      "prompt": "Model B scores one point higher than model A on our benchmark, so we'll ship B.",
+      "candidates": [
+        "No confidence interval — a one-point lead on one run may be noise",
+        "The benchmark is too small",
+        "B is probably slower",
+        "We didn't try a model C"
+      ],
+      "correct": "No confidence interval — a one-point lead on one run may be noise",
+      "explanation": "A one-point difference with no sense of variance is a coin-flip. Pair the comparison and bootstrap the difference (Chapter 3): if the 95% CI on B−A straddles zero, you'd be shipping noise.",
+      "principle": "Never act on a model comparison without an interval on the difference."
+    },
+    {
+      "id": "offline-only",
+      "prompt": "We passed offline evaluation at 0.88, so the feature is done — ship it and move on.",
+      "candidates": [
+        "Offline is a launch gate, not a guarantee — add live guardrails and drift monitoring",
+        "0.88 is too low to ship",
+        "We should have used a different metric",
+        "We need a bigger model"
+      ],
+      "correct": "Offline is a launch gate, not a guarantee — add live guardrails and drift monitoring",
+      "explanation": "A frozen offline metric can't move when production drifts (Chapter 11). Without live guardrails (override rate, latency, cost) and drift detection, a regression on real traffic is invisible until users complain.",
+      "principle": "Evaluation is continuous: offline gates launch, monitoring keeps it honest."
+    },
+    {
+      "id": "wrong-construct",
+      "prompt": "Our customer-support RAG bot tops the MMLU leaderboard, so it's ready for customers.",
+      "candidates": [
+        "MMLU doesn't measure RAG faithfulness on your docs — build a domain eval",
+        "MMLU is too easy",
+        "The bot needs a bigger context window",
+        "Support bots don't need evaluation"
+      ],
+      "correct": "MMLU doesn't measure RAG faithfulness on your docs — build a domain eval",
+      "explanation": "MMLU is exam trivia; a support bot's job is grounded answers from your documents. That's a construct-validity miss (Chapter 8): you need a domain eval set measuring retrieval (precision/recall@k) and faithfulness (Chapter 9), not a generic leaderboard.",
+      "principle": "Evaluate the construct your system actually performs, on data that looks like its job."
+    }
+  ]
+}

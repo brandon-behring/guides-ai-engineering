@@ -1,0 +1,164 @@
+---
+title: "The evaluation mindset"
+slug: evaluation-mindset
+description: "Before any metric: how is the output used, what does each error cost, and what failures do you fear? The evaluation mindset — error taxonomy before metrics — drilled on three systems where the obvious metric hides the real failure."
+freshness: literature-survey
+last_verified: 2026-06-08
+tags: [evaluation, mindset, error-taxonomy, metric-selection]
+sources: []
+draft: false
+mode: tutorial
+target: transfer
+ordering: problem-first
+commitment: long-lived
+paradigms: [default]
+research_debt_addressed: |
+  Metric explainers jump straight to definitions. The judgment that separates strong
+  candidates is upstream of any formula: starting from how the output is used and the
+  failures you fear, and choosing what to measure before how. This chapter drills the
+  mindset — error taxonomy before metrics — on three systems where the tempting metric
+  hides the failure that matters.
+task_classes: [error-taxonomy, metric-selection]
+provenance:
+  ai_tools: ["Claude Opus 4.8 (Anthropic)"]
+  audit_history:
+    - date: 2026-06-08
+      type: authored
+      file: src/content/evaluation/01-evaluation-mindset.mdx
+  citation_backstop: manual
+los:
+  - id: EVAL-1.1
+    bloom: explain
+    statement: "Explain why choosing what to measure is the core design decision, and why error taxonomy comes before metrics."
+    anchor: mindset-what-before-how
+    threshold: true
+  - id: EVAL-1.2
+    bloom: analyze
+    statement: "Diagnose a metric mismatch: name the failure a tempting metric hides for a given system and how its output is used."
+    anchor: mindset-metric-mismatch
+    threshold: true
+  - id: EVAL-1.3
+    bloom: design
+    statement: "Given a system, choose a metric family from how the output is used and the cost of each error, and justify it."
+    anchor: mindset-choose-from-use
+    threshold: true
+---
+
+import YouWillLearn from '@brandon_m_behring/book-scaffold-astro/components/YouWillLearn.astro';
+import Pitfall from '@brandon_m_behring/book-scaffold-astro/components/Pitfall.astro';
+import Practice from '@brandon_m_behring/book-scaffold-astro/components/Practice.astro';
+import MetricMatchExplorer from '../../components/MetricMatchExplorer.tsx';
+import mindsetData from '../../data/mindset_demo.json';
+
+# The evaluation mindset
+
+<YouWillLearn prerequisites="Chapter 0 — why evaluation is the scarce skill.">
+- Why **choosing what to measure** is the design decision, not a detail.
+- **Error taxonomy before metrics**: name the failures you fear, *then* pick numbers.
+- How to choose a metric from **how the output is used** and the cost of each error.
+</YouWillLearn>
+
+## "Here's the model — evaluate it"
+
+A teammate drops a trained model in your lap: "It works pretty well. Can you set up
+an eval?" Your hands itch to compute accuracy, or BLEU, or to spin up an
+LLM-as-judge. In the interview version of this moment, that itch is the trap.
+
+Pause: before *any* metric, what three questions decide whether the eval will mean
+anything? Write them down.
+
+<Pitfall title="Metric-chasing">
+A very common senior-interview stumble is reciting a metric taxonomy — "precision,
+recall, F1, BLEU, ROUGE, AUC…" — instead of starting from the system. A metric
+chosen before you understand how the output is used measures *something*, just
+rarely the thing that matters. Choosing what to measure **is** the work.
+</Pitfall>
+
+## What before how {/* anchor: mindset-what-before-how */}
+
+Strong evaluators start from the system, not the metric. Three questions, in order:
+
+1. **How is the output used?** A ranked queue worked top-down, a probability that
+   sets a price, a generated answer a user trusts — each implies a different metric
+   *family* before you pick a specific number.
+2. **What's the operating point and the cost of each error?** A fixed review
+   capacity, a recall floor, a false-positive budget. Which mistake is expensive,
+   and how much more than the other? (Chapter 2 turns exactly this into a threshold.)
+3. **What failures do you most fear?** Write the **error taxonomy first** — the
+   concrete ways this system goes wrong — and the metrics fall out of it. Starting
+   with "let's compute ROUGE" before "what does broken look like here?" is backward.
+
+The taxonomy tells you *what* to measure; the metric is only *how well* you measure
+each item on it. Reverse that order and you get a number that's easy to compute and
+easy to game, tracking a failure mode nobody cares about.
+
+## The wrong metric hides the failure {/* anchor: mindset-metric-mismatch */}
+
+The same model can look great or terrible depending on which metric you reach for —
+and the *tempting* metric is often the one that hides the failure that matters.
+Three systems, three traps:
+
+- A **fraud queue** worked at fixed capacity: accuracy is ~99% by doing nothing, and
+  a whole-list ranking score grades cases no investigator will ever see.
+- An **insurance price** built from a predicted probability: a model can rank risk
+  beautifully (AUC 0.95) and still be miscalibrated enough to misprice every policy.
+- A **RAG answer** with sources: a fluent reply can match a reference yet invent
+  facts the documents never supported.
+
+Predict, for each, which metric matches the *use* — then see what the alternatives hide.
+
+<MetricMatchExplorer client:visible data={mindsetData} />
+
+Now *explain* the pattern you used: in every case the right metric mirrors **how the
+output is consumed** — the top of a capacity-bounded queue, the calibrated
+probability itself, the grounding of a generated claim. The wrong choices aren't
+*incorrect arithmetic*; they're correct numbers answering the wrong question.
+
+Now apply it on a system you haven't seen. {/* anchor: mindset-choose-from-use */}
+
+<Practice id="mindset-choose-practice" difficulty={2}>
+A support assistant drafts replies that a human agent approves or edits before
+sending. Leadership wants "one number for quality." What do you ask before choosing
+it, what metric family do you land on — and which tempting metric would you refuse?
+
+<details>
+<summary>One defensible answer</summary>
+
+Ask **how the output is used**: a human is in the loop and edits before send, so the
+cost of a weak draft is *agent edit time*, not a customer-facing error. That points
+to an **acceptance / edit-distance** family — how often a draft ships with light
+edits — stratified by query type. Refuse a bare **LLM-as-judge "5/5 helpfulness"** as
+the headline: it's fluent-but-unfaithful-prone (Chapter 7) and ignores the
+human-in-the-loop economics that actually define quality here.
+</details>
+</Practice>
+
+## How this is graded
+
+- **Technical Correctness** — you map a system to the right metric *family*
+  (classification vs ranking vs calibration vs generation) and know why.
+- **Trade-off Awareness** — this chapter's weighted dimension: you start from use and
+  error cost, and can say what each tempting-but-wrong metric *hides*.
+- **Evaluation Rigor** — you write an error taxonomy before metrics, and stratify
+  rather than trusting one aggregate number.
+- **Communication** — "the output feeds a fixed-capacity queue, so I'd report
+  precision@k, not AUC" is the one-sentence justification interviewers grade.
+
+### Industry variation
+
+- **Frontier labs / research** — capability and safety are co-equal; "what failure do
+  you fear" includes harmful or deceptive outputs, not just wrong ones.
+- **Fintech / risk** — calibration and fairness sit *beside* accuracy, because the
+  probability is the product and the decision is regulated.
+- **Healthcare** — the feared error (a missed diagnosis) dominates metric choice;
+  recall and calibrated risk beat headline accuracy.
+
+## Stretch: the metric that looked fine
+
+Your triage model's offline F1 has been flat for months — green dashboard, no alerts.
+Then the human automation rate quietly climbs from 42% to 62%, and complaints rise
+with it. The offline metric never moved. What did it fail to measure, and what would
+you have watched instead? (Hint: the *threshold* the product runs at drifted as the
+input mix changed; F1 at a fixed cut missed a **calibration** shift — Chapter 4 — and
+an **online** signal — Chapter 11 — would have caught it. The mindset lesson: an
+unmoving offline number is not the same as a system that's still working.)

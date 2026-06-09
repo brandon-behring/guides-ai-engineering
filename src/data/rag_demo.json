@@ -1,0 +1,154 @@
+{
+  "name": "RAG evaluation: retrieval and faithfulness",
+  "note": "Retrieval finds the context; faithfulness checks that the answer only used it.",
+  "retrieval": {
+    "query": "How do I get a refund?",
+    "n_relevant": 3,
+    "chunks": [
+      {
+        "rank": 1,
+        "id": "d3",
+        "relevant": true,
+        "snippet": "Refunds are processed within 5 business days to the original payment method."
+      },
+      {
+        "rank": 2,
+        "id": "d7",
+        "relevant": false,
+        "snippet": "Our customer-service hours are 9am\u20135pm, Monday to Friday."
+      },
+      {
+        "rank": 3,
+        "id": "d1",
+        "relevant": true,
+        "snippet": "A refund can be requested within 30 days of purchase."
+      },
+      {
+        "rank": 4,
+        "id": "d9",
+        "relevant": false,
+        "snippet": "The company was founded in 2012 in Berlin."
+      },
+      {
+        "rank": 5,
+        "id": "d2",
+        "relevant": true,
+        "snippet": "Refund requests must include the original order number."
+      },
+      {
+        "rank": 6,
+        "id": "d5",
+        "relevant": false,
+        "snippet": "Gift cards and final-sale items are non-refundable."
+      },
+      {
+        "rank": 7,
+        "id": "d8",
+        "relevant": false,
+        "snippet": "Standard shipping is free on orders over $50."
+      },
+      {
+        "rank": 8,
+        "id": "d4",
+        "relevant": false,
+        "snippet": "Returned items must be unopened and in original packaging."
+      },
+      {
+        "rank": 9,
+        "id": "d6",
+        "relevant": false,
+        "snippet": "You can reach support through the in-app chat."
+      },
+      {
+        "rank": 10,
+        "id": "d0",
+        "relevant": false,
+        "snippet": "The mobile app is available on iOS and Android."
+      }
+    ],
+    "sweep": [
+      {
+        "k": 1,
+        "precision": 1.0,
+        "recall": 0.3333,
+        "ndcg": 1.0
+      },
+      {
+        "k": 2,
+        "precision": 0.5,
+        "recall": 0.3333,
+        "ndcg": 0.6131
+      },
+      {
+        "k": 3,
+        "precision": 0.6667,
+        "recall": 0.6667,
+        "ndcg": 0.7039
+      },
+      {
+        "k": 4,
+        "precision": 0.5,
+        "recall": 0.6667,
+        "ndcg": 0.7039
+      },
+      {
+        "k": 5,
+        "precision": 0.6,
+        "recall": 1.0,
+        "ndcg": 0.8855
+      },
+      {
+        "k": 6,
+        "precision": 0.5,
+        "recall": 1.0,
+        "ndcg": 0.8855
+      },
+      {
+        "k": 7,
+        "precision": 0.4286,
+        "recall": 1.0,
+        "ndcg": 0.8855
+      },
+      {
+        "k": 8,
+        "precision": 0.375,
+        "recall": 1.0,
+        "ndcg": 0.8855
+      },
+      {
+        "k": 9,
+        "precision": 0.3333,
+        "recall": 1.0,
+        "ndcg": 0.8855
+      },
+      {
+        "k": 10,
+        "precision": 0.3,
+        "recall": 1.0,
+        "ndcg": 0.8855
+      }
+    ]
+  },
+  "faithfulness": {
+    "answer": "You can request a refund within 30 days of purchase. Refunds go back to your original payment method in about 5 business days. You'll also receive a $10 credit for the inconvenience.",
+    "claims": [
+      {
+        "text": "You can request a refund within 30 days of purchase.",
+        "supported": true,
+        "note": "grounded in chunk d1"
+      },
+      {
+        "text": "Refunds go back to your original payment method in about 5 business days.",
+        "supported": true,
+        "note": "grounded in chunk d3"
+      },
+      {
+        "text": "You'll also receive a $10 credit for the inconvenience.",
+        "supported": false,
+        "note": "Type-I hallucination: no retrieved chunk says this \u2014 the model invented it."
+      }
+    ],
+    "score": 0.6667,
+    "note": "Two claims are grounded; the third is a Type-I hallucination \u2014 an unsupported addition. Faithfulness catches it; answer-vs-reference accuracy can miss it."
+  }
+}

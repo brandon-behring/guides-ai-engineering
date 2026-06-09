@@ -97,28 +97,39 @@ def threshold_sweep(
 ) -> list[dict]:
     """Metrics across the full threshold range [0, 1] — the data behind every
     precision/recall, ROC, and PR curve. The single most useful eval artifact."""
+    if n_steps < 2:
+        raise ValueError("n_steps must be >= 2 (need both endpoints 0 and 1)")
     return [metrics_at(y_true, y_score, i / (n_steps - 1)) for i in range(n_steps)]
 
 
 def average_precision(y_true: list[int], y_score: list[float]) -> float:
-    """Area under the precision–recall curve (step interpolation). The
-    threshold-free summary you should report *with* a chosen operating point,
-    never instead of one."""
-    # Sort by descending score; sweep the decision boundary down one example at a time.
-    order = sorted(range(len(y_score)), key=lambda i: y_score[i], reverse=True)
+    """Average precision: the sum of precision × Δrecall as the boundary sweeps
+    down the ranking (no interpolation). The threshold-free summary you report
+    *with* a chosen operating point, never instead of one. Returns 0.0 when there
+    are no positives. Bridge: ``sklearn.metrics.average_precision_score``."""
     total_pos = sum(y_true)
     if total_pos == 0:
         return 0.0
+    # Sort by descending score. Equal scores form one tie group — a threshold
+    # can't split them — so we advance through a whole group before scoring a
+    # point. (Counting one example at a time would make AP depend on the
+    # arbitrary input order of tied items.)
+    order = sorted(range(len(y_score)), key=lambda i: y_score[i], reverse=True)
     tp = fp = 0
     ap = 0.0
     prev_recall = 0.0
-    for i in order:
-        if y_true[i] == 1:
-            tp += 1
-        else:
-            fp += 1
+    j, n = 0, len(order)
+    while j < n:
+        k = j
+        while k < n and y_score[order[k]] == y_score[order[j]]:
+            if y_true[order[k]] == 1:
+                tp += 1
+            else:
+                fp += 1
+            k += 1
         prec = tp / (tp + fp)
         rec = tp / total_pos
         ap += prec * (rec - prev_recall)  # rectangle: precision × Δrecall
         prev_recall = rec
+        j = k
     return ap

@@ -1,0 +1,185 @@
+---
+title: "Data integrity: leakage, contamination, reproducibility"
+slug: data-integrity
+description: "The fastest way to a great eval number is a broken eval set. Train/eval overlap, parametric-memory leakage in RAG, adaptive overfitting from tuning on a fixed set, benchmark contamination, and the reproducibility hygiene — frozen sets, pinned versions, seeds — that makes a number mean something."
+freshness: literature-survey
+last_verified: 2026-06-08
+tags: [evaluation, data-leakage, contamination, reproducibility]
+sources: []
+draft: false
+mode: tutorial
+target: transfer
+ordering: problem-first
+commitment: long-lived
+paradigms: [default]
+research_debt_addressed: |
+  Most eval mistakes aren't in the metric — they're in the data. Train/eval overlap,
+  answering from parametric memory, and adaptive overfitting silently inflate scores,
+  and interviews probe whether you'd catch them. This chapter names the leakage modes,
+  the decontamination checks, and the reproducibility hygiene that separates a real
+  result from a lucky one.
+task_classes: [data-integrity, leakage-detection]
+provenance:
+  ai_tools: ["Claude Opus 4.8 (Anthropic)"]
+  audit_history:
+    - date: 2026-06-08
+      type: authored
+      file: src/content/evaluation/05-data-integrity.mdx
+  citation_backstop: manual
+los:
+  - id: EVAL-5.1
+    bloom: explain
+    statement: "Explain the main leakage modes — train/eval overlap, parametric-memory leakage, and adaptive overfitting — and why each inflates a score."
+    anchor: integrity-leakage
+    threshold: true
+  - id: EVAL-5.2
+    bloom: analyze
+    statement: "Given an eval setup, detect which integrity threat is present and name the decontamination check that catches it."
+    anchor: integrity-detect
+    threshold: true
+  - id: EVAL-5.3
+    bloom: design
+    statement: "Specify the reproducibility hygiene — frozen/held-out sets, pinned versions, seeds, recorded config — that makes an eval result trustworthy."
+    anchor: integrity-repro
+    threshold: true
+---
+
+import YouWillLearn from '@brandon_m_behring/book-scaffold-astro/components/YouWillLearn.astro';
+import Pitfall from '@brandon_m_behring/book-scaffold-astro/components/Pitfall.astro';
+import Practice from '@brandon_m_behring/book-scaffold-astro/components/Practice.astro';
+import NoteBox from '@brandon_m_behring/book-scaffold-astro/components/NoteBox.astro';
+import ScenarioQuiz from '../../components/ScenarioQuiz.tsx';
+import leakageData from '../../data/leakage_demo.json';
+
+# Data integrity: leakage, contamination, reproducibility
+
+<YouWillLearn prerequisites="Chapter 3 (variance); pairs with Chapter 8 (benchmark contamination).">
+- The leakage modes that silently inflate a score: **overlap, parametric memory, adaptive overfitting**.
+- The **decontamination** checks that catch each, and why temporal splits beat random ones.
+- The **reproducibility** hygiene — frozen sets, pinned versions, seeds — behind a trustworthy number.
+</YouWillLearn>
+
+## The 0.98 that means nothing
+
+A teammate is thrilled: the new eval reports **0.98**. Before you celebrate, ask the
+question that has saved more projects than any metric choice: *where did the eval
+data come from, and could the model have seen it?* More great-looking numbers die
+here than at the hands of a wrong metric.
+
+Predict: name one way an eval set can produce a near-perfect score that says nothing
+about whether the model actually works.
+
+<Pitfall title="A broken eval set beats a good metric every time">
+You can pick the perfect metric, compute a flawless confidence interval, and still be
+completely wrong — because the eval data leaked. Integrity is upstream of everything
+else in this guide: garbage-in is unrecoverable downstream.
+</Pitfall>
+
+## The leakage modes {/* anchor: integrity-leakage */}
+
+Three ways information sneaks from where it shouldn't:
+
+1. **Train/eval overlap.** Eval examples — or near-duplicates — are also in training,
+   so the score measures memorization. A *random* split is the usual culprit: it
+   scatters near-duplicate records across train and test. Split by **time** or
+   **entity** *before* dedup so echoes can't straddle the boundary.
+2. **Parametric-memory leakage (RAG).** The answer is in the model's pretraining
+   memory, so the generator is right even when retrieval fails — masking your
+   retrieval and faithfulness metrics (Chapter 9). Test on documents the model could
+   not have memorized: private, post-cutoff, or synthetic.
+3. **Adaptive overfitting.** Every prompt you tune against a *fixed* eval set leaks a
+   bit of that set into your system; after enough rounds the gains are overfitting,
+   not progress. Keep a held-out **confirmation** set you touch rarely, and refresh
+   the dev set.
+
+## Decontamination, concretely {/* anchor: integrity-detect */}
+
+Detecting overlap isn't magic — it's bookkeeping:
+
+- **Exact + near-duplicate** matching (hashing, n-gram / MinHash overlap) between eval
+  and training corpora.
+- **Canary strings** planted in training data: if they surface at eval time, you have
+  a leak path.
+- **Perturbation tests**: paraphrase or numerically alter eval items; a score that
+  craters under paraphrase was memorized, not understood.
+- **Temporal holdout**: evaluate only on data created *after* the training cutoff
+  (the LiveBench idea from Chapter 8), which is contamination-proof by construction.
+
+<NoteBox title="Leakage is the dual of contamination">
+Chapter 8's *benchmark contamination* is this same problem from the benchmark
+author's side; *leakage* is it from yours. Public benchmark in your pretraining =
+contamination; your eval set overlapping your training = leakage. Same fix on both
+sides: keep the thing you measure with disjoint from the thing you train on.
+</NoteBox>
+
+## See it
+
+Three setups that each report a great number. **Predict** the leak in each before you
+reveal it.
+
+<ScenarioQuiz client:visible data={leakageData} />
+
+Now *explain* the through-line: in every case the model had *seen the answer* by some
+path — the same examples, its own memory, or the eval set it had been tuned against —
+so the score measured recall of that path, not capability.
+
+## Reproducibility hygiene {/* anchor: integrity-repro */}
+
+Even a clean eval set is worthless if you can't reproduce the number. The checklist:
+
+- **Freeze the eval set** and version it; never edit it silently between runs.
+- **Pin everything that moves**: model version/snapshot, decoding params (temperature,
+  top-p), prompt template, and library versions.
+- **Seed** stochastic steps, and for unavoidable stochasticity (sampling, agents)
+  report **mean ± std over n runs** (Chapter 3), not one run.
+- **Record the config with the result** so "0.73" always carries *which model, which
+  prompt, which set, which day*.
+
+<Practice id="integrity-design" difficulty={2}>
+You're standing up evaluation for a new feature from scratch. Name three things you'd
+do *to the data and process* — before choosing any metric — to make sure next
+quarter's "the score went up" is real.
+
+<details>
+<summary>One defensible answer</summary>
+
+1. **Disjoint, time-split eval set**: hold out the most recent data, deduplicate
+   across the boundary, and keep a separate **confirmation** set you touch rarely.
+2. **Decontamination check**: n-gram/near-dup overlap between the eval set and any
+   training/fine-tuning data (and, for RAG, verify answers aren't recallable from
+   parametric memory).
+3. **Pinned, recorded runs**: freeze + version the set, pin model/prompt/decoding,
+   seed, and log the full config with every score — so quarter-over-quarter is
+   actually comparable.
+</details>
+</Practice>
+
+## How this is graded
+
+- **Technical Correctness** — you name the leakage modes precisely and the
+  decontamination check for each, not just "avoid leakage".
+- **Trade-off Awareness** — you know a random split is convenient but dangerous, and
+  why temporal/entity splits cost more but buy trust.
+- **Evaluation Rigor** — the weighted dimension: you treat the *data* as the first
+  thing to audit, keep a held-out confirmation set, and make runs reproducible.
+- **Communication** — "before I trust 0.98 I'd check train/eval overlap and whether
+  we've been tuning on this set" is the answer that flags the senior instinct.
+
+### Industry variation
+
+- **Finance / healthcare** — temporal leakage is the cardinal sin; splits must respect
+  time, and audited reproducibility is mandatory.
+- **Search / RAG** — parametric-memory leakage dominates; private and post-cutoff
+  corpora are how you isolate retrieval.
+- **Research** — contamination disclosure and decontamination reports are now expected
+  alongside any benchmark claim.
+
+## Stretch: you inherited the eval set
+
+You join a team with a year-old eval set that everyone trusts and that the model has
+been tuned against the whole time. You suspect it's compromised but can't just throw
+it out. How do you find out — and what do you build alongside it? (Hint: build a
+*fresh, held-out* set from recent data and compare the model's score on old vs new; a
+large gap is the tell. Then run overlap/decontamination on the legacy set, and move
+the team's decisions onto the fresh confirmation set while keeping the old one only
+as a smoke test.)

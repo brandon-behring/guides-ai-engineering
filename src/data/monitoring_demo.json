@@ -1,0 +1,160 @@
+{
+  "name": "Offline looks fine; online drifts",
+  "note": "The frozen offline eval stays flat and green; the live signal drifts past the guardrail. Only monitoring catches it.",
+  "days": 30,
+  "guardrail": 0.55,
+  "breach_day": 22,
+  "ylabel": "human-override rate",
+  "series": [
+    {
+      "day": 0,
+      "offline": 0.3217,
+      "online": 0.2778
+    },
+    {
+      "day": 1,
+      "offline": 0.3033,
+      "online": 0.2948
+    },
+    {
+      "day": 2,
+      "offline": 0.2912,
+      "online": 0.2885
+    },
+    {
+      "day": 3,
+      "offline": 0.2948,
+      "online": 0.298
+    },
+    {
+      "day": 4,
+      "offline": 0.3039,
+      "online": 0.3203
+    },
+    {
+      "day": 5,
+      "offline": 0.302,
+      "online": 0.3217
+    },
+    {
+      "day": 6,
+      "offline": 0.3042,
+      "online": 0.3013
+    },
+    {
+      "day": 7,
+      "offline": 0.2974,
+      "online": 0.2797
+    },
+    {
+      "day": 8,
+      "offline": 0.2838,
+      "online": 0.2974
+    },
+    {
+      "day": 9,
+      "offline": 0.2978,
+      "online": 0.3053
+    },
+    {
+      "day": 10,
+      "offline": 0.3028,
+      "online": 0.2739
+    },
+    {
+      "day": 11,
+      "offline": 0.2924,
+      "online": 0.2767
+    },
+    {
+      "day": 12,
+      "offline": 0.3093,
+      "online": 0.2965
+    },
+    {
+      "day": 13,
+      "offline": 0.3006,
+      "online": 0.3059
+    },
+    {
+      "day": 14,
+      "offline": 0.2868,
+      "online": 0.3371
+    },
+    {
+      "day": 15,
+      "offline": 0.2983,
+      "online": 0.3828
+    },
+    {
+      "day": 16,
+      "offline": 0.2843,
+      "online": 0.4052
+    },
+    {
+      "day": 17,
+      "offline": 0.2908,
+      "online": 0.4133
+    },
+    {
+      "day": 18,
+      "offline": 0.296,
+      "online": 0.4401
+    },
+    {
+      "day": 19,
+      "offline": 0.3038,
+      "online": 0.4909
+    },
+    {
+      "day": 20,
+      "offline": 0.3027,
+      "online": 0.4879
+    },
+    {
+      "day": 21,
+      "offline": 0.3034,
+      "online": 0.531
+    },
+    {
+      "day": 22,
+      "offline": 0.3078,
+      "online": 0.5539
+    },
+    {
+      "day": 23,
+      "offline": 0.2834,
+      "online": 0.5586
+    },
+    {
+      "day": 24,
+      "offline": 0.2953,
+      "online": 0.6168
+    },
+    {
+      "day": 25,
+      "offline": 0.298,
+      "online": 0.6416
+    },
+    {
+      "day": 26,
+      "offline": 0.3022,
+      "online": 0.6251
+    },
+    {
+      "day": 27,
+      "offline": 0.2997,
+      "online": 0.6845
+    },
+    {
+      "day": 28,
+      "offline": 0.3033,
+      "online": 0.6694
+    },
+    {
+      "day": 29,
+      "offline": 0.3035,
+      "online": 0.712
+    }
+  ]
+}

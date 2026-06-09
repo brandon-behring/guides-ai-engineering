@@ -1,0 +1,209 @@
+---
+title: "Capstone: design an evaluation strategy"
+slug: eval-strategy-capstone
+description: "The interview question this whole guide was for: 'design an evaluation strategy for this system.' A framework that is just the guide in order — clarify the use, choose metrics, protect the data, quantify uncertainty, decompose the pipeline, and monitor in production — with the four-dimension rubric as the scorecard you're graded on."
+freshness: literature-survey
+last_verified: 2026-06-08
+tags: [evaluation, system-design, capstone, rubric]
+sources: []
+draft: false
+mode: tutorial
+target: transfer
+ordering: problem-first
+commitment: long-lived
+paradigms: [default]
+research_debt_addressed: |
+  The hardest AI-engineering interview question is open-ended: "design an evaluation
+  strategy for X." Candidates jump to metrics without clarifying, or list techniques
+  without a structure. This capstone gives a sequencing framework (the guide in
+  order), a worked mock, a diagnose-the-gap drill, and makes the four-dimension rubric
+  — the spine of the whole guide — the explicit scorecard.
+task_classes: [eval-system-design, rubric-self-assessment]
+companion_modules: [mini-eval]
+provenance:
+  ai_tools: ["Claude Opus 4.8 (Anthropic)"]
+  audit_history:
+    - date: 2026-06-08
+      type: authored
+      file: src/content/evaluation/12-eval-strategy-capstone.mdx
+  citation_backstop: manual
+los:
+  - id: EVAL-12.1
+    bloom: design
+    statement: "Design an end-to-end evaluation strategy for a given AI system, sequencing what-to-measure, metrics, data integrity, uncertainty, and production monitoring."
+    anchor: capstone-design
+    threshold: true
+  - id: EVAL-12.2
+    bloom: analyze
+    statement: "Diagnose the critical gap in an incomplete eval plan and map it to the principle it violates."
+    anchor: capstone-diagnose
+    threshold: true
+  - id: EVAL-12.3
+    bloom: explain
+    statement: "Explain how the four-dimension rubric scores an eval-design answer and use it to self-assess."
+    anchor: capstone-rubric
+    threshold: true
+---
+
+import YouWillLearn from '@brandon_m_behring/book-scaffold-astro/components/YouWillLearn.astro';
+import Pitfall from '@brandon_m_behring/book-scaffold-astro/components/Pitfall.astro';
+import WorkedExample from '@brandon_m_behring/book-scaffold-astro/components/WorkedExample.astro';
+import Practice from '@brandon_m_behring/book-scaffold-astro/components/Practice.astro';
+import NoteBox from '@brandon_m_behring/book-scaffold-astro/components/NoteBox.astro';
+import ScenarioQuiz from '../../components/ScenarioQuiz.tsx';
+import capstoneData from '../../data/capstone_demo.json';
+
+# Capstone: design an evaluation strategy
+
+<YouWillLearn prerequisites="Chapters 1–11 — this chapter assembles them.">
+- A **framework** for the open-ended prompt "design an eval strategy for X".
+- A **worked mock** that walks the framework end-to-end.
+- The **four-dimension rubric** as the explicit scorecard — and how to self-assess against it.
+</YouWillLearn>
+
+## "Design an evaluation strategy for this system"
+
+This is the question the whole guide was for. An interviewer describes a system — a
+customer-support RAG assistant, say — and asks you to design its evaluation. There's
+no single right answer; there's a structure that separates strong answers from
+flailing ones.
+
+Predict: before you name a single metric, what's the *first thing* you say?
+
+<Pitfall title="Jumping to metrics without clarifying">
+A very common interview rejection reason is jumping straight to a solution
+without clarifying the problem. "I'd use F1 and an LLM judge" — before asking what the
+system does, how its output is used, and what failure is feared — signals the exact
+gap this guide trained out of you. Clarify first.
+</Pitfall>
+
+## The framework is just this guide, in order {/* anchor: capstone-design */}
+
+Every chapter is a step in the strategy. Walk them in order and you've designed the eval:
+
+1. **Clarify the use & failures** (Ch 1) — what is the output, how is it consumed, what
+   error is most expensive, what does broken look like? Error taxonomy *before* metrics.
+2. **Choose metrics & the operating point** (Ch 2, 4) — the metric family the use
+   demands; a threshold from error costs; calibration if the probability is the product.
+3. **Decide the reference strategy** (Ch 6, 7) — verifier / exact match where
+   correctness is checkable; similarity or an anchored LLM judge where it isn't.
+4. **Decompose the pipeline** (Ch 9, 10) — for RAG or agents, eval each stage
+   (retrieval vs generation; outcome vs trajectory vs cost), not just end-to-end.
+5. **Protect the data** (Ch 5, 8) — a disjoint, time-split, decontaminated eval set;
+   a held-out confirmation set; your own set over a public benchmark.
+6. **Quantify uncertainty** (Ch 3) — report metrics with confidence intervals; compare
+   models paired; don't ship on a lead that straddles zero.
+7. **Monitor in production** (Ch 11) — online signals, guardrails, drift detection,
+   cost/latency — because offline is a gate, not a guarantee.
+
+<NoteBox title="Say the structure out loud">
+In an interview, *narrating the framework* is half the score: "First I'd pin down how
+the output is used, then choose metrics from that, then talk data integrity, then
+production." It shows judgment and trade-off awareness before any technique — the two
+dimensions candidates most often miss.
+</NoteBox>
+
+## A worked mock {/* the synthesis */}
+
+<WorkedExample id="capstone-support-rag" title="Eval strategy for a customer-support RAG assistant">
+**Clarify (Ch 1):** the bot answers customer questions from our help-center docs; a
+human agent can be escalated to. The feared failure is a *confident wrong answer*
+(unfaithful) that a customer acts on. Output is consumed directly by customers →
+faithfulness and groundedness dominate; latency and cost matter (volume).
+
+**Metrics (Ch 2, 6, 7, 9):** decompose into **retrieval** (precision@k / recall@k /
+NDCG against a labeled set of relevant doc chunks) and **generation** (faithfulness:
+fraction of answer claims grounded in retrieved context, via an LLM judge anchored to
+~100 human labels; answer relevance for evasiveness). No single golden answer exists →
+reference-free, anchored.
+
+**Data integrity (Ch 5, 8):** build a domain eval set from real questions; for RAG,
+use docs the model can't answer from memory; keep a held-out confirmation set; don't
+tune prompts against the test set.
+
+**Uncertainty (Ch 3):** report each metric with a bootstrap CI; compare a new model to
+the current one *paired*, ship only if the faithfulness gain's CI clears zero.
+
+**Production (Ch 11):** online — sample live answers through the faithfulness judge
+daily; guardrails on escalation rate, p95 latency, and cost-per-resolved; drift
+monitoring on input mix and judge–human agreement; canary new versions.
+
+**The one-liner:** "Faithfulness on a domain set is the headline, decomposed into
+retrieval and generation, reported with CIs, gated offline and guarded online." That
+sentence is the strong answer.
+</WorkedExample>
+
+## Diagnose the gap {/* anchor: capstone-diagnose */}
+
+Real answers are usually incomplete in one telling way. **Predict** the critical gap
+in each plan before revealing it — each maps to a chapter.
+
+<ScenarioQuiz client:visible data={capstoneData} />
+
+The skill the drill builds: every plausible-sounding eval plan can be checked against
+the framework, and the *missing step* is the diagnosis — no CI (Ch 3), offline-only
+(Ch 11), wrong construct (Ch 8).
+
+## The rubric is the scorecard {/* anchor: capstone-rubric */}
+
+Every chapter tied back to the same four dimensions because they're how an
+eval-design answer is *scored*. Self-assess your mock against them:
+
+- **Technical Correctness** — are your metrics defined right and matched to the task
+  (ranking vs calibration vs grounding; verifier where checkable)?
+- **Trade-off Awareness** — did you reason from *use* and error cost, weigh offline vs
+  online, cheap-exact vs flexible-biased, quality vs cost?
+- **Evaluation Rigor** — CIs, paired comparison, data integrity, decomposition,
+  monitoring — or a bare point estimate? This is the dimension candidates most often
+  miss and interviewers most weight.
+- **Communication** — did you narrate a structure and land a crisp one-liner, or list
+  techniques?
+
+A strong answer scores high on all four; a very common failure is high Technical
+Correctness with low Rigor and Communication — knowing metrics but not *how to use
+them* or *how to say it*.
+
+<Practice id="capstone-design-practice" difficulty={3}>
+Design an evaluation strategy for a **coding agent that fixes bugs in a company's
+private repo**. Walk the seven-step framework; then self-score your answer on the four
+dimensions.
+
+<details>
+<summary>One defensible sketch</summary>
+
+**Clarify:** output is a code patch applied to a private repo; feared failure is a
+patch that passes superficially but breaks something or edits the wrong files. **Metrics:**
+outcome via a **verifier** — the repo's tests pass (reference-based, Ch 6); pass@1 the
+honest number, trajectory checks (only relevant files touched), cost per fix (Ch 10).
+**Reference/data:** held-out real issues the agent hasn't seen; immutable hidden tests
+to prevent gaming; no contamination from the agent's own commits. **Uncertainty:**
+n-roll each issue, mean ± std, CI on any model comparison (Ch 3). **Production:** monitor
+merge/revert rate, CI-pass rate on real PRs, cost-per-fix; alert on regressions; canary
+new agent versions. **Self-score:** Rigor (n-roll + verifier + held-out) and Trade-off
+(success-per-dollar, gaming defenses) are where this answer earns its marks.
+</details>
+</Practice>
+
+## How this is graded
+
+The rubric applies to the *design answer itself*:
+
+- **Technical Correctness** — right metrics for each stage, verifier vs judge chosen well.
+- **Trade-off Awareness** — clarified before solving; weighed offline/online, cost/quality.
+- **Evaluation Rigor** — CIs, paired tests, data integrity, decomposition, monitoring.
+- **Communication** — a narrated structure and a one-sentence headline, not a metric dump.
+
+### Industry variation
+
+- **Frontier labs** — capability *and* safety eval, contamination control, held-out everything.
+- **Applied product** — domain eval set + production monitoring beat any public benchmark.
+- **Regulated** — auditable, reproducible eval with documented data lineage and drift checks.
+
+## Where to go next
+
+You now have a complete mental model and a hand-built `mini_eval` that implements its
+core. The bridges from here: **`eval-toolkit` / RAGAS / trec_eval / sklearn** for the
+production versions of what you built; and the rest of the series — **LLM application
+engineering**, **production AI systems** — where evaluation stops being a chapter and
+becomes the thing that keeps everything else honest. You built the evaluator; now you
+can explain it cold, and design one for any system you're handed.

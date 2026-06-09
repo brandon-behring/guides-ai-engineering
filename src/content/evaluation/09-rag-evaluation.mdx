@@ -1,0 +1,229 @@
+---
+title: "RAG evaluation"
+slug: rag-evaluation
+description: "A retrieval-augmented system is two systems in a trenchcoat — a retriever and a generator — and a single end-to-end score hides which one failed. Retrieval metrics (precision@k, recall@k, NDCG) in mini_eval, faithfulness for the answer, and the Type-I vs Type-II hallucination split that tells you which half to fix."
+freshness: literature-survey
+last_verified: 2026-06-08
+tags: [evaluation, rag, retrieval, faithfulness, hallucination]
+sources: []
+draft: false
+mode: tutorial
+target: transfer
+ordering: problem-first
+commitment: long-lived
+paradigms: [default]
+research_debt_addressed: |
+  RAG evaluation is asked in almost every AI-engineering interview, and the weak
+  answer is "we use RAGAS / we LLM-judge the final answer". The skill is decomposing
+  the pipeline: grading retrieval and generation separately so a bad answer can be
+  localized, and knowing the Type-I/Type-II hallucination split that makes the two
+  failures have opposite fixes. This chapter builds the retrieval metrics in mini_eval
+  and makes the faithfulness check concrete.
+task_classes: [rag-evaluation, failure-localization]
+companion_modules: [mini-eval]
+provenance:
+  ai_tools: ["Claude Opus 4.8 (Anthropic)"]
+  audit_history:
+    - date: 2026-06-08
+      type: authored
+      file: src/content/evaluation/09-rag-evaluation.mdx
+  citation_backstop: manual
+los:
+  - id: EVAL-9.1
+    bloom: explain
+    statement: "Explain why a RAG system must be evaluated as two stages — retrieval and generation — and what each stage's failure looks like."
+    anchor: rag-decompose
+    threshold: true
+  - id: EVAL-9.2
+    bloom: calculate
+    statement: "Compute precision@k, recall@k, and NDCG@k for a retrieval result and a faithfulness score for a generated answer."
+    anchor: rag-retrieval-metrics
+    threshold: true
+  - id: EVAL-9.3
+    bloom: design
+    statement: "Localize a RAG failure to retrieval vs generation (Type-II vs Type-I) and choose the fix, including the retrieval-k trade-off."
+    anchor: rag-diagnose
+    threshold: true
+---
+
+import YouWillLearn from '@brandon_m_behring/book-scaffold-astro/components/YouWillLearn.astro';
+import Pitfall from '@brandon_m_behring/book-scaffold-astro/components/Pitfall.astro';
+import WorkedExample from '@brandon_m_behring/book-scaffold-astro/components/WorkedExample.astro';
+import Practice from '@brandon_m_behring/book-scaffold-astro/components/Practice.astro';
+import NoteBox from '@brandon_m_behring/book-scaffold-astro/components/NoteBox.astro';
+import RagEvalExplorer from '../../components/RagEvalExplorer.tsx';
+import ragData from '../../data/rag_demo.json';
+
+# RAG evaluation
+
+<YouWillLearn prerequisites="Chapter 2 (precision/recall); Chapter 7 (LLM-as-judge).">
+- Why a RAG system is **two systems** — retrieval and generation — that you grade separately.
+- **Retrieval metrics** (precision@k, recall@k, NDCG) and an answer **faithfulness** score.
+- The **Type-I vs Type-II hallucination** split that localizes a failure to one half.
+</YouWillLearn>
+
+## The bot is confidently wrong
+
+A support assistant answers "How do I get a refund?" with a fluent paragraph — and
+quietly invents a "$10 credit" your docs never promised. In the interview, the
+question is not "is the answer good?" but: **where is the bug — retrieval or
+generation?**
+
+Predict before reading: name the two distinct places this pipeline could have
+failed, and how you'd tell them apart.
+
+<Pitfall title="One end-to-end score hides which half failed">
+Grading only the final answer (a thumbs-up, a single judge score) tells you the
+system is wrong but not *why*. A RAG answer can be wrong because retrieval never
+fetched the right chunk, or because the generator had the chunk and ignored it.
+Those have **opposite fixes** — and one number can't distinguish them.
+</Pitfall>
+
+## Two systems in a trenchcoat {/* anchor: rag-decompose */}
+
+RAG is a pipeline: a **retriever** fetches candidate chunks, a **generator** writes
+an answer from them. Evaluate each stage on its own terms:
+
+- **Retrieval** is a *ranking* problem (Chapter 2's cousin): did the right chunks
+  come back, and near the top? Graded with precision@k, recall@k, NDCG, MRR.
+- **Generation** is a *grounding* problem: did the answer use the retrieved context
+  faithfully, and actually address the question? Graded with faithfulness, answer
+  relevance, and context precision — usually via an LLM judge (Chapter 7).
+
+Decomposing this way is the whole skill: it turns "the bot is wrong" into "retrieval
+recall@5 is 0.6, so 40% of answerable questions never get the chunk" *or* "retrieval
+is fine but faithfulness is 0.7 — the generator is adding things."
+
+## Grading retrieval {/* anchor: rag-retrieval-metrics */}
+
+Retrieval returns a ranked list; you have a set of relevant chunk ids. The metrics
+from Chapter 2 carry over, now indexed by a cutoff *k* (how many chunks you feed the
+generator) — all in `mini_eval`:
+
+```python
+from mini_eval import precision_at_k, recall_at_k, ndcg_at_k
+
+precision_at_k(retrieved, relevant, k=5)  # of the top 5, how many are relevant
+recall_at_k(retrieved, relevant, k=5)     # of all relevant, how many made the top 5
+ndcg_at_k(retrieved, relevant, k=5)       # rewards relevant chunks ranked *higher*
+```
+
+The same precision/recall tension as Chapter 2 reappears over *k*: a bigger context
+window raises recall (more relevant chunks make the cut) but lowers precision (more
+distractors come with them) — and, as we'll see, distractors are exactly what
+trigger the second kind of hallucination. NDCG adds what plain recall ignores —
+that a relevant chunk at rank 1 is worth more than the same chunk at rank 8:
+
+$$
+\text{NDCG@}k = \frac{\text{DCG@}k}{\text{IDCG@}k},\qquad
+\text{DCG@}k = \sum_{i=1}^{k}\frac{\text{rel}_i}{\log_2(i+1)}.
+$$
+
+## Grading the answer
+
+For the generated answer, the workhorse is **faithfulness**: break the answer into
+atomic claims and check each one is *supported by the retrieved context*. The score
+is the fraction grounded. Two siblings complete the picture (the core RAGAS metrics):
+
+- **Faithfulness** — are the answer's claims grounded in the context? (catches
+  hallucination)
+- **Answer relevance** — does the answer actually address the question? (catches
+  evasive or off-topic answers)
+- **Context precision/recall** — of the retrieved context, how much was needed, and
+  was all the needed context retrieved? (connects back to the retriever)
+
+Faithfulness is itself an LLM-as-judge task, so everything from Chapter 7 applies —
+biases, swap-and-aggregate, a human-anchored set.
+
+<WorkedExample id="rag-faithfulness-by-hand" title="A faithfulness score by hand">
+The refund answer has three claims: "30-day window" (grounded in a retrieved
+chunk), "5 business days to original method" (grounded), and "$10 credit" (in *no*
+retrieved chunk). Faithfulness = 2/3 ≈ 0.67. Note what a reference-based metric would
+miss: if a golden answer happened to mention the 30-day window, BLEU/embedding
+similarity could still score the whole answer "close" while the fabricated credit
+sails through. Faithfulness is reference-*free* and grounds against the context
+the system actually used.
+</WorkedExample>
+
+## See it
+
+Two tabs: drag *k* to watch retrieval's precision/recall/NDCG trade off, then switch
+to **Faithfulness** to see the answer's claims checked against the context.
+**Predict**: on the retrieval tab, as you raise *k* from 1 to 10, what happens to
+precision versus recall?
+
+<RagEvalExplorer client:visible data={ragData} />
+
+Now *explain* the two screens together. Recall climbs with *k* (you eventually catch
+all the relevant chunks) while precision sags (distractors pile in); the faithfulness
+tab shows the generator inventing the "$10 credit" — a claim grounded in *nothing*
+retrieved.
+
+## Two hallucinations, opposite fixes {/* anchor: rag-diagnose */}
+
+<NoteBox title="Type I vs Type II">
+*Type-I/II* here is a mnemonic borrowed from the false-positive / false-negative
+error pair — **not** standard terminology (the hallucination literature calls these
+*intrinsic* vs *extrinsic*). The two-failure decomposition is the point, not the label.
+
+- **Type-I (unfaithful):** the answer adds claims the context doesn't support (the
+  "$10 credit"). Retrieval was fine; the *generator* over-reached. Fix on the
+  generation side — stricter grounding prompt, lower temperature, a faithfulness
+  guardrail.
+- **Type-II (wrong context):** the answer faithfully summarizes chunks that were the
+  *wrong* ones — retrieval missed the right doc. Fix on the *retrieval* side — better
+  embeddings, reranking, more recall.
+
+They pull against each other on *k*: raising *k* adds context that can fix Type-I
+(the right fact is now present) but feeds Type-II (more distractors to faithfully
+summarize). You can't tune your way out with one knob — you must measure the two
+stages separately.
+</NoteBox>
+
+<Practice id="rag-localize" difficulty={2}>
+Your RAG bot answers a policy question fluently and every claim *is* supported by
+the chunks it retrieved — but the answer is still wrong, because it cited an
+*outdated* policy doc. Faithfulness is ~1.0. Which stage failed, which metric would
+have caught it, and what do you fix?
+
+<details>
+<summary>One defensible answer</summary>
+
+**Retrieval** failed (Type-II): faithfulness is high because the generator honestly
+used what it got — but it got the wrong document. Faithfulness can't see this;
+**context precision/recall against the *correct* doc** (or retrieval precision@k with
+the up-to-date doc as the relevant id) would. Fixes are retrieval-side: freshness
+filtering / recency in ranking, removing stale docs from the index, or reranking —
+not a generation-prompt change.
+</details>
+</Practice>
+
+## How this is graded
+
+- **Technical Correctness** — you separate retrieval from generation and name the
+  right metric for each (ranked-list vs grounding), not "we use RAGAS".
+- **Trade-off Awareness** — you reason about the precision/recall-over-*k* tension
+  and how it couples to the two hallucination types.
+- **Evaluation Rigor** — the weighted dimension: you'd build a small labeled set
+  (relevant chunks per query + a faithfulness rubric), measure each stage, and
+  localize failures rather than scoring end-to-end.
+- **Communication** — "recall@5 is 0.6 so 40% of questions never get the chunk —
+  that's our ceiling, fix retrieval first" beats "the answers feel off".
+
+### Industry variation
+
+- **Customer support / docs** — faithfulness is paramount; a fluent unsupported
+  answer is a trust and liability risk.
+- **Legal / medical** — Type-II (right-sounding, wrong source) is the feared failure;
+  provenance and citation-level grounding are required.
+- **Enterprise search** — retrieval recall over a huge, permissioned corpus dominates;
+  access-control leakage is its own eval.
+
+## Stretch: you don't have relevance labels
+
+Everything above assumed you knew which chunks were relevant. On a fresh corpus you
+don't. How would you bootstrap a retrieval eval set without hand-labeling thousands
+of query–chunk pairs? (Hints: **LLM-generated** question–answer pairs *from* known
+chunks give you free relevance labels; **context precision/recall** can be judged by
+an LLM without a gold set; and production **click/citation logs** are weak labels.
+Each is reference-free — Chapter 6 — and each has its own biases to watch.)

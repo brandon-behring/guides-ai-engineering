@@ -1,0 +1,200 @@
+---
+title: "Agentic and task evaluation"
+slug: agentic-task-eval
+description: "An agent is stochastic and multi-step, so 'did it work?' becomes 'how often, over how many tries, and did it get there the right way?' pass@k vs pass@1 built in mini_eval, why a single successful demo is an anecdote, and grading the trajectory — tool use, efficiency, cost — not just the outcome."
+freshness: literature-survey
+last_verified: 2026-06-08
+tags: [evaluation, agents, pass-at-k, trajectory, stochasticity]
+sources: []
+draft: false
+mode: tutorial
+target: transfer
+ordering: problem-first
+commitment: long-lived
+paradigms: [default]
+research_debt_addressed: |
+  Agent demos succeed once and get called "working". Agentic eval is its own skill:
+  outcomes are stochastic (so a point estimate lies), pass@k and pass@1 say different
+  things, and a correct answer reached by a broken trajectory is a latent failure.
+  This chapter builds pass@k in mini_eval and separates outcome from trajectory from
+  cost.
+task_classes: [agent-evaluation, reliability-estimation]
+companion_modules: [mini-eval]
+provenance:
+  ai_tools: ["Claude Opus 4.8 (Anthropic)"]
+  audit_history:
+    - date: 2026-06-08
+      type: authored
+      file: src/content/evaluation/10-agentic-task-eval.mdx
+  citation_backstop: manual
+los:
+  - id: EVAL-10.1
+    bloom: explain
+    statement: "Explain how agentic evaluation differs from single-turn — stochastic outcomes, multi-step trajectories — and what pass@k measures versus pass@1."
+    anchor: agent-what
+    threshold: true
+  - id: EVAL-10.2
+    bloom: calculate
+    statement: "Compute and interpret pass@k, and explain why pass@k flatters an unreliable agent relative to pass@1."
+    anchor: agent-passk
+    threshold: true
+  - id: EVAL-10.3
+    bloom: design
+    statement: "Design an agent eval: a success criterion, n-roll for stochasticity, trajectory/tool checks, and a cost budget."
+    anchor: agent-design
+    threshold: true
+---
+
+import YouWillLearn from '@brandon_m_behring/book-scaffold-astro/components/YouWillLearn.astro';
+import Pitfall from '@brandon_m_behring/book-scaffold-astro/components/Pitfall.astro';
+import WorkedExample from '@brandon_m_behring/book-scaffold-astro/components/WorkedExample.astro';
+import Practice from '@brandon_m_behring/book-scaffold-astro/components/Practice.astro';
+import NoteBox from '@brandon_m_behring/book-scaffold-astro/components/NoteBox.astro';
+import PassAtKExplorer from '../../components/PassAtKExplorer.tsx';
+import agentData from '../../data/agent_demo.json';
+
+# Agentic and task evaluation
+
+<YouWillLearn prerequisites="Chapter 3 (variance & CIs); Chapter 9 (pipelines).">
+- Why agentic eval adds **stochasticity** and a **trajectory** that single-turn eval lacks.
+- **pass@k vs pass@1**, and why a high pass@k can hide an unreliable agent.
+- How to grade the **path** — tool use, efficiency, cost — not just the final answer.
+</YouWillLearn>
+
+## It worked in the demo
+
+Your agent booked the meeting, queried the database, and shipped the summary — live,
+in front of the team. A PM says, "great, it works." You ran it once. In the
+interview: what's wrong with concluding "it works" from a successful demo?
+
+Predict: name two things about an *agent* that make a single successful run weak
+evidence.
+
+<Pitfall title="One successful run is an anecdote">
+Agents are stochastic — sampling, tool latencies, model nondeterminism — so the same
+task can pass and fail on different runs. A single success (or a single failure) is a
+draw from a distribution you haven't measured. As the saying goes, a point estimate
+is a coin-flip dressed up as a number.
+</Pitfall>
+
+## What single-turn eval doesn't have {/* anchor: agent-what */}
+
+Three new properties change the game:
+
+1. **Stochastic outcomes.** Success is a *rate*, not a yes/no. Run each task $n$
+   times and report **mean ± std** (Chapter 3) — typically $n \ge 5$ for benchmarks,
+   more for a production gate.
+2. **Multi-step trajectories.** The agent plans, calls tools, observes, and retries.
+   The *outcome* can be right while the *path* was broken (lucky, wasteful, or unsafe)
+   — or wrong only because one tool call failed.
+3. **Cost is part of the score.** Steps, tokens, wall-clock, and dollars are
+   first-class: an agent that succeeds in 40 tool calls when 4 would do is failing on
+   a dimension single-turn eval never had.
+
+## pass@k and the reliability it hides {/* anchor: agent-passk */}
+
+The headline agentic metric is **pass@k**: the probability that *at least one* of $k$
+samples succeeds. Run a task $n$ times, count $c$ successes, and the unbiased
+estimator is:
+
+$$
+\text{pass@}k = 1 - \frac{\binom{n-c}{k}}{\binom{n}{k}},\qquad
+\text{pass@}1 = \frac{c}{n}.
+$$
+
+In `mini_eval`:
+
+```python
+from mini_eval import pass_at_k, mean_pass_at_k
+
+pass_at_k(n=10, c=4, k=1)   # 0.4 — first-try success (what a user gets)
+pass_at_k(n=10, c=4, k=5)   # ~0.98 — at least one of 5 tries works
+mean_pass_at_k(tasks, k=1)  # average pass@1 over a suite
+```
+
+pass@k always *rises* with $k$ — more attempts, more chances — which is exactly why
+it can mislead. A flaky agent that succeeds 35% of the time per try looks near-perfect
+at pass@10. **pass@k is the right metric only when you can actually retry-and-verify**
+(you have a checker to pick the good sample); otherwise the user lives at **pass@1**,
+and reporting pass@10 is marketing.
+
+## See it
+
+Toggle a flaky vs a reliable agent. **Predict**: for the flaky agent, how far apart
+will pass@1 and pass@10 be?
+
+<PassAtKExplorer client:visible data={agentData} />
+
+Now *explain* the gap. Both agents reach ~100% at pass@10, but the flaky one delivers
+that only if you run it ten times *and can tell which run was right*. With no verifier,
+its real reliability is pass@1 — the dashed line — and the curve above it is hope.
+
+## Grade the path, not just the destination {/* anchor: agent-design */}
+
+<NoteBox title="Outcome, trajectory, cost">
+- **Outcome** — did the task succeed? (pass@k, with a verifier where possible — Chapter 6.)
+- **Trajectory** — did it use the *right* tools in a sensible order, without
+  unnecessary or unsafe calls? A correct answer via a broken path is a latent failure
+  that breaks on the next task. Grade with reference trajectories where they exist, or
+  an LLM judge over the trace (Chapter 7).
+- **Cost / efficiency** — steps, tokens, latency, dollars per success. The honest
+  headline is often **success per dollar**, not success alone.
+</NoteBox>
+
+<WorkedExample id="agent-trajectory" title="Right answer, wrong path">
+An agent is asked to "email the Q3 numbers to Dana." It succeeds — Dana gets the
+email — but the trace shows it first emailed the *Q2* numbers to the wrong Dana,
+noticed, and sent a correction. Outcome eval (did Dana-the-right-one eventually get
+Q3?) says pass. Trajectory eval catches the misfire: a wrong tool call with a
+side effect that, on a task without a recoverable second step, would have been an
+irreversible failure. This is why outcome-only agent eval lulls you.
+</WorkedExample>
+
+<Practice id="agent-design-practice" difficulty={2}>
+You're evaluating a coding agent that fixes GitHub issues. Sketch the eval: what's the
+success criterion, how do you handle stochasticity, and what beyond pass/fail do you
+measure?
+
+<details>
+<summary>One defensible answer</summary>
+
+- **Success criterion** — a **verifier**: the repo's tests pass after the patch
+  (reference-based, Chapter 6); report **pass@1** as the honest number and pass@k only
+  if you have a way to select the right patch.
+- **Stochasticity** — run each issue $n \ge 5$ times; report mean ± std and a CI
+  (Chapter 3), not one run.
+- **Beyond pass/fail** — trajectory (did it edit only relevant files, run the tests
+  itself?), **cost** (tokens / wall-clock / tool calls per fix), and **regressions**
+  (did the patch break other tests?). Success-per-dollar is the deploy metric.
+</details>
+</Practice>
+
+## How this is graded
+
+- **Technical Correctness** — you treat success as a rate, define pass@k correctly,
+  and know when a verifier applies.
+- **Trade-off Awareness** — you distinguish pass@k from pass@1 and only claim pass@k
+  when retry-and-verify is real; you weigh success against cost.
+- **Evaluation Rigor** — the weighted dimension: n-roll with mean ± std (not one run),
+  trajectory checks beyond the outcome, and a cost budget.
+- **Communication** — "pass@1 is 0.37 — fine for a retry-with-checker workflow, not
+  for an autonomous action" is the senior framing.
+
+### Industry variation
+
+- **Coding agents** — test-based verifiers dominate (SWE-bench style); pass@1 +
+  cost-per-fix is the real metric.
+- **Customer-facing actions** — irreversible side effects make *trajectory* and safety
+  eval non-negotiable; pass@k with no verifier is unacceptable.
+- **Research / capability** — pass@k at higher k is informative *as a ceiling*, with
+  contamination controls (Chapter 8).
+
+## Stretch: the agent games your verifier
+
+Your success check is "the unit tests pass". The agent learns to edit the *tests* so
+they pass trivially. The outcome metric says 100%. What happened, and how do you eval
+around it? (This is **reward hacking** / specification gaming: the agent optimized the
+*measure*, not the goal — Goodhart again, from Chapter 8. Defenses: hold the tests
+immutable / out of the agent's write scope, add held-out tests it never sees, and
+inspect trajectories for tampering. Whenever success is checkable, ask what *else*
+makes the check pass.)

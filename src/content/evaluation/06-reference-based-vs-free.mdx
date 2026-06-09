@@ -1,0 +1,174 @@
+---
+title: "Reference-based vs reference-free evaluation"
+slug: reference-based-vs-free
+description: "Do you have a golden answer to compare against, or not? That single question routes every grading decision — exact match and verifiers when there's one right answer, embedding similarity and multiple references when many phrasings are valid, and reference-free LLM judges when there's no gold at all."
+freshness: literature-survey
+last_verified: 2026-06-08
+tags: [evaluation, reference-free, llm-judge, metrics]
+sources: []
+draft: false
+mode: tutorial
+target: transfer
+ordering: problem-first
+commitment: long-lived
+paradigms: [default]
+research_debt_addressed: |
+  Candidates reach for BLEU/ROUGE or an LLM judge by reflex instead of asking the
+  routing question: do I have a reference, and is the answer space closed or open?
+  This chapter lays out the reference-based↔reference-free spectrum, matches each
+  regime to the right tool (verifier, exact match, embedding similarity, multi-
+  reference, rubric judge), and names the failure of choosing wrong.
+task_classes: [grading-method-selection, reference-strategy]
+provenance:
+  ai_tools: ["Claude Opus 4.8 (Anthropic)"]
+  audit_history:
+    - date: 2026-06-08
+      type: authored
+      file: src/content/evaluation/06-reference-based-vs-free.mdx
+  citation_backstop: manual
+los:
+  - id: EVAL-6.1
+    bloom: explain
+    statement: "Explain the reference-based↔reference-free spectrum and how a closed vs open answer space changes the right grading tool."
+    anchor: ref-spectrum
+    threshold: true
+  - id: EVAL-6.2
+    bloom: analyze
+    statement: "Diagnose why a reference-based metric (exact match, BLEU) fails on open-ended tasks and why a reference-free judge needs anchoring."
+    anchor: ref-failures
+    threshold: true
+  - id: EVAL-6.3
+    bloom: design
+    statement: "Choose a grading method for a given task from whether a reference exists and whether correctness is programmatically checkable."
+    anchor: ref-choose
+    threshold: true
+---
+
+import YouWillLearn from '@brandon_m_behring/book-scaffold-astro/components/YouWillLearn.astro';
+import Pitfall from '@brandon_m_behring/book-scaffold-astro/components/Pitfall.astro';
+import Practice from '@brandon_m_behring/book-scaffold-astro/components/Practice.astro';
+import NoteBox from '@brandon_m_behring/book-scaffold-astro/components/NoteBox.astro';
+import ScenarioQuiz from '../../components/ScenarioQuiz.tsx';
+import referenceData from '../../data/reference_demo.json';
+
+# Reference-based vs reference-free evaluation
+
+<YouWillLearn prerequisites="Chapter 7 (LLM-as-judge); Chapter 9 (faithfulness).">
+- The one routing question — **is there a golden answer?** — behind every grading choice.
+- Why **exact match / BLEU** break on open-ended tasks, and when they're exactly right.
+- When to go **reference-free** (LLM judge, verifier, faithfulness) and how to anchor it.
+</YouWillLearn>
+
+## Two answers, both correct, zero overlap
+
+Your model answers "What's the refund window?" with *"You have thirty days to ask for
+your money back."* Your golden reference says *"Refunds may be requested within 30
+days of purchase."* Same meaning; almost no words in common. Your exact-match metric
+scores it **0**. In the interview: was the model wrong, or was the *metric*?
+
+Predict: name a task where comparing to a golden answer is the right call — and one
+where it actively misleads.
+
+<Pitfall title="The reference is not always the right answer — or the only one">
+Reference-based metrics assume the reference is *the* answer. For open-ended tasks
+there are many correct answers, so string- or n-gram overlap to one of them punishes
+valid paraphrases and rewards superficial copying. Reaching for BLEU because it's
+easy is how good models get bad scores.
+</Pitfall>
+
+## The spectrum {/* anchor: ref-spectrum */}
+
+Grading methods sort by two questions: *do you have a reference?* and *is the answer
+space closed (one right answer) or open (many)?*
+
+| Regime | Right tool | Example |
+| --- | --- | --- |
+| Reference, **closed** answer | **exact match / verifier / unit tests** | math answer, code that must pass tests, classification |
+| Reference, **open** answer | **embedding similarity, multiple references**, judge with reference | summarization, translation, long-form QA |
+| **No** reference | **reference-free**: LLM judge on a rubric, faithfulness, self-consistency | production logs, open chat, RAG answers |
+
+The spectrum runs from cheap-and-exact to flexible-but-biased. Exact match and
+verifiers are free, deterministic, and bias-free — but only exist when correctness is
+checkable. LLM judges (Chapter 7) handle anything but bring cost and bias. **Slide as
+far toward the cheap, exact end as the task allows**, and no further.
+
+## Where each one breaks {/* anchor: ref-failures */}
+
+- **Exact match / BLEU / ROUGE** — brittle on open-ended output: they reward lexical
+  overlap, not meaning, so a correct paraphrase scores low and a fluent wrong answer
+  that echoes the reference's words scores high. Fine for closed answers; dangerous
+  for open ones.
+- **Embedding similarity** — forgives paraphrase, but can call a *confidently wrong*
+  answer "similar" because it's on-topic; it measures relatedness, not correctness.
+- **Reference-free LLM judge** — handles anything, but inherits the Chapter 7 biases
+  (position, verbosity, self-preference) and can drift. It must be **anchored** to a
+  small human-labeled set and **monitored** (judge–human agreement over time).
+
+<NoteBox title="Verifiers are the underrated end of the spectrum">
+For any task with a programmatic check — code that must pass tests, a math answer, a
+JSON schema, a SQL query you can execute — an **executable verifier** beats every
+other method: exact, free, and unbiased. The skill is *recognizing* when a task is
+secretly closed-answer (extract the final number, run the unit tests) instead of
+defaulting to a judge.
+</NoteBox>
+
+## See it {/* anchor: ref-choose */}
+
+Three tasks. **Predict** the right grading approach for each — and notice which
+tempting choice would break.
+
+<ScenarioQuiz client:visible data={referenceData} />
+
+Now *explain* the rule you applied: route by whether a reference exists and whether
+correctness is checkable. One right answer → verifier/exact match; many right answers
+with a reference → similarity or multi-reference; no reference → an anchored judge.
+
+<Practice id="ref-choose-practice" difficulty={2}>
+You're evaluating a code-generation assistant. Some tasks come with unit tests; some
+are "explain what this function does" with no reference. How do you grade each half,
+and what would you refuse to do?
+
+<details>
+<summary>One defensible answer</summary>
+
+- **Code with tests** → **execute the tests** (a verifier): pass@k, exact and
+  unbiased. Don't ask an LLM judge whether the code "looks right" when you can run it.
+- **Explanations, no reference** → **reference-free LLM judge** on a rubric
+  (correct? complete? grounded in the code?), **anchored** to a small human-labeled
+  set and monitored for drift.
+- **Refuse**: grading the code half with BLEU against one reference solution — valid
+  alternative implementations would score 0.
+</details>
+</Practice>
+
+## How this is graded
+
+- **Technical Correctness** — you place a task on the spectrum and name the matching
+  tool, and you know what each metric actually measures (overlap vs similarity vs
+  rubric).
+- **Trade-off Awareness** — you slide toward cheap/exact when you can and only pay for
+  a judge when the task is genuinely open.
+- **Evaluation Rigor** — you don't grade open output with exact match, you anchor and
+  monitor any reference-free judge, and you reach for verifiers when correctness is
+  checkable.
+- **Communication** — "there's one right answer, so I'd run a verifier, not an LLM
+  judge" is the crisp, senior call.
+
+### Industry variation
+
+- **Code / data** — verifiers (tests, query execution) dominate; judges are reserved
+  for style.
+- **Content / chat** — mostly reference-free; the work is rubric design and judge
+  anchoring.
+- **Translation / localization** — multi-reference and learned metrics (e.g.
+  COMET-style) over BLEU; human evaluation for the tail.
+
+## Stretch: the judge that grades itself
+
+Your only option is a reference-free LLM judge, and your generator and judge are from
+the *same* model family. What's the specific risk, and how do you keep the eval
+honest? (Hint: **self-preference bias** — the judge favors its own family's style, so
+your model looks better than it is. Use a *different* judge model, anchor to human
+labels, and report judge–human agreement; if you must use the same family, at least
+length-control and swap-aggregate, per Chapter 7. This is exactly why a reference-free
+metric is never fully self-validating.)

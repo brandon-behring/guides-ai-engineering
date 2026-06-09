@@ -1,0 +1,45 @@
+{
+  "name": "Reference-based or reference-free?",
+  "note": "For each task, pick the grading approach that fits — and avoid the one that looks easy but breaks.",
+  "items": [
+    {
+      "id": "paraphrase",
+      "prompt": "Grading a summarization model where many different phrasings are equally correct.",
+      "candidates": [
+        "Semantic similarity or an LLM judge — exact match punishes valid paraphrases",
+        "Exact string match against one reference summary",
+        "BLEU against one reference",
+        "Accuracy"
+      ],
+      "correct": "Semantic similarity or an LLM judge — exact match punishes valid paraphrases",
+      "explanation": "With an open-ended target, a single reference is one of many right answers; exact match and n-gram overlap (BLEU/ROUGE) penalize correct paraphrases. Use embedding similarity, multiple references, or a reference-free LLM judge with a rubric — watching the judge biases from Chapter 7.",
+      "principle": "When many phrasings are correct, don't grade by string overlap to one of them."
+    },
+    {
+      "id": "no-gold",
+      "prompt": "You have 50,000 production support tickets to evaluate answers on, and no gold answers.",
+      "candidates": [
+        "Reference-free: an LLM judge on a rubric (faithfulness, helpfulness), anchored to a small human-labeled set",
+        "Hand-write 50,000 gold answers first",
+        "Exact match",
+        "Skip evaluation — there's no ground truth"
+      ],
+      "correct": "Reference-free: an LLM judge on a rubric (faithfulness, helpfulness), anchored to a small human-labeled set",
+      "explanation": "No references means reference-based metrics are off the table. Reference-free grading — an LLM judge on an explicit rubric, or grounded checks like faithfulness (Chapter 9) — scales, but must be calibrated against a small human-labeled anchor set so you can trust and monitor it.",
+      "principle": "No gold answers → reference-free, but anchor the judge to human labels."
+    },
+    {
+      "id": "one-right-answer",
+      "prompt": "Grading math word problems that each have a single correct numeric answer.",
+      "candidates": [
+        "Reference-based exact match on the final answer — cheap, exact, unbiased",
+        "An LLM judge scoring 1–5 for reasoning quality",
+        "Embedding similarity to a reference solution",
+        "Human review of every solution"
+      ],
+      "correct": "Reference-based exact match on the final answer — cheap, exact, unbiased",
+      "explanation": "When there's exactly one right answer, exact match (or a verifier/unit test for code) is free, deterministic, and bias-free. Reaching for an LLM judge here adds cost and bias for no gain — save judges for tasks where no programmatic check exists.",
+      "principle": "If you can check correctness programmatically, do — don't pay for a judge."
+    }
+  ]
+}

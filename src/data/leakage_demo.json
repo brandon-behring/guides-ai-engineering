@@ -1,0 +1,45 @@
+{
+  "name": "Spot the leak",
+  "note": "Each setup looks fine and reports a great number. Pick the leak that makes the number a lie.",
+  "items": [
+    {
+      "id": "train-eval-overlap",
+      "prompt": "We built our eval set by sampling from the same conversation logs the model was fine-tuned on. Accuracy is 0.96.",
+      "candidates": [
+        "Train/eval overlap — the model may have seen these exact examples in training",
+        "The eval set is too small",
+        "We should have used F1 instead of accuracy",
+        "The logs are too old"
+      ],
+      "correct": "Train/eval overlap — the model may have seen these exact examples in training",
+      "explanation": "If eval examples (or near-duplicates) appear in the training data, the score measures memorization, not generalization. The eval set must be disjoint from training — ideally split by time or by entity so near-duplicates can't straddle the boundary.",
+      "principle": "A test set the model trained on is not a test set."
+    },
+    {
+      "id": "parametric-memory",
+      "prompt": "Our RAG eval uses Wikipedia articles that are also in the model's pretraining corpus. Answer accuracy is high.",
+      "candidates": [
+        "The model can answer from memory, so you aren't testing retrieval at all",
+        "Wikipedia is unreliable",
+        "We didn't measure latency",
+        "The chunks are too long"
+      ],
+      "correct": "The model can answer from memory, so you aren't testing retrieval at all",
+      "explanation": "When the answer is in parametric memory, the generator can be right even if retrieval returned garbage — your retrieval metrics and faithfulness are masked. Test RAG on documents the model could not have memorized (private, post-cutoff, or synthetic) to isolate the retrieval contribution.",
+      "principle": "To test retrieval, use context the model can't already recall."
+    },
+    {
+      "id": "adaptive-overfitting",
+      "prompt": "We've been tuning prompts against the same 500-example eval set for three months. Our score keeps climbing.",
+      "candidates": [
+        "Adaptive overfitting — the eval set has effectively become training data",
+        "500 examples is plenty",
+        "Prompts don't affect evaluation",
+        "The metric is wrong"
+      ],
+      "correct": "Adaptive overfitting — the eval set has effectively become training data",
+      "explanation": "Every decision you make to raise a score on a fixed set leaks information from it into your system. After enough rounds the gains are overfitting to that set, not real improvement. Keep a rotating or held-out confirmation set you touch rarely, and refresh the dev set.",
+      "principle": "A test set you optimize against stops being a test set."
+    }
+  ]
+}

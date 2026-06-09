@@ -1,0 +1,182 @@
+---
+title: "Production evaluation and monitoring"
+slug: production-eval-monitoring
+description: "Offline eval is a snapshot; production is a stream. Why a frozen offline metric stays green while live quality drifts, the online signals and guardrails that catch it, drift detection, cost and latency as first-class metrics, and the alerting that turns evaluation into a continuous process."
+freshness: literature-survey
+last_verified: 2026-06-08
+tags: [evaluation, production, monitoring, drift, guardrails]
+sources: []
+draft: false
+mode: tutorial
+target: transfer
+ordering: problem-first
+commitment: long-lived
+paradigms: [default]
+research_debt_addressed: |
+  "No production experience" and "ignoring operational concerns" are top interview
+  failure modes. Offline eval gets all the attention, but a frozen offline metric can
+  stay flat while live quality degrades under distribution shift. This chapter covers
+  online evaluation, guardrails, drift detection, and cost/latency as first-class
+  metrics — evaluation as a continuous process, not a pre-launch gate.
+task_classes: [production-monitoring, drift-detection]
+provenance:
+  ai_tools: ["Claude Opus 4.8 (Anthropic)"]
+  audit_history:
+    - date: 2026-06-08
+      type: authored
+      file: src/content/evaluation/11-production-eval-monitoring.mdx
+  citation_backstop: manual
+los:
+  - id: EVAL-11.1
+    bloom: explain
+    statement: "Explain why offline evaluation is necessary but not sufficient, and what online evaluation and guardrail metrics add."
+    anchor: prod-online
+    threshold: true
+  - id: EVAL-11.2
+    bloom: analyze
+    statement: "Diagnose drift: how a frozen offline metric can stay flat while a live signal degrades, and what to monitor instead."
+    anchor: prod-drift
+    threshold: true
+  - id: EVAL-11.3
+    bloom: design
+    statement: "Design a production eval/monitoring plan: online signals, guardrails, drift detection, cost/latency, and alerting."
+    anchor: prod-design
+    threshold: true
+---
+
+import YouWillLearn from '@brandon_m_behring/book-scaffold-astro/components/YouWillLearn.astro';
+import Pitfall from '@brandon_m_behring/book-scaffold-astro/components/Pitfall.astro';
+import Practice from '@brandon_m_behring/book-scaffold-astro/components/Practice.astro';
+import NoteBox from '@brandon_m_behring/book-scaffold-astro/components/NoteBox.astro';
+import DriftMonitorExplorer from '../../components/DriftMonitorExplorer.tsx';
+import monitoringData from '../../data/monitoring_demo.json';
+
+# Production evaluation and monitoring
+
+<YouWillLearn prerequisites="Chapter 4 (calibration drift); Chapter 3 (variance).">
+- Why offline eval is **necessary but not sufficient**, and what online eval adds.
+- How a **frozen offline metric stays green** while live quality drifts — and what to watch.
+- A production eval stack: **guardrails, drift detection, cost/latency, alerting**.
+</YouWillLearn>
+
+## The dashboard is green and users are angry
+
+Your offline F1 has been flat at a healthy number for months — green dashboard, no
+alerts. Yet support tickets are climbing and the human-override rate is creeping up.
+In the interview: how can the eval say everything's fine while the product gets worse?
+
+Predict: what does a frozen offline eval set *structurally* fail to see?
+
+<Pitfall title="Offline eval is a snapshot; production is a stream">
+An offline metric is computed on a *fixed* set, so by construction it can't move when
+the world does. Real traffic drifts — new user intents, new input formats, a changed
+upstream model — and the offline number, measured on last quarter's data, stays
+serenely flat while live quality degrades. Passing offline eval is a launch gate, not
+a guarantee.
+</Pitfall>
+
+## Offline is necessary, not sufficient {/* anchor: prod-online */}
+
+Offline eval (everything in Chapters 2–10) answers "is this good enough to ship?" on
+data you control. Production adds three things it can't provide:
+
+- **Online evaluation** — quality measured on *live* traffic: a sampled human review,
+  an LLM judge on real outputs (Chapter 7), implicit signals (thumbs, edits,
+  re-asks, escalations).
+- **Guardrail metrics** — bounds you alert on, not optimize: refusal rate, override
+  rate, p95 latency, cost per request, safety-flag rate. They catch regressions a
+  quality average hides.
+- **Continuous comparison** — canary / shadow / A-B in production, so a new version is
+  judged against the old on *current* traffic, with the statistics of Chapter 3.
+
+## Drift is what offline misses {/* anchor: prod-drift */}
+
+The core production failure is **distribution shift**: the input mix moves away from
+your eval set, so the model degrades on reality while scoring fine on the frozen set.
+What you monitor instead:
+
+- **Input drift** — embedding/feature distribution of live inputs vs the eval set.
+- **Output-quality drift** — a rolling judged or human-labeled sample of live outputs;
+  **calibration drift** (ECE creeping up, Chapter 4); judge–human agreement over time.
+- **Business / guardrail signals** — override rate, escalation rate, conversion — the
+  things that move *before* anyone files a bug.
+
+<NoteBox title="The silent-drift story, made literal">
+A triage model's offline F1 never moves, but its human automation rate climbs from
+42% to 62% as the input mix shifts — the threshold it runs at is now miscalibrated for
+reality (Chapter 4). No offline alert fires because the eval set is frozen. Only a
+*live* guardrail on the override/automation rate catches it. This is the single most
+common "we had evals and still shipped a regression" story.
+</NoteBox>
+
+## See it
+
+A frozen offline metric and a live online signal over 30 days, with a guardrail.
+**Predict**: will the offline line move when the input distribution shifts on ~day 12?
+
+<DriftMonitorExplorer client:visible data={monitoringData} />
+
+Now *explain* the divergence. The offline line is flat — it *can't* move, the set is
+fixed — while the online signal drifts past the guardrail and trips an alert on day
+22. The lesson isn't "offline eval is bad"; it's that offline eval and a live guardrail
+catch *different* failures, and you need both.
+
+## Cost and latency are eval, too {/* anchor: prod-design */}
+
+A correct answer that costs $2 and takes 30 seconds can be a worse product than a
+slightly-worse answer that costs 2¢ and returns instantly. In production, evaluation
+includes:
+
+- **Latency** (p50/p95/p99), **throughput**, **cost per request / per success**.
+- **SLOs** with error budgets: bound the operational metrics and alert on the budget.
+- **Quality-per-dollar** trade-offs across model tiers — often the real deploy
+  decision, not raw quality.
+
+<Practice id="prod-design-practice" difficulty={2}>
+You're launching an LLM feature. Beyond the offline eval that gated the launch, name
+three things you'd put in place to know — *within a day* — if it starts going wrong in
+production.
+
+<details>
+<summary>One defensible answer</summary>
+
+1. **Online quality sample** — an LLM judge (or human review) on a rolling sample of
+   live outputs, plus an implicit signal (edits / thumbs / re-asks), trended daily.
+2. **Guardrail alerts** — override/escalation rate, refusal rate, p95 latency, and
+   cost-per-request, each with a threshold that pages.
+3. **Drift detection** — input-distribution monitoring and a canary/A-B against the
+   prior version, so a regression on *current* traffic is caught with a real
+   comparison (Chapter 3), not anecdotes.
+</details>
+</Practice>
+
+## How this is graded
+
+- **Technical Correctness** — you distinguish offline from online eval and name
+  concrete online signals and guardrails, not "we monitor it".
+- **Trade-off Awareness** — you treat cost/latency as eval and reason about
+  quality-per-dollar across model tiers.
+- **Evaluation Rigor** — the weighted dimension: you'd monitor drift, keep a live
+  judged sample, alert on guardrails, and compare versions with production statistics.
+- **Communication** — "offline gates launch; a live override-rate guardrail and a
+  canary catch the drift offline can't see" is the answer that signals production
+  experience.
+
+### Industry variation
+
+- **High-traffic consumer** — implicit signals and A-B dominate; latency/cost SLOs are
+  hard gates.
+- **Regulated (finance/health)** — drift and calibration monitoring are compliance
+  requirements; human-in-the-loop sampling is mandated.
+- **Low-traffic / high-stakes** — not enough volume for A-B; lean on human review of a
+  large fraction and tight guardrails.
+
+## Stretch: your monitor needs labels
+
+Online quality monitoring needs to know if live answers were *good* — but production
+has no ground truth. Where do the labels come from, fast and cheap enough to trend
+daily? (Hints: an **LLM judge** anchored to a small human set (Chapter 7); **implicit
+labels** from user behavior — edits, thumbs, re-asks, escalations; **delayed ground
+truth** that arrives later (did the flagged transaction charge back?); and a small
+**human-reviewed sample** as the calibration anchor for all of the above. Each is
+noisy — the skill is triangulating several weak signals into one you can trust.)

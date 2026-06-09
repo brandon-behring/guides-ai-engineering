@@ -14,7 +14,6 @@ type Resp = { id: string; text: string; quality: number; len: number };
 type Pair = {
   label: string; a: Resp; b: Resp; truth: string;
   position: { order_ab: string; order_ba: string; debiased: string };
-  verbosity: { order_ab: string };
 };
 type Data = { pairs: Pair[]; position_flip_rate: number; note: string };
 
