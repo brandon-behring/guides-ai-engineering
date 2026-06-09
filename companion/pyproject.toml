@@ -17,7 +17,7 @@ dependencies = []  # stdlib-only by design — you should be able to read every 
 test = ["pytest>=8"]
 
 [tool.hatch.build.targets.wheel]
-packages = ["src/mini_eval"]
+packages = ["src/mini_eval", "src/mini_rag"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

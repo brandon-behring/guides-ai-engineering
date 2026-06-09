@@ -1,0 +1,45 @@
+{
+  "name": "Spot the LLM-app myth",
+  "note": "Each line is a plausible plan for building an LLM feature. Pick the sharpest reason it breaks before you commit to it.",
+  "items": [
+    {
+      "id": "stuff-the-context",
+      "prompt": "Our knowledge base is 5,000 documents. We'll just paste them all into the prompt so the model always has full context.",
+      "candidates": [
+        "Context limits + cost/latency — you can't fit 5,000 docs, and even near the limit it's slow, pricey, and recall sags in the middle",
+        "The model isn't smart enough to read that much",
+        "You just need a bigger model",
+        "The documents would have to be PDFs"
+      ],
+      "correct": "Context limits + cost/latency — you can't fit 5,000 docs, and even near the limit it's slow, pricey, and recall sags in the middle",
+      "explanation": "Context windows are bounded and billed per token; long contexts raise latency and cost and suffer 'lost in the middle' recall loss. Retrieval (RAG) fetches only the few relevant chunks per query — cheaper, faster, and usually more accurate. This is why retrieval, not a giant prompt, is the backbone of this guide.",
+      "principle": "Retrieve the relevant few; don't stuff the irrelevant many."
+    },
+    {
+      "id": "finetune-for-facts",
+      "prompt": "Our assistant doesn't know our internal policies, so we'll fine-tune the model on our policy PDFs to teach it the facts.",
+      "candidates": [
+        "Fine-tuning teaches style and format, not reliable fact recall — and it goes stale the moment a policy changes; retrieval is the right tool for changing knowledge",
+        "Fine-tuning is simply too expensive to attempt",
+        "You'd need far more GPUs than you have",
+        "PDFs can't be used as fine-tuning data"
+      ],
+      "correct": "Fine-tuning teaches style and format, not reliable fact recall — and it goes stale the moment a policy changes; retrieval is the right tool for changing knowledge",
+      "explanation": "Fine-tuning shapes behavior, tone, and output structure; it is a poor and stale way to inject a knowledge base that changes. Retrieval keeps facts external, fresh, and citable. Reach for fine-tuning for how the model should respond — not for which documents it should know. (We make this decision explicit in the fine-tune-vs-RAG chapter.)",
+      "principle": "Fine-tune for behavior; retrieve for knowledge."
+    },
+    {
+      "id": "rag-kills-hallucination",
+      "prompt": "Once we add RAG, the model will stop hallucinating — it can only use the retrieved documents.",
+      "candidates": [
+        "No — retrieval can miss the answer, and the generator can still add claims the context never supported; you have to measure faithfulness, not assume it",
+        "Correct — RAG always grounds the answer",
+        "Hallucination is unfixable, so it doesn't matter",
+        "You'd need a second model to check the first"
+      ],
+      "correct": "No — retrieval can miss the answer, and the generator can still add claims the context never supported; you have to measure faithfulness, not assume it",
+      "explanation": "RAG reduces but does not remove hallucination: retrieval can fail to surface the answer, and the generator can introduce unsupported claims even with good context. You still measure faithfulness and groundedness (that is the Evaluation guide, Ch 9). RAG changes the failure modes; it doesn't delete them.",
+      "principle": "RAG moves the failure modes; only evaluation tells you they're gone."
+    }
+  ]
+}

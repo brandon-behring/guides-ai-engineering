@@ -10,15 +10,30 @@ import Base from '@brandon_m_behring/book-scaffold-astro/layouts/Base.astro';
       and the documented reasons strong candidates fail — taught for transfer to
       the novel problems real interviews throw at you, not memorization.
     </p>
-    <p>
-      First guide: <strong>Evaluation &amp; benchmarking</strong> — arguably the
-      scarce skill of 2025–26 as model training commoditizes. Start at
-      <a href="/ai-engineering/chapters/00-why-evaluation/">Chapter 0 — Why evaluation is the scarce skill</a>.
-    </p>
+
+    <h2>Guides</h2>
+    <ol>
+      <li>
+        <strong><a href="/ai-engineering/chapters/evaluation/why-evaluation/">Evaluation &amp; benchmarking</a></strong>
+        — arguably the scarce skill of 2025–26 as model training commoditizes:
+        deciding what &ldquo;good&rdquo; means for a real system, measuring it
+        honestly, and knowing how the measurement itself can lie.
+        <em>Complete — 13 chapters.</em>
+      </li>
+      <li>
+        <strong><a href="/ai-engineering/chapters/llm-app-engineering/why-llm-app-engineering/">LLM application engineering</a></strong>
+        — building reliable systems on top of models: prompting as a discipline,
+        retrieval &amp; RAG, agents and tool use, and the cost/latency trade-offs
+        that decide a design. <em>In progress.</em>
+      </li>
+    </ol>
+
     <p>
       Each guide is paired with a hand-rolled <code>companion</code> library you
-      build chapter-by-chapter (here, <code>mini-eval</code>), then bridge to the
-      production tools (<code>eval-toolkit</code>, RAGAS).
+      build chapter-by-chapter (<code>mini_eval</code> for evaluation,
+      <code>mini_rag</code> for retrieval) — deliberately minimal and
+      <em>for learning, not production</em> — then bridge to the production tools
+      (<code>eval-toolkit</code>, RAGAS).
     </p>
     <p>
       Part of the <a href="https://guides.brandon-behring.dev/">guides.brandon-behring.dev</a> hub.

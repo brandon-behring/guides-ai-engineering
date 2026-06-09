@@ -8,9 +8,14 @@
  * fields (mode/target/ordering/los/load_targets/paradigms/...), carried over
  * from the guides-experimentation pilot.
  *
- * NOTE (multi-guide routing): for the first guide we keep a single `chapters`
- * collection (base ./src/content/evaluation) and the inherited single-book route.
- * When guide #2 lands, generalize to per-guide collections + `[guide]/...` routes.
+ * NOTE (multi-guide routing): one `chapters` collection over ./src/content, so every
+ * guide's chapters (src/content/<guide>/*.mdx) share it. A `generateId` (below) namespaces
+ * each id by its guide folder, so the scaffold route serves /chapters/<guide>/<slug>/ and
+ * slugs only need to be unique *within* a guide. (Without it, Astro's glob keys ids off the
+ * frontmatter `slug` and routes flat at /chapters/<slug>/, forcing globally-unique slugs.)
+ * The `!frontmatter/**` guard keeps the frontmatter collection out of `chapters`. The shared
+ * /chapters/ index still lists all guides mixed; a per-guide index/landing waits on scaffold
+ * #15 (multibook, deferred post-v4.x).
  */
 import { defineCollection, z } from 'astro:content';
 import { glob } from 'astro/loaders';
@@ -61,8 +66,18 @@ const v02ChapterExtensions = z.object({
 
 const chapters = defineCollection({
   loader: glob({
-    pattern: ['**/*.{md,mdx}', '!**/_*'],
-    base: './src/content/evaluation',
+    pattern: ['**/*.{md,mdx}', '!**/_*', '!frontmatter/**'],
+    base: './src/content',
+    // Namespace each chapter's id (hence its URL) by its guide folder so guides can
+    // share slugs: id -> "<guide>/<slug>", served at /chapters/<guide>/<slug>/. Astro's
+    // glob keys ids off frontmatter `slug` by default (which would be flat, /chapters/<slug>/,
+    // forcing globally-unique slugs); this restores the per-guide URL prefix with no custom
+    // route. `entry` is the file path relative to base, e.g. "evaluation/00-why-evaluation.mdx".
+    generateId: ({ entry, data }) => {
+      const guide = entry.split('/')[0];
+      const slug = (data && data.slug) || entry.replace(/\.[^.]+$/, '').split('/').pop();
+      return `${guide}/${slug}`;
+    },
   }),
   schema: researchPortfolioChapterSchema.merge(v02ChapterExtensions),
 });

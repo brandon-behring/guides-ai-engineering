@@ -1,0 +1,222 @@
+---
+title: "Prompt engineering as a discipline"
+slug: prompt-engineering-discipline
+description: "Prompting isn't magic words — it's writing a spec. What to pin down (role, context, instruction, format), why anything code consumes needs a structured-output contract you validate, and why prompts are code: versioned and tested against a held-out set, not three happy-path examples."
+freshness: literature-survey
+last_verified: 2026-06-09
+tags: [llm-app-engineering, prompting, structured-output, robustness]
+sources: []
+draft: false
+mode: tutorial
+target: transfer
+ordering: problem-first
+commitment: long-lived
+paradigms: [default]
+research_debt_addressed: |
+  Prompting is taught as folklore — magic phrases, "10 tips", "act as a…" — divorced
+  from the system the prompt serves. The discipline that separates strong candidates is
+  treating a prompt as a spec with an explicit output contract, and treating prompts
+  like code: versioned and tested. This chapter drills that, and refuses the demo-grade
+  "it worked on three examples" as evidence of robustness.
+task_classes: [prompt-design, structured-output]
+provenance:
+  ai_tools: ["Claude Opus 4.8 (Anthropic)"]
+  audit_history:
+    - date: 2026-06-09
+      type: authored
+      file: src/content/llm-app-engineering/01-prompt-engineering-discipline.mdx
+  citation_backstop: manual
+los:
+  - id: LAE-1.1
+    bloom: explain
+    statement: "Explain why a prompt is a spec, and name what to pin down — role, context, instruction, output format — so outputs are consistent rather than improvised."
+    anchor: prompt-as-spec
+    threshold: true
+  - id: LAE-1.2
+    bloom: design
+    statement: "For any output a program consumes, design a structured-output contract (a schema) and validate it, rather than parsing prose."
+    anchor: prompt-as-contract
+    threshold: true
+  - id: LAE-1.3
+    bloom: design
+    statement: "Treat prompts like code: version them and test against a held-out set so an edit can't silently regress."
+    anchor: prompt-as-code
+    threshold: true
+---
+
+import YouWillLearn from '@brandon_m_behring/book-scaffold-astro/components/YouWillLearn.astro';
+import Pitfall from '@brandon_m_behring/book-scaffold-astro/components/Pitfall.astro';
+import Practice from '@brandon_m_behring/book-scaffold-astro/components/Practice.astro';
+import ScenarioQuiz from '../../components/ScenarioQuiz.tsx';
+import promptData from '../../data/prompt_robustness_demo.json';
+
+# Prompt engineering as a discipline
+
+<YouWillLearn prerequisites="Chapter 0 — the LLM-app stack. You can call an LLM and read basic Python.">
+- Why a prompt is a **spec**, and what to pin down so outputs don't improvise.
+- Why anything your *code* consumes needs a **structured-output contract** you validate.
+- Why prompts are **code**: versioned and tested against a held-out set.
+</YouWillLearn>
+
+## The prompt that worked once
+
+You need to pull `{name, amount, due_date}` off incoming invoices. You write the
+obvious prompt — "Tell me the name, amount, and due date from this invoice" — and try
+it on three invoices from your inbox. Perfect every time. You wire it into the
+pipeline and ship.
+
+The next morning the pipeline is full of errors. One invoice had two dates and the
+model returned a sentence. One was in euros and the amount came back as `"€1,200"`.
+One had no due date and the model *made one up*. Nothing about the model changed —
+the prompt was never a spec, so the model improvised, and your parser had no idea.
+
+Predict: name two things the original prompt failed to pin down.
+
+<Pitfall title="Prompt whispering">
+The folklore version of prompting is a hunt for magic words — "act as an expert,"
+"take a deep breath," a pile of tips. Phrasing matters at the margin, but treating
+prompting as incantation hides the actual skill: a prompt is a **specification** for
+a function whose body you don't control. Vague spec, improvised output. The work is
+making the spec precise — and checkable.
+</Pitfall>
+
+## A prompt is a spec {/* anchor: prompt-as-spec */}
+
+A reliable prompt pins down four things. Leave any of them unstated and the model
+picks for you — differently each call:
+
+1. **Role** — who the model is acting as (sets vocabulary and defaults).
+2. **Context** — the specific material to use, and the rule for when it's missing.
+3. **Instruction** — the task, and the guardrails (what *not* to do).
+4. **Output format** — length, structure, and shape the rest of your system expects.
+
+```python
+def build_prompt(question: str, context: str) -> str:
+    """A prompt is a spec: role, context, instruction, and output format — each
+    pinned so the model can't quietly decide it for you."""
+    return (
+        "You are a support assistant for ACME. "             # role
+        "Answer ONLY from the context below; "               # instruction + guardrail
+        "if the answer isn't there, say 'I don't know'.\n\n"  # the missing-context rule
+        f"Context:\n{context}\n\n"                            # context
+        f"Question: {question}\n\n"
+        "Answer in at most 2 sentences, in plain language."  # output format
+    )
+```
+
+Every clause is there to remove a degree of freedom the model would otherwise
+exercise on its own. "Answer ONLY from the context" is the difference between a
+grounded assistant and a confident fabricator; "if the answer isn't there, say 'I
+don't know'" is the difference between a safe failure and a made-up one.
+
+## Make the output a contract {/* anchor: prompt-as-contract */}
+
+The invoice pipeline broke because **code** consumed prose. Anything a program reads
+needs a *contract*: a fixed structure you ask for and then validate. Don't parse
+sentences — demand JSON and check it.
+
+```python
+import json
+
+SCHEMA = {"name": str, "amount": float, "due_date": str}
+
+INSTRUCTION = (
+    "Return ONLY a JSON object with keys: "
+    "name (string), amount (number, no currency symbol), "
+    "due_date (string, YYYY-MM-DD). Use null if a field is absent."
+)
+
+def parse_invoice(reply: str) -> dict:
+    """Validate against the contract. On a miss you reject — or re-prompt to repair —
+    instead of letting malformed data into the pipeline."""
+    data = json.loads(reply)  # raises immediately if the model didn't return JSON
+    for field, typ in SCHEMA.items():
+        if field not in data:
+            raise ValueError(f"missing field: {field}")
+        if data[field] is not None and not isinstance(data[field], typ):
+            raise ValueError(f"{field} should be {typ.__name__}, got {data[field]!r}")
+    return data
+```
+
+Now the failures become *visible and handleable*: a non-JSON reply raises at
+`json.loads`, a missing `due_date` is `null` you can branch on (not an invented date),
+and `"€1,200"` fails the type check instead of poisoning a downstream sum. Structured
+output is what turns an LLM call into a reliable function call — the same idea behind
+"function calling" / "tool use" and library validators like Pydantic.
+
+## Prompts are code {/* anchor: prompt-as-code */}
+
+The original prompt "worked on three examples." That's a demo, not a test. A prompt is
+code with an unusually stochastic runtime, so it earns the same discipline:
+
+- **Version it.** Keep prompts in source control, not pasted in a hundred call sites.
+  A prompt change is a code change with a diff and a reviewer.
+- **Keep a held-out test set.** Ten to a few dozen labeled cases that cover the long
+  tail you fear — empty input, two dates, another currency, a hostile user — not three
+  from your inbox.
+- **Check for regressions on every edit.** Re-run the set when you "improve" a prompt;
+  a tweak that helps one case routinely breaks another. (How you score those outputs is
+  the Evaluation guide — here, the habit is enough.)
+
+The mindset shift: you are not crafting one perfect string, you are maintaining a small
+program against a distribution of inputs.
+
+## See it: which prompt is the engineering choice?
+
+Three contrasts. **Predict** what actually makes the disciplined version robust before
+you reveal it — then notice each maps to one section above.
+
+<ScenarioQuiz client:visible data={promptData} />
+
+The pattern: robustness never came from nicer wording. It came from *pinning the spec*,
+*demanding a contract*, and *testing against the distribution* — the three habits that
+turn prompting from folklore into engineering.
+
+<Practice id="prompt-harden" difficulty={2}>
+You're given this prompt for a classifier: *"Read the support ticket and tell me how
+urgent it is."* It feeds an auto-routing system. Rewrite the **spec** and the **output
+contract**, and say what your held-out set must contain.
+
+<details>
+<summary>One defensible answer</summary>
+
+- **Spec** — role ("you triage support tickets"), the rule ("classify urgency as one of
+  `low`, `medium`, `high` using these definitions: …"), and the missing-info rule
+  ("if the ticket is empty or unintelligible, return `unknown`").
+- **Contract** — `{"urgency": "low|medium|high|unknown", "reason": string}`; reject any
+  value outside that enum so the router never sees a surprise label.
+- **Held-out set** — labeled tickets across all four classes *and* the edge cases that
+  break routers: empty body, multiple issues in one ticket, sarcasm/ALL CAPS that looks
+  urgent but isn't, and a non-English ticket. Re-run it on every prompt edit.
+</details>
+</Practice>
+
+## How this is graded
+
+- **Technical Correctness** — you distinguish prompt *wording* from prompt *spec*, and
+  know structured output is a contract you validate, not a formatting preference.
+- **Trade-off Awareness** — you know when a strict schema helps (machine-consumed output)
+  and when it's overkill (a human reads the reply), and you weigh re-prompting-to-repair
+  against rejecting.
+- **Evaluation Rigor** — this chapter's weighted dimension: you refuse "worked on three
+  examples" and reach for a held-out set and regression checks on every edit.
+- **Communication** — "I'd return a validated JSON object with an enum for the label, and
+  gate prompt changes on a held-out set" beats "I'd tweak the wording."
+
+### Industry variation
+
+- **Startups** — a versioned prompt + a 20-case eval set is often the *entire* eval
+  infrastructure, and it's enough to ship responsibly.
+- **Enterprise** — prompts are reviewed artifacts with audit trails; structured output and
+  validation are mandatory because the result crosses a system boundary.
+- **AI-assisted coding interviews** — increasingly you'll be asked to write *and verify*
+  an LLM call live; the contract-and-test habit is exactly what's being assessed.
+
+## Stretch: the prompt was never the bottleneck
+
+You harden the prompt, add a schema, build a held-out set — and the assistant *still*
+gets refund questions wrong. The spec is perfect; the problem is that the right policy
+was never in the context window in the first place. No prompt can cite a document the
+model never saw. What layer is actually failing, and what would you build to fix it?
+(That's **retrieval** — Chapter 2 — where getting the right context in front of the
+model becomes its own engineering problem.)

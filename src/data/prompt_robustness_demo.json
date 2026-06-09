@@ -1,0 +1,45 @@
+{
+  "name": "Is this prompt an engineering choice?",
+  "note": "Each scenario contrasts a casual prompt with a disciplined one. Predict what actually makes it robust before you reveal it.",
+  "items": [
+    {
+      "id": "spec-vs-wish",
+      "prompt": "Prompt A: \"Summarize this.\"  Prompt B: \"Summarize the email below in 2 sentences for a busy executive; if it names a deadline, state the date.\"  Which is the engineering choice?",
+      "candidates": [
+        "B — it pins length, audience, and an explicit rule for the edge case (a deadline), so outputs are consistent and testable",
+        "A — shorter prompts generalize better",
+        "They're equivalent; the model infers the rest",
+        "B over-specifies and will confuse the model"
+      ],
+      "correct": "B — it pins length, audience, and an explicit rule for the edge case (a deadline), so outputs are consistent and testable",
+      "explanation": "A under-specifies, so every call drifts on length, tone, and edge cases. B encodes the spec — length, audience, and a conditional for the deadline — turning a vague ask into something repeatable and checkable. A prompt is a spec, not a wish.",
+      "principle": "Specify length, audience, format, and the edge cases — or the model decides them for you."
+    },
+    {
+      "id": "output-contract",
+      "prompt": "You extract {name, amount, due_date} from invoices to feed a database. The prompt says \"tell me the name, amount, and due date.\" What breaks first in production?",
+      "candidates": [
+        "Free-form prose can't be parsed reliably — you need a structured-output contract (a JSON schema) plus validation",
+        "The model can't actually read invoices",
+        "You need a bigger context window",
+        "Nothing — prose output is fine to parse"
+      ],
+      "correct": "Free-form prose can't be parsed reliably — you need a structured-output contract (a JSON schema) plus validation",
+      "explanation": "Prose answers vary in wording and order, so the downstream parser breaks on the first unusual phrasing. Ask for a fixed JSON schema and validate it (reject or repair on a miss). Structured output is what turns an LLM call into a reliable function call.",
+      "principle": "If code consumes the output, demand a schema and validate it — don't parse prose."
+    },
+    {
+      "id": "works-once",
+      "prompt": "A prompt works perfectly on the three test emails you tried, so you ship it. Why isn't that evidence it's robust?",
+      "candidates": [
+        "Three happy-path examples don't cover the distribution — you need a held-out test set and versioned prompts to catch regressions",
+        "Three is an unlucky number; try a fourth",
+        "It is evidence — if it works, ship it",
+        "You should fine-tune the model instead"
+      ],
+      "correct": "Three happy-path examples don't cover the distribution — you need a held-out test set and versioned prompts to catch regressions",
+      "explanation": "A prompt that passes three hand-picked cases tells you nothing about the long tail: empty input, two deadlines, a different language, a hostile user. Treat prompts like code — a held-out eval set, version control, and a regression check whenever you edit. \"Worked once\" is a demo, not a test.",
+      "principle": "Prompts are code: version them and test them against a held-out set, not three happy-path examples."
+    }
+  ]
+}
