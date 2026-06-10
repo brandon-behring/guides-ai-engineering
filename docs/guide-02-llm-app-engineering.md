@@ -57,7 +57,17 @@ demand spine: `~/guides/docs/research/role_demand_and_interview_signals/`.
   funnel, distillation economics, three eval gates + the real bill); reuses `ScenarioQuiz`
   with hand-authored `adaptation_decision_demo.json` (5 split-the-claim scenarios). No
   companion changes (absorbs the demoted fine-tuning guide per roadmap).
-- **Next:** Ch 11 (System-design capstone).
+- **Ch 11 authored** — system-design capstone mirroring guide-1 ch12 mechanics: 5-step
+  framework (guide-in-order) + time budget, worked bank-bot mock (validator as first-class
+  box), the senior trade-off sentence, rubric scorecard; `capstone_design_demo.json`
+  (5 diagnose-the-gap scenarios, ScenarioQuiz).
+- **Ch 12 authored** — interview craft & transfer: the craft loop (communication = #1
+  documented rejection reason), the AI-assisted coding round (preregister-then-prompt,
+  verification-under-automation, the 200-pasted-lines anti-pattern — from the demand-spine
+  deep-dive), deliberate practice + the bridge pattern for unseen questions;
+  `interview_craft_demo.json` (5 scenarios).
+- **ALL 13 CHAPTERS (0–12) AUTHORED** — next: independent 5-dim review gate
+  (math / demo-honesty / factual / pedagogy / island+MDX), then fixes, then complete.
 
 ## Spine & outline (RAG-centric, ~13 ch)
 

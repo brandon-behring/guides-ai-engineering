@@ -1,0 +1,71 @@
+{
+  "name": "Spot the craft failure",
+  "note": "Five interview moments. The technical content is fine in every one — diagnose what the candidate's craft is costing them before revealing.",
+  "items": [
+    {
+      "id": "silent-solver",
+      "prompt": "A candidate reads the system-design prompt, says \"okay, give me a minute,\" and works silently on the whiteboard for six minutes, producing a correct architecture. What did those six minutes cost?",
+      "candidates": [
+        "Everything the interviewer can grade: silence is indistinguishable from being lost, the reasoning and trade-offs never became visible, and the interviewer can't steer toward what they wanted to assess",
+        "Nothing — correct architecture is the only deliverable",
+        "A few style points, recoverable with a good summary",
+        "The whiteboard marker dried out"
+      ],
+      "correct": "Everything the interviewer can grade: silence is indistinguishable from being lost, the reasoning and trade-offs never became visible, and the interviewer can't steer toward what they wanted to assess",
+      "explanation": "Communication failures are the #1 documented rejection reason (~40–45% in hiring-manager surveys) — ahead of any knowledge gap. The interview's actual product is your visible reasoning: narrated structure, trade-offs spoken as they're weighed, checkpoints that let the interviewer redirect. A silent right answer scores like a guessed one.",
+      "principle": "Think aloud structurally: narrate the plan, the options, and the choice — the reasoning IS the deliverable."
+    },
+    {
+      "id": "paste-and-pray",
+      "prompt": "In an AI-assisted coding round, a candidate prompts the assistant, gets ~200 lines, pastes them in, runs the tests (green), and says \"done.\" The interviewer asks why a particular helper function handles the empty case the way it does. The candidate doesn't know. How is this scored?",
+      "candidates": [
+        "As a failure — the round assesses verification and comprehension under automation; shipping code you can't explain or defend is the named anti-pattern, green tests or not",
+        "As a pass — the tests are green and that's what tests are for",
+        "As neutral — the assistant wrote it, so the assistant defends it",
+        "As a pass if the candidate offers to refactor it"
+      ],
+      "correct": "As a failure — the round assesses verification and comprehension under automation; shipping code you can't explain or defend is the named anti-pattern, green tests or not",
+      "explanation": "AI-assisted rounds (Meta, Google, Canva have all shipped versions) grade four things: strategic prompting, genuine code comprehension, verification-and-debugging, and communication while automating. Relying solely on prompting is an explicit fail condition. The visible failure mode even has a shape: 200 pasted lines, a feeling of productivity, and nothing you can defend — failing while the code looks fine.",
+      "principle": "You own every line you ship, whoever wrote it. Review and verify like the author you now are."
+    },
+    {
+      "id": "preregister",
+      "prompt": "Same round, different candidate. Before touching the AI, they say: \"My theory: the bug is in the pagination offset; I expect the fix in fetch_page, and this failing test should flip first.\" Then they prompt. Why does this beat diving straight into prompting?",
+      "candidates": [
+        "They preregistered a falsifiable theory — now the AI's output gets checked against a prediction instead of accepted on vibes, demonstrating governance over the tool rather than dependence on it",
+        "It doesn't — it wastes a minute the AI could have used",
+        "It's mainly politeness toward the interviewer",
+        "It guarantees the AI gives a better answer"
+      ],
+      "correct": "They preregistered a falsifiable theory — now the AI's output gets checked against a prediction instead of accepted on vibes, demonstrating governance over the tool rather than dependence on it",
+      "explanation": "Committing to a theory — which files, which invariants, which test flips — before invoking the assistant turns its output into evidence for or against your model of the system. If the AI's fix lands somewhere your theory didn't predict, that's a signal to understand before accepting. Interviewers call the alternative 'prompt theater'; this is the durable skill that survives every tool version.",
+      "principle": "Preregister, then prompt: commit to what you expect so the output can actually be verified."
+    },
+    {
+      "id": "honest-bridge",
+      "prompt": "Asked \"how would you tune HNSW parameters for this workload?\", a candidate who has never tuned HNSW says: \"I haven't tuned HNSW specifically — here's how I'd approach it: it trades recall against latency, so I'd benchmark recall@10 on our golden set across ef_search values against the p95 budget.\" Strong or weak?",
+      "candidates": [
+        "Strong — an honest gap, immediately bridged with the right structure (the trade-off, the measurement, the constraint); this is what transfer looks like under pressure",
+        "Weak — admitting any gap is disqualifying at senior levels",
+        "Weak — they should have improvised parameter values confidently",
+        "Neutral — the interviewer will just move on"
+      ],
+      "correct": "Strong — an honest gap, immediately bridged with the right structure (the trade-off, the measurement, the constraint); this is what transfer looks like under pressure",
+      "explanation": "Bluffing specifics gets probed and collapses; bare 'I don't know' leaves points on the table. The bridge pattern — name the gap, then map the unseen thing onto a structure you do own (here: a tunable trading recall for latency, measured on a golden set against an SLO) — converts every stretch question into a demonstration of how you'd learn. That mapping skill is trained, not innate: it's what every chapter's stretch problem was for.",
+      "principle": "Bridge, don't bluff: name the gap, then map the unknown onto a structure you own."
+    },
+    {
+      "id": "no-numbers",
+      "prompt": "Behavioral round: \"Tell me about an AI system you shipped.\" The candidate gives a fluent two-minute story — problem, approach, launch — with zero numbers: no scale, no metric movement, no cost, no eval result. What's the gap?",
+      "candidates": [
+        "Unquantified impact: without baseline → intervention → measured movement (and how it was measured), the story is unverifiable narrative — and 'overstated impact without metrics' is a named screening failure",
+        "The story was too short",
+        "Behavioral rounds don't expect numbers",
+        "The candidate should have name-dropped the model vendor"
+      ],
+      "correct": "Unquantified impact: without baseline → intervention → measured movement (and how it was measured), the story is unverifiable narrative — and 'overstated impact without metrics' is a named screening failure",
+      "explanation": "The strongest behavioral answers about AI systems are eval stories wearing a narrative: here's the metric that defined success, the baseline, what I changed, what moved, and how I knew the movement was real (the same golden-set discipline as Chapter 5). 'Deflection went from 31% to 47% on a 400-ticket golden set, holding junk-answer rate flat' survives any follow-up; 'it worked great' invites one.",
+      "principle": "Quantify the story: baseline, change, measured movement, and how you measured — or it didn't happen."
+    }
+  ]
+}

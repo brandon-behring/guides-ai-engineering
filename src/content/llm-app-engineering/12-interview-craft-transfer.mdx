@@ -1,0 +1,263 @@
+---
+title: "Interview craft and transfer: the skill above the skills"
+slug: interview-craft-transfer
+description: "The meta-chapter: why communication outranks knowledge in documented rejection data, the craft loop that makes reasoning visible, the new AI-assisted coding round and the verification-under-automation skill it actually grades, and deliberate practice for transfer — mapping questions you've never seen onto the structures this guide built."
+freshness: literature-survey
+last_verified: 2026-06-10
+tags: [llm-app-engineering, interview-craft, ai-assisted-coding, transfer]
+sources: []
+draft: false
+mode: tutorial
+target: transfer
+ordering: problem-first
+commitment: long-lived
+paradigms: [default]
+research_debt_addressed: |
+  Interview prep treats craft as garnish — a "communication tips" listicle after the
+  real content — while hiring-manager data puts communication failures ahead of every
+  knowledge gap as the rejection reason. Meanwhile a genuinely new round (AI-assisted
+  coding) is normalizing with almost no honest prep material: what's graded is
+  directing and verifying an AI, not racing it. This chapter treats both as trainable
+  engineering skills, and makes the guide's stretch-problem spine explicit as
+  preparation for future learning.
+task_classes: [interview-craft, transfer]
+provenance:
+  ai_tools: ["Claude Fable 5 (Anthropic)"]
+  audit_history:
+    - date: 2026-06-10
+      type: authored
+      file: src/content/llm-app-engineering/12-interview-craft-transfer.mdx
+  citation_backstop: manual
+los:
+  - id: LAE-12.1
+    bloom: explain
+    statement: "Explain why communication is the #1 documented rejection reason and run the craft loop that fixes it: clarify, narrate structure, checkpoint, close — in every round type."
+    anchor: communication-craft
+    threshold: true
+  - id: LAE-12.2
+    bloom: design
+    statement: "Perform the AI-assisted coding round as a direct-and-verify loop — clarify, decompose, preregister a theory, prompt, review, run, explain — owning every line you ship."
+    anchor: ai-assisted-round
+    threshold: true
+  - id: LAE-12.3
+    bloom: design
+    statement: "Design your own deliberate-practice plan — timed mocks, spaced retrieval, rubric self-audits — and transfer under pressure by mapping unseen questions onto owned structures."
+    anchor: transfer-practice
+    threshold: true
+---
+
+import YouWillLearn from '@brandon_m_behring/book-scaffold-astro/components/YouWillLearn.astro';
+import Pitfall from '@brandon_m_behring/book-scaffold-astro/components/Pitfall.astro';
+import Practice from '@brandon_m_behring/book-scaffold-astro/components/Practice.astro';
+import NoteBox from '@brandon_m_behring/book-scaffold-astro/components/NoteBox.astro';
+import ScenarioQuiz from '../../components/ScenarioQuiz.tsx';
+import craftData from '../../data/interview_craft_demo.json';
+
+# Interview craft and transfer: the skill above the skills
+
+<YouWillLearn prerequisites="Chapters 0–11. This chapter is about how everything before it gets seen.">
+- The **craft loop** — clarify, narrate, checkpoint, close — and why the data says it outranks knowledge.
+- The **AI-assisted coding round**: what's actually graded when the assistant writes the code, and the preregister-then-prompt discipline.
+- **Deliberate practice and transfer**: turning this guide's stretch problems into a method for questions you've never seen.
+</YouWillLearn>
+
+## The rejection that wasn't about knowledge
+
+A friend — a genuinely strong engineer, who'd have aced every technical
+question in this guide — gets rejected from a loop and asks the recruiter for
+feedback. It comes back: *"solved the problem in silence,"* *"jumped in
+without clarifying requirements,"* *"we couldn't follow the reasoning."*
+Nothing about RAG, nothing about agents, nothing wrong with the architecture.
+
+That feedback is the norm, not the anecdote: in hiring-manager surveys,
+communication and articulation failures are the most-cited rejection reason
+(~40–45%), with jumping-in-without-clarifying close behind — both ahead of any
+knowledge gap. Predict: if the reasoning was *right*, what exactly was the
+interviewer unable to grade — and whose job was it to make that gradable?
+
+<Pitfall title="Silent and right reads as lost">
+The interview's product is not the answer — it's your *visible reasoning*.
+An interviewer literally cannot distinguish six silent minutes of correct
+thinking from six silent minutes of flailing, and they can't steer toward
+what they wanted to assess. Every chapter of this guide ended with a
+"How this is graded" section for this reason: Technical Correctness is one
+dimension of four, and the other three only exist out loud.
+</Pitfall>
+
+## The craft loop {/* anchor: communication-craft */}
+
+The same four moves run every round type — coding, design, deep-dive,
+behavioral:
+
+1. **Clarify before solving.** Restate the problem in your own words, surface
+   the constraint that changes the answer ("is this latency-sensitive?
+   what's the feared failure?"), confirm scope. Chapter 11 budgeted five
+   minutes for this; even a coding question earns ninety seconds.
+2. **Narrate the structure, then fill it.** "Three candidate approaches —
+   here's the trade-off, here's my pick and why" beats discovering your
+   structure mid-sentence. The senior trade-off sentence (Ch 11) is this
+   move in miniature.
+3. **Checkpoint.** Every few minutes: "that's retrieval — want me to go
+   deeper here or move to generation?" Checkpoints let the interviewer
+   steer, which converts the interview from exam to collaboration — and
+   following their cue is itself scored.
+4. **Close the loop.** Summarize what you built, name what you'd do next
+   with more time, and *quantify* anything you claim — behavioral stories
+   included: baseline, change, measured movement, and how you measured it.
+   An unquantified impact story is a named screening failure
+   ("overstated impact without metrics").
+
+None of this is personality. It's a protocol, and protocols are practicable.
+
+## The round where the AI writes the code {/* anchor: ai-assisted-round */}
+
+The newest round changes what "coding interview" means: Meta runs a
+three-panel setup where you pick your model and work a 60-minute multi-file
+task; Google pilots "code comprehension" rounds with an assistant; startups
+hand you realistic, deliberately un-one-shottable problems. The assistant's
+presence isn't a perk — it's the *subject*. Four things are graded: strategic
+prompting and clarification, genuine code comprehension, **verification and
+debugging**, and communication while you automate. Meta's guidance is blunt:
+rely solely on prompting and you fail.
+
+The loop that passes it — and it should look familiar, because it's
+Chapter 8's agent discipline applied to *yourself as the orchestrator*:
+
+1. **Clarify** the task like any other (the craft loop doesn't pause for
+   tooling).
+2. **Decompose** — name the files, the seams, the order of attack.
+3. **Preregister your theory** before prompting: "the bug should be in the
+   pagination offset; this failing test should flip first." Committing to a
+   falsifiable expectation turns the AI's output into *evidence* you can
+   check instead of plausible text you accept — interviewers distinguish
+   exactly this from "prompt theater."
+4. **Prompt** with a spec, not a wish (Chapter 1, verbatim).
+5. **Review like the author** — because you now are: read the diff, interrogate
+   the parts that surprise you, reject what you can't defend.
+6. **Run and verify** — tests, edge cases, the prediction from step 3.
+7. **Explain** — narrate what you accepted, what you rejected, and why.
+
+The visible anti-pattern has a shape worth fearing: two hundred pasted lines,
+green tests, a feeling of great productivity — and one follow-up question you
+can't answer. *Failing while the code looks fine.* The durable skill —
+durable across every model generation — is governance over automation: you
+own every line you ship, whoever wrote it.
+
+## Transfer: the question you've never seen {/* anchor: transfer-practice */}
+
+Every chapter of this guide ended with a stretch problem that introduced
+something *not taught* and asked you to reason about it with the chapter's
+tools. That wasn't decoration — it was training for the moment every
+interview eventually reaches: the question you've never seen. The trained
+response is a **bridge**: name the gap honestly, then map the unknown onto a
+structure you own. "I haven't tuned HNSW — but it's a recall/latency
+trade-off, so: golden set, sweep the knob, measure against the p95 budget."
+The structures you now own are exactly the maps: every wrong answer
+localizes to a stage (Ch 4); every config decision wants a golden set
+(Ch 5); every upgrade has a price (Ch 6, 7); every autonomy question is
+dials and gates (Ch 8, 9); every adaptation question runs the funnel
+(Ch 10); every "design X" runs five steps (Ch 11). Bluffing collapses under
+one probe; bridging converts the same probe into a demonstration of how you
+learn.
+
+The practice method, briefly and honestly:
+
+- **Mocks under real conditions** — timed, out loud, with a person or a
+  recording you actually review. Untimed silent practice trains the wrong
+  skill.
+- **Score against the rubric, with evidence.** After each mock, one paragraph
+  per dimension citing what you *said* — "never volunteered the eval
+  strategy" is actionable; "felt okay" isn't. You built this habit in
+  Chapter 11's capstone.
+- **Spaced retrieval beats re-reading.** Return to chapters' practice
+  problems at growing intervals; re-reading produces fluency that evaporates
+  under pressure (this guide's whole pedagogy assumes you'll *do* the
+  problems).
+- **Match the prep horizon to the target.** Startup loops are
+  portfolio-first — "what have you shipped?" — and reward exactly the kind
+  of public artifact this guide's companion is. Frontier-style loops
+  realistically take months of preparation including visible work, not a
+  two-week cram. Calibrate honestly.
+
+<NoteBox title="The four dimensions, one last time">
+Technical Correctness · Trade-off Awareness · Evaluation Rigor ·
+Communication. Twelve chapters graded you against them; interviews will too,
+under different names. If you can be correct, price your choices, prove your
+claims, and be followed while doing it — the round format stops mattering.
+</NoteBox>
+
+## See it: spot the craft failure
+
+Five moments where the *technical* content is fine and the craft is the
+variable. Diagnose each before revealing.
+
+<ScenarioQuiz client:visible data={craftData} />
+
+<Practice id="craft-practice-plan" difficulty={2}>
+Design your own four-week practice plan for a target you actually have (or
+invent: senior AI engineer at a marketplace company). Constraints: ≤5 hours
+per week, must include all four round types, and every session must produce
+an artifact you can review (recording, written design, scored rubric).
+
+<details>
+<summary>One defensible answer</summary>
+
+- **Week 1 — baseline**: one timed system-design mock (Ch 11's hospital
+  scenario), recorded; rubric self-score with evidence; one AI-assisted
+  coding session on an open-source issue using the preregister-then-prompt
+  loop. Artifacts: recording + scored rubric + the PR.
+- **Week 2 — weakest dimension**: whatever Week 1's rubric flagged. If
+  Communication: re-run the *same* design prompt, graded only on narration,
+  checkpoints, and the senior sentence. Retrieval practice: redo Ch 4/5/10
+  practice problems cold.
+- **Week 3 — breadth + behavioral**: one new design scenario (different
+  sector — note how the industry-variation callouts change the feared
+  failure); write and time three quantified impact stories
+  (baseline → change → movement → measurement); one mock deep-dive where a
+  friend probes one of them for fifteen minutes.
+- **Week 4 — integration**: full loop simulation in one sitting (design +
+  AI-assisted coding + behavioral), spaced-retrieval pass over all stretch
+  problems, final rubric scoring compared against Week 1's. The diff between
+  the two scorecards is the deliverable — and the plan for the next four
+  weeks.
+</details>
+</Practice>
+
+## How this is graded
+
+- **Technical Correctness** — your bridges land on real structure: the
+  mapped-to framework actually fits the unseen question.
+- **Trade-off Awareness** — visible in real time: options narrated with
+  prices *as you think*, not reconstructed afterward.
+- **Evaluation Rigor** — claims quantified, theories preregistered, AI
+  output verified before shipped — in the interview and in the stories you
+  tell about your work.
+- **Communication** — this chapter's weighted dimension, and the guide's
+  closing argument: it is not garnish on engineering skill; in every
+  documented dataset, it *is* the differentiating engineering skill.
+
+### Industry variation
+
+- **Big tech** — AI-assisted coding rounds are mainstream; expect multi-file,
+  phased tasks and explicit comprehension probes; cost/latency fluency
+  (Ch 7) shows up in *every* design round.
+- **Startups** — portfolio-first: shipped artifacts and quantified outcomes
+  outweigh round performance; the companion library you built alongside this
+  guide is precisely the genre of evidence they ask for.
+- **Frontier labs** — paper fluency and research taste enter the loop,
+  safety conviction is screened throughout, and some labs *ban* AI
+  assistance in rounds — read the loop's rules before training for it; the
+  prep horizon is months of visible work, not weeks of cramming.
+
+## Stretch: the loop that doesn't end
+
+This guide ends where the dogfooding loop begins. The transfer test that
+matters isn't a stretch paragraph — it's the next real system you build.
+So run the full circuit once, on something real: take a system you own (or
+build the companion's support bot into one), run Chapter 11's mock on its
+design, Chapter 5's golden set on its behavior, Chapter 7's budget on its
+bill — and write up what you found where someone can read it. A public,
+quantified post-mortem of your own system is simultaneously the best
+interview preparation in this guide and the artifact every "what have you
+shipped?" conversation wants. The production-systems guide — operating these
+things when the traffic is real — picks up from there.
