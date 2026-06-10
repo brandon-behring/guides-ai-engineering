@@ -53,7 +53,11 @@ demand spine: `~/guides/docs/research/role_demand_and_interview_signals/`.
   deadlock preventer) + `mini_agent.crew` (3 least-privilege specialists, scripted
   triage_router, sick_day variant; tests 12/12) + `OrchestraExplorer` island (computed
   `orchestra_demo.json`: triage day + failure-isolation sick day, expandable inner loops).
-- **Next:** Ch 10 (Fine-tune vs RAG vs prompt) — judgment chapter, no new companion.
+- **Ch 10 authored** — the judgment chapter (behavior-vs-knowledge split, data-availability
+  funnel, distillation economics, three eval gates + the real bill); reuses `ScenarioQuiz`
+  with hand-authored `adaptation_decision_demo.json` (5 split-the-claim scenarios). No
+  companion changes (absorbs the demoted fine-tuning guide per roadmap).
+- **Next:** Ch 11 (System-design capstone).
 
 ## Spine & outline (RAG-centric, ~13 ch)
 

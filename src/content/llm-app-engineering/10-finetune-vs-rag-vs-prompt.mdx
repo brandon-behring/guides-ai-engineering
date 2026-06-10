@@ -1,0 +1,237 @@
+---
+title: "Prompt, RAG, or fine-tune: the judgment chapter"
+slug: finetune-vs-rag-vs-prompt
+description: "The #1 judgment question in AI-engineering interviews, answered the way seniors answer it: lead with when NOT to fine-tune. The behavior-vs-knowledge split, the data-availability funnel (prompt → RAG → SFT → DPO), the distillation-for-economics case, and the three evaluation gates that a fine-tune must pass before it ships — plus the costs that aren't the training run."
+freshness: literature-survey
+last_verified: 2026-06-10
+tags: [llm-app-engineering, fine-tuning, rag, judgment]
+sources: []
+draft: false
+mode: tutorial
+target: transfer
+ordering: problem-first
+commitment: long-lived
+paradigms: [default]
+research_debt_addressed: |
+  "Fine-tune vs RAG" gets taught as a feature-comparison table, but it's asked in
+  interviews as a judgment probe — and the failing answers are symmetrical: naive
+  enthusiasm ("fine-tune on our data!") and naive dismissal ("fine-tuning is
+  obsolete"). The skill is the split: behavior vs knowledge, a data-availability
+  funnel, the economics case, and evaluation gates — argued with arithmetic against
+  a concrete proposal, which is exactly how the question arrives at work.
+task_classes: [adaptation-strategy, judgment]
+provenance:
+  ai_tools: ["Claude Fable 5 (Anthropic)"]
+  audit_history:
+    - date: 2026-06-10
+      type: authored
+      file: src/content/llm-app-engineering/10-finetune-vs-rag-vs-prompt.mdx
+  citation_backstop: manual
+los:
+  - id: LAE-10.1
+    bloom: explain
+    statement: "Explain the behavior-vs-knowledge split — fine-tuning teaches HOW to respond, retrieval supplies WHAT to respond with — and why fine-tuning for facts is the named anti-pattern."
+    anchor: behavior-vs-knowledge
+    threshold: true
+  - id: LAE-10.2
+    bloom: analyze
+    statement: "Run the decision funnel: data availability picks the technique (prompting → RAG → SFT → preference tuning), with distillation as the economics case and hybrid as the production norm."
+    anchor: decision-funnel
+    threshold: true
+  - id: LAE-10.3
+    bloom: design
+    statement: "Gate a fine-tune like an engineer: domain lift, catastrophic-forgetting check, and a quality bar — plus the total-cost accounting (data curation, retraining cadence, serving ownership) that the training run hides."
+    anchor: prove-it
+    threshold: true
+---
+
+import YouWillLearn from '@brandon_m_behring/book-scaffold-astro/components/YouWillLearn.astro';
+import Pitfall from '@brandon_m_behring/book-scaffold-astro/components/Pitfall.astro';
+import Practice from '@brandon_m_behring/book-scaffold-astro/components/Practice.astro';
+import ScenarioQuiz from '../../components/ScenarioQuiz.tsx';
+import decisionData from '../../data/adaptation_decision_demo.json';
+
+# Prompt, RAG, or fine-tune: the judgment chapter
+
+<YouWillLearn prerequisites="Chapters 1–9 — you've built the prompting and retrieval halves of this decision. No training experience required.">
+- The **behavior-vs-knowledge split** that resolves most of these debates in one sentence.
+- The **data-availability funnel** — what you *have* picks the technique — and the distillation case where fine-tuning wins on pure economics.
+- The **three gates** a fine-tune must pass before shipping, and the costs that aren't the training run.
+</YouWillLearn>
+
+## The meeting you can't vibe through
+
+Chapter 9 ended in the CTO's question, so here it is again, with the budget
+attached: *"Two years of support transcripts. Fine-tune our own model and
+delete half this machinery — the retrieval stack, the prompt versioning, the
+reranker. One model that just knows our business. Why not?"*
+
+Around the table: the platform lead nodding (fewer moving parts), finance
+nodding (the API bill from Chapter 7), and you — holding everything this
+guide has built so far. "Fine-tuning is hard" loses this meeting. So does
+"sure, let's try it." Predict: what's *true* in the CTO's proposal, what's
+false, and what single distinction separates the two?
+
+<Pitfall title="Fine-tuning for knowledge">
+The most expensive mistake in this decision space is fine-tuning to inject
+facts. Training on your documents does not reliably make their contents
+retrievable — it nudges weights, and the model will confidently blend
+half-memorized fragments into fabrications. Worse: facts change, and every
+change means retraining, while a retrieval index updates by re-indexing.
+Fine-tune for *behavior* — format, tone, domain vocabulary, reasoning style.
+Keep *knowledge* in an index the model reads at answer time.
+</Pitfall>
+
+## Behavior versus knowledge {/* anchor: behavior-vs-knowledge */}
+
+One sentence resolves most of these debates: **fine-tuning teaches the model
+HOW to respond; retrieval supplies WHAT to respond with.** They're
+complements, not competitors — which is why "fine-tune *or* RAG" is usually a
+malformed question, and the best production systems run both: a model tuned
+to the house style and output contracts, grounded at answer time by retrieval
+over the current documents.
+
+Run the CTO's transcripts through the split and the proposal falls into two
+clean halves. The transcripts encode *style* — how good agents phrase things,
+de-escalate, structure a resolution — and that half is genuinely trainable.
+They also encode *policy facts as they stood at the time of each ticket* —
+and that half is a contamination risk, not an asset: a model trained on them
+will cite superseded refund windows with total confidence, and no retrieval
+stack will be there to correct it. (Also: two years of transcripts are full
+of customer PII, which now lives in your weights. Scrubbing training data is
+real work that the proposal's budget didn't include.)
+
+The comparison table, with the dimension that decides each row:
+
+| | Prompting | RAG | Fine-tuning |
+|---|---|---|---|
+| Data needed | 0–20 examples | documents | 1K–100K examples |
+| Changes what | instructions | available knowledge | weights/behavior |
+| Knowledge updates | instant (edit prompt) | re-index | **retrain** |
+| Latency | baseline | + retrieval | can *reduce* (shorter prompts, smaller model) |
+| Best at | general tasks, prototyping | dynamic facts, grounding, citations | format, tone, vocabulary, distillation |
+
+## The decision funnel {/* anchor: decision-funnel */}
+
+The technique is mostly picked by **what data you actually have** — read the
+funnel top-down and stop at the first floor you can afford:
+
+1. **No data, or a handful of examples** → *prompting*. Five great exemplars
+   are a few-shot prompt, not a training set; tuning on them teaches noise.
+2. **Documents that answer your users' questions** → *RAG*. You built this in
+   Chapters 2–7; it ships in days and updates by re-indexing.
+3. **1K–10K+ clean labeled examples and a *behavioral* failure** (format
+   violations, tone, domain phrasing) → *supervised fine-tuning*. LoRA/QLoRA
+   make the mechanics cheap — adapters under 1% of weights, a 7–8B model
+   tunable on a single modest GPU — which moved the bottleneck from compute
+   to *data quality and evaluation*, where it now stays.
+4. **5K+ preference pairs (this answer beats that one)** → *preference
+   tuning* (DPO-family). Alignment to taste, not just imitation — and it
+   amplifies whatever your annotators systematically believe, for better or
+   worse.
+
+Two cases cut across the funnel. **Distillation** is fine-tuning argued from
+Chapter 7's spreadsheet: a frontier model is nailing a narrow task at painful
+unit economics, you've logged millions of its input→output pairs, and a small
+model SFT'd on them recovers most of the quality at a fraction of the cost
+and latency. No new capability — just your task's distribution, made cheap.
+And **hybrid** is the production norm, not a compromise: tuned behavior,
+retrieved facts, prompted task instructions — each layer doing the one job
+it's best at.
+
+## Prove it: gates and the real bill {/* anchor: prove-it */}
+
+A fine-tune is a config change with weights, so Chapter 5's discipline
+applies, scaled up. Before one ships, it passes **three gates**:
+
+1. **Domain lift** — does it beat the prompted/RAG baseline on *your* golden
+   set? If not, stop here; you just saved a quarter of maintenance.
+2. **Forgetting check** — did general capability survive? Catastrophic
+   forgetting is the classic silent regression: the model gets your format
+   right and quietly gets worse at everything else. Hold out a general-purpose
+   eval and require parity.
+3. **Quality bar** — does it meet the absolute standard the product needs,
+   not just "better than before"?
+
+And answer the CTO with the **whole bill**, because the training run is the
+cheap line: data curation and PII scrubbing (the actual work), eval-set
+construction for all three gates, a *retraining cadence* (every policy change
+that RAG absorbed by re-indexing now has a training-pipeline SLA), serving
+ownership if you self-host the tuned model (Chapter 7's break-even math, now
+mandatory), and the option you give up — provider model upgrades no longer
+arrive for free; your adapter is married to a base model version. Sometimes
+the bill is still worth it — distillation at volume usually is. The judgment
+is knowing *which* line items dominate for *this* proposal.
+
+## See it: five calls to make
+
+Each scenario below is a decision you'll face more or less verbatim. Commit
+before revealing — the graded skill is the justification, and notice how
+often the right answer *splits* the proposal rather than accepting or
+rejecting it whole.
+
+<ScenarioQuiz client:visible data={decisionData} />
+
+<Practice id="answer-the-cto" difficulty={3}>
+Write your actual answer to the CTO — three minutes of meeting time, so
+roughly 150 words plus one table or list. It must: split the claim, propose
+the experiment that settles the trainable half, keep the load-bearing
+machinery, and name the two biggest line items the proposal underestimated.
+
+<details>
+<summary>One defensible answer</summary>
+
+"Half the proposal is right. The transcripts can teach a model our *voice* —
+format, tone, de-escalation — and I want to run that experiment: LoRA-tune a
+mid-size model on ~10K curated, PII-scrubbed exchanges, gate it on (1) lift
+over our current prompted baseline on the support golden set, (2) no
+regression on general capability, (3) the product quality bar. Two weeks,
+mostly data work.
+
+The other half deletes the wrong thing. Policy *facts* change monthly; the
+transcripts memorize them as they stood in 2024. Retrieval is what keeps
+answers grounded in *today's* policy with citations — remove it and we ship
+confident, stale answers that no retraining cadence can chase. The two
+underestimated line items: data curation/PII scrubbing (the real cost of
+'we have two years of data'), and the retraining + serving ownership we take
+on the day the API's model upgrades stop arriving for free. Tuned voice,
+retrieved facts — both, on purpose."
+</details>
+</Practice>
+
+## How this is graded
+
+- **Technical Correctness** — you state the behavior/knowledge split
+  precisely and know what each technique physically changes (prompt text,
+  index contents, weights).
+- **Trade-off Awareness** — this chapter's weighted dimension: the funnel run
+  on the data that exists, the full bill named (curation, gates, cadence,
+  serving, foregone upgrades), and the hybrid default.
+- **Evaluation Rigor** — no fine-tune ships without the three gates against
+  the same golden set every other config change faces.
+- **Communication** — "split the claim" beats "yes" and beats "no": the
+  CTO-answer pattern — what's right, what's wrong, the experiment, the bill —
+  is the deliverable.
+
+### Industry variation
+
+- **Startups** — prompting and RAG until the funnel *forces* otherwise;
+  the main legitimate early fine-tune is distillation once unit economics
+  bite at scale.
+- **Enterprise & regulated** — data residency can make tuned self-hosted
+  models attractive, but PII-in-weights is a governance problem prompting
+  never had; legal reviews training data now.
+- **Frontier-adjacent product teams** — preference tuning on real user
+  feedback is the moat-building move, and annotator-bias amplification is
+  its documented failure mode; the eval gates get *more* rigorous as the
+  technique gets more powerful.
+
+## Stretch: all of it, at once, on a whiteboard
+
+You now hold every layer's judgment: prompts as specs, retrieval and its
+upgrades, eval as the instrument, production economics, agents and their
+guards, and this chapter's adaptation funnel. The interview that tests all
+of it at once is forty-five minutes and one sentence long: *"Design a
+customer-support AI for a mid-size bank."* Where do you start — and in what
+order do you spend the minutes so the judgment shows? That's Chapter 11:
+the system-design capstone, run exactly like the real thing.

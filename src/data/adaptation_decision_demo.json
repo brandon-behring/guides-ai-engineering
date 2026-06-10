@@ -1,0 +1,71 @@
+{
+  "name": "Prompt, RAG, or fine-tune?",
+  "note": "Five real decision scenarios. Commit to a call before revealing — the skill being graded is the justification, not the vocabulary.",
+  "items": [
+    {
+      "id": "cto-transcripts",
+      "prompt": "The CTO: \"We have two years of support transcripts. Fine-tune our own model on them and delete the RAG stack?\" What's the strongest answer?",
+      "candidates": [
+        "Split the claim: transcripts can teach tone and format (fine-tuning's job), but policy facts change monthly and live in documents — that's RAG's job; deleting it means the model answers from stale memorized policies",
+        "Yes — two years of data is more than the 1K-example minimum, so fine-tuning will work",
+        "No — fine-tuning is too hard and expensive to ever beat prompting",
+        "Yes, but use LoRA so it's cheaper"
+      ],
+      "correct": "Split the claim: transcripts can teach tone and format (fine-tuning's job), but policy facts change monthly and live in documents — that's RAG's job; deleting it means the model answers from stale memorized policies",
+      "explanation": "Fine-tuning teaches the model HOW to respond; RAG supplies WHAT to respond with. Transcripts encode both — style (trainable) and policy facts that were true at the time (a contamination risk, not an asset: the model would confidently cite superseded policies, and the transcripts carry PII to scrub). The technologies are complementary, and the honest answer to the CTO splits the claim instead of picking a side.",
+      "principle": "Fine-tune for behavior; RAG for knowledge. They're complements, not competitors."
+    },
+    {
+      "id": "knowledge-injection",
+      "prompt": "\"The model doesn't know our new product's specs. Fine-tune it on the spec sheets?\"",
+      "candidates": [
+        "No — fine-tuning is unreliable for injecting facts (the model may hallucinate 'learned' details), and specs change; index the sheets for retrieval instead",
+        "Yes — that's exactly what fine-tuning is for",
+        "Yes, but you'll need at least 10K spec sheets",
+        "No — put the entire spec sheet in every prompt forever"
+      ],
+      "correct": "No — fine-tuning is unreliable for injecting facts (the model may hallucinate 'learned' details), and specs change; index the sheets for retrieval instead",
+      "explanation": "Training on documents doesn't reliably make their facts retrievable — it nudges weights, and the model can blend memorized fragments into confident fabrications. Worse, every spec revision means retraining. Retrieval grounds answers in the current document and updates by re-indexing. The anti-pattern has a name: fine-tuning for knowledge.",
+      "principle": "Never fine-tune to inject facts. Facts live in an index; behavior lives in weights."
+    },
+    {
+      "id": "format-behavior",
+      "prompt": "Despite a hardened prompt and a validator, ~20% of your extraction outputs still violate the schema, and re-prompting doubles latency. You have 50K clean labeled examples. Now what?",
+      "candidates": [
+        "This is the fine-tuning case: a consistent behavioral failure, abundant labeled data, and a measurable target — SFT the format in (after checking the provider's structured-output mode first, which may fix it for free)",
+        "Keep iterating on the prompt — 20% just means the prompt isn't good enough yet",
+        "Switch to RAG so the model can retrieve the schema",
+        "Collect 500K more examples before doing anything"
+      ],
+      "correct": "This is the fine-tuning case: a consistent behavioral failure, abundant labeled data, and a measurable target — SFT the format in (after checking the provider's structured-output mode first, which may fix it for free)",
+      "explanation": "Output format is behavior, not knowledge — exactly what supervised fine-tuning changes reliably. The data exists (50K labeled examples clears the 1K–10K bar), and success is mechanically measurable (schema-valid rate). The one cheaper thing to check first: modern APIs offer constrained/structured output modes that enforce schemas at decode time — if that fixes it, the training run was never needed.",
+      "principle": "Fine-tune when the failure is behavioral, the data exists, and the win is measurable — after exhausting the free options."
+    },
+    {
+      "id": "distill-latency",
+      "prompt": "A frontier model handles your classification task at 96% accuracy — but at 900ms and $0.008/query, and volume is exploding. You've logged 2M (input → final label) pairs. Options?",
+      "candidates": [
+        "Distill: fine-tune a small model on the logged input→label pairs — this is the latency/cost case for fine-tuning, with the frontier model as the teacher and your eval as the gate",
+        "Cache more aggressively — classification queries never repeat, but try anyway",
+        "RAG — retrieve similar past queries and their labels into the prompt",
+        "Negotiate a discount with the provider"
+      ],
+      "correct": "Distill: fine-tune a small model on the logged input→label pairs — this is the latency/cost case for fine-tuning, with the frontier model as the teacher and your eval as the gate",
+      "explanation": "Narrow task + huge logged dataset + cost/latency pressure is the cleanest fine-tuning case there is: a small model SFT'd on the teacher's outputs typically recovers most of the quality at a fraction of the latency and cost. The non-negotiable: a held-out eval comparing student to teacher BEFORE cutover, and monitoring after — the student won't generalize past the distribution it was taught.",
+      "principle": "Distillation = fine-tuning for economics: a small model learns the big one's behavior on YOUR distribution."
+    },
+    {
+      "id": "no-data",
+      "prompt": "\"We want the model to reason like our senior counsel. We have five example memos.\" What do you reach for?",
+      "candidates": [
+        "Prompting — five exemplars is a few-shot prompt, not a training set; fine-tuning on 5 examples teaches noise, and the funnel says no-data → prompt first",
+        "SFT with heavy data augmentation to stretch 5 into 5,000",
+        "DPO — preference pairs are stronger than examples",
+        "RAG over the five memos"
+      ],
+      "correct": "Prompting — five exemplars is a few-shot prompt, not a training set; fine-tuning on 5 examples teaches noise, and the funnel says no-data → prompt first",
+      "explanation": "The decision funnel is a data-availability funnel: no data → prompting; documents → RAG; 1K+ labeled examples → SFT; 5K+ preference pairs → DPO. Five memos is a beautiful few-shot prompt (and a style guide for it). Augmenting 5 examples into 5,000 manufactures the same 5 opinions with extra steps — the model overfits to phrasing, not judgment.",
+      "principle": "Read the funnel before reaching for the trainer: the data you HAVE picks the technique."
+    }
+  ]
+}
