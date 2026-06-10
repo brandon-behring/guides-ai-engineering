@@ -93,7 +93,7 @@ three genuinely different jobs, three different least-privilege toolsets.
 *Parallelism*: tickets are independent; forty of them serialized through one
 loop is a wall-clock choice, not a necessity. *Context decomposition*: the
 stew was the bug — ticket 3's reasoning had no business in ticket 9's
-context, and the fix is structural, not promptly. The queue passes the test
+context, and the fix is structural, not a prompt tweak. The queue passes the test
 on all three. (Most proposals pass on zero.)
 
 What the architecture *costs*, name it before building: N× the loops to pay

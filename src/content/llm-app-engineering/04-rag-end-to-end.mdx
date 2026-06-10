@@ -64,15 +64,16 @@ import pipelineData from '../../data/rag_pipeline_demo.json';
 Chapter 3 closed with this trace, and now you get to resolve it. A user asks
 *"Can I get a refund on a gift card I bought five weeks ago?"* and your
 assistant answers *"Yes — within 30 days"*: wrong twice. You check retrieval —
-it worked. The 30-day rule ranked #1; the gift-card exclusion was retrieved
-too, at rank #4. Recall on the golden set: unchanged. Chunking: coherence 1.0.
-The model: same model that aces every other question.
+it worked. The 30-day rule ranked near the top; the gift-card exclusion was
+retrieved too, near the bottom of the list. Recall on the golden set:
+unchanged. Chunking: coherence 1.0. The model: same model that aces every
+other question.
 
 So you read the *assembled context* — the thing the model actually received —
 and there it is. Your assembly step packs retrieved chunks into a fixed word
-budget, in rank order, until they stop fitting. Rank #4 didn't fit. The
-exclusion was retrieved, scored, and then silently dropped by four lines of
-glue code nobody had looked at since the prototype.
+budget, in rank order, until they stop fitting. The bottom-ranked hit didn't
+fit. The exclusion was retrieved, scored, and then silently dropped by four
+lines of glue code nobody had looked at since the prototype.
 
 Predict: which stage of *your* pipeline would you instrument first, and what
 would you log to catch this class of bug before users do?
@@ -169,17 +170,17 @@ the pipe debugs itself:
 |---|---|---|---|
 | 1 | **Retrieval** | context is irrelevant or empty; answer says "based on the context" about the wrong thing | chunking, hybrid search, query expansion, the floor |
 | 2 | **Context window** | the right chunk was retrieved but the answer misses it | rerank before assembly, raise/spend the budget smarter, fewer-but-better chunks |
-| 3 | **Extraction** | the right chunk is *in* the context; the answer still misses the detail | tighter instructions ("extract specifically…"), citations, chain-of-thought |
+| 3 | **Answer extraction** | the right chunk is *in* the context; the answer still misses the detail | tighter instructions ("extract specifically…"), citations, chain-of-thought |
 | 4 | **Generation** | the answer contradicts or invents beyond the context | grounding rules, lower temperature, few-shot "not found" examples |
 
 Two disciplines turn the table into practice. **Diagnose before fixing** — a
 "30% wrong answers" system is almost never one cause; measure each stage
 (retrieval precision, coverage, groundedness) and read the numbers *together*
-like a dashboard, not a scorecard. And **fix upstream first** — the majority
-of RAG failures are retrieval failures wearing a generation costume: if the
-right document never reached the context, no prompt engineering can save the
-answer, and an upstream fix cascades (better retrieval reduces hallucination
-*and* vagueness downstream).
+like a dashboard, not a scorecard. And **fix upstream first** — practitioner
+postmortems consistently attribute the majority of RAG failures to retrieval,
+usually wearing a generation costume: if the right document never reached the
+context, no prompt engineering can save the answer, and an upstream fix
+cascades (better retrieval reduces hallucination *and* vagueness downstream).
 
 ## See it: one pipeline, three traces
 
@@ -193,8 +194,10 @@ actually saw, and it settles every argument about "what the model knew."
 
 <Practice id="rag-diagnose-dashboard" difficulty={3}>
 A literature-Q&A RAG system answers wrong 30% of the time. Its eval dashboard
-reads: faithfulness 0.92 · answer relevancy 0.65 · context precision 0.45 ·
-context recall 0.50. Diagnose the failure point, propose fixes in priority
+reads: faithfulness 0.92 (answer claims supported by the retrieved context) ·
+answer relevancy 0.65 (answer addresses the question) · context precision 0.45
+(retrieved chunks that are relevant) · context recall 0.50 (needed information
+that was retrieved). Diagnose the failure point, propose fixes in priority
 order, and say what you expect each metric to do after the first fix.
 
 <details>
@@ -228,9 +231,9 @@ order, and say what you expect each metric to do after the first fix.
   on both sides.
 - **Evaluation Rigor** — you diagnose with per-stage measurements before
   fixing, and you treat thresholds as calibrated choices, not defaults.
-- **Communication** — "the exclusion chunk was retrieved at rank 4 and dropped
-  by the 60-word budget; I'd rerank before assembly and re-run the golden set"
-  beats "the model hallucinated."
+- **Communication** — "the exclusion chunk was retrieved at rank #3 and
+  dropped by the 60-word budget; I'd rerank before assembly and re-run the
+  golden set" beats "the model hallucinated."
 
 ### Industry variation
 
@@ -247,11 +250,12 @@ order, and say what you expect each metric to do after the first fix.
 
 ## Stretch: which pipeline is better?
 
-You fix the opener's bug two ways: pipeline A reranks before assembly;
-pipeline B doubles the budget. Both pass your five spot-checked questions.
-They disagree on cost, latency, and — you suspect — quality, but "I read ten
-answers and B felt better" won't survive review. Design the decision: what
-labeled data, which metrics for each half of the system (the retrieval half
-and the generation half), and what would make the comparison *fair*? That's
+You fix the opener's bug two ways: pipeline A keeps the original tight budget
+and no floor; pipeline B adds a similarity floor and triples the budget. Both
+pass your five spot-checked questions. They disagree on cost, on safety, and —
+you suspect — on quality, but "I read ten answers and B felt better" won't
+survive review. Design the decision: what labeled data, which metrics for each
+half of the system (the retrieval half and the generation half), and what
+would make the comparison *fair*? That's
 Chapter 5 — evaluating RAG with golden sets, ranked-list metrics, and
 faithfulness — where this guide shakes hands with the Evaluation guide.

@@ -18,7 +18,7 @@ type QuestionRow = { q: string; relevant: number[]; fact: string | null; note: s
 type Config = { key: string; label: string; detail: string };
 type Agg = { correct: number; harmful: number; safe_abstain: number; missed_abstain: number; avg_context_recall: number };
 type Data = {
-  name: string; note: string; verdict: string;
+  name: string; note: string; predict: string; verdict: string;
   chunks: { id: number; text: string }[];
   configs: Config[]; questions: QuestionRow[]; aggregates: Record<string, Agg>;
 };
@@ -28,8 +28,9 @@ const OUTCOME: Record<string, { label: string; bg: string; fg: string }> = {
   'junk': { label: 'junk answer', bg: '#fee2e2', fg: '#dc2626' },
   'retrieval-miss': { label: 'retrieval miss', bg: '#fee2e2', fg: '#dc2626' },
   'lost-in-assembly': { label: 'lost in assembly', bg: '#fee2e2', fg: '#dc2626' },
-  'extraction-miss': { label: 'extraction miss', bg: '#fee2e2', fg: '#dc2626' },
+  'extraction-miss': { label: 'answer-extraction miss', bg: '#fee2e2', fg: '#dc2626' },
   'abstain-safe': { label: 'abstained (safe)', bg: '#fef9c3', fg: '#a16207' },
+  'abstain-unreachable': { label: 'abstained (unreachable)', bg: '#fef9c3', fg: '#a16207' },
   'abstain-missed': { label: 'abstained (missed)', bg: '#fee2e2', fg: '#dc2626' },
 };
 
@@ -65,10 +66,7 @@ export default function PipelineCompareExplorer({ data }: { data: Data }) {
       {!revealed ? (
         <div>
           <p style={{ fontSize: 13, margin: '10px 0' }}>
-            <strong>Predict first:</strong> config A maximizes coverage (no floor, tight budget);
-            config B is hardened (floor 0.12, big budget). Six questions: three plainly answerable,
-            one paraphrase, one out-of-scope, one morphology trap. Which config wins — and is there
-            a question where <em>both</em> lose?
+            <strong>Predict first:</strong> {data.predict}
           </p>
           <button style={{ ...btn(true), padding: '6px 14px' }} onClick={() => setRevealed(true)}>
             Reveal the table

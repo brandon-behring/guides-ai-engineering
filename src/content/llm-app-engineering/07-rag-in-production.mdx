@@ -64,8 +64,9 @@ import budgetData from '../../data/budget_demo.json';
 
 Chapter 6's upgrades shipped. Quality holds — the golden set says so. Then
 finance forwards the API invoice with a "?" and the on-call channel lights up:
-p95 latency went from 1.8s to 5.6s, cost per query tripled, and during Monday's
-traffic spike the bot timed out for eleven minutes. In the retro, three
+the retrieval stage tripled its latency, end-to-end p95 blew past the
+2-second SLA, cost per query tripled, and during Monday's traffic spike the
+bot timed out for eleven minutes. In the retro, three
 questions go around the room and nobody has numbers: *Where do the milliseconds
 go? Where do the dollars go? And why did our dashboards — GPU at 60%, error
 rate 0.1%, all green — say nothing?*
@@ -91,8 +92,10 @@ search, rerank — tens of milliseconds each), then the model's two phases.
 **Prefill** processes the whole input at once — compute-bound, roughly *1ms
 per billion parameters per 1K input tokens*. **Decode** generates one token at
 a time — memory-bandwidth-bound, roughly *0.5ms per token per billion
-parameters*, self-hosted. Those constants are estimates to be replaced by
-measurement, but the *structure* is the lesson, and the structure says:
+parameters*, self-hosted on a modern accelerator with quantized weights
+(expect 2–4× slower on older fp16 setups). Those constants are estimates to
+be replaced by measurement, but the *structure* is the lesson, and the
+structure says:
 
 $$
 \text{latency} \approx \underbrace{\text{stages}}_{\sim 100\text{ms}}
@@ -211,8 +214,9 @@ have a mini-tier API model, the frontier API model, and one 24GB GPU
   repeats heavily; even 30% hits → ~$420/month) — and it helps the SLA's
   *average*, though not p95.
 - **Decline the GPU**: at tier-1's residual volume the break-even
-  ($864 / $0.0005 ≈ 58K queries/day) is nowhere close; the GPU only re-enters
-  on data-residency or hard-latency grounds, which weren't in the mandate.
+  ($864/month ÷ 30 days ÷ $0.0005/query ≈ 58K queries/day) is nowhere close;
+  the GPU only re-enters on data-residency or hard-latency grounds, which
+  weren't in the mandate.
 - **Verify the SLA side**: the mini-tier model decodes faster, so 80% of
   traffic gets *quicker*; re-measure p95 on the escalated 20% and cap their
   output length — the calibration of the router gets validated on the golden

@@ -12,7 +12,7 @@
         "The whiteboard marker dried out"
       ],
       "correct": "Everything the interviewer can grade: silence is indistinguishable from being lost, the reasoning and trade-offs never became visible, and the interviewer can't steer toward what they wanted to assess",
-      "explanation": "Communication failures are the #1 documented rejection reason (~40–45% in hiring-manager surveys) — ahead of any knowledge gap. The interview's actual product is your visible reasoning: narrated structure, trade-offs spoken as they're weighed, checkpoints that let the interviewer redirect. A silent right answer scores like a guessed one.",
+      "explanation": "Communication failures are the most-cited rejection reason — one published review of ~50 hiring decisions put them at ~40–45%, and practitioner guides consistently rank them first, ahead of any knowledge gap. The interview's actual product is your visible reasoning: narrated structure, trade-offs spoken as they're weighed, checkpoints that let the interviewer redirect. A silent right answer scores like a guessed one.",
       "principle": "Think aloud structurally: narrate the plan, the options, and the choice — the reasoning IS the deliverable."
     },
     {
@@ -25,7 +25,7 @@
         "As a pass if the candidate offers to refactor it"
       ],
       "correct": "As a failure — the round assesses verification and comprehension under automation; shipping code you can't explain or defend is the named anti-pattern, green tests or not",
-      "explanation": "AI-assisted rounds (Meta, Google, Canva have all shipped versions) grade four things: strategic prompting, genuine code comprehension, verification-and-debugging, and communication while automating. Relying solely on prompting is an explicit fail condition. The visible failure mode even has a shape: 200 pasted lines, a feeling of productivity, and nothing you can defend — failing while the code looks fine.",
+      "explanation": "AI-assisted rounds (Meta and Canva have shipped versions; Google has announced its pilot) grade four things: strategic prompting, genuine code comprehension, verification-and-debugging, and communication while automating. Relying solely on prompting is an explicit fail condition. The visible failure mode even has a shape: 200 pasted lines, a feeling of productivity, and nothing you can defend — failing while the code looks fine.",
       "principle": "You own every line you ship, whoever wrote it. Review and verify like the author you now are."
     },
     {
@@ -38,7 +38,7 @@
         "It guarantees the AI gives a better answer"
       ],
       "correct": "They preregistered a falsifiable theory — now the AI's output gets checked against a prediction instead of accepted on vibes, demonstrating governance over the tool rather than dependence on it",
-      "explanation": "Committing to a theory — which files, which invariants, which test flips — before invoking the assistant turns its output into evidence for or against your model of the system. If the AI's fix lands somewhere your theory didn't predict, that's a signal to understand before accepting. Interviewers call the alternative 'prompt theater'; this is the durable skill that survives every tool version.",
+      "explanation": "Committing to a theory — which files, which invariants, which test flips — before invoking the assistant turns its output into evidence for or against your model of the system. If the AI's fix lands somewhere your theory didn't predict, that's a signal to understand before accepting. The alternative gets derided as 'prompt theater'; this is the durable skill that survives every tool version.",
       "principle": "Preregister, then prompt: commit to what you expect so the output can actually be verified."
     },
     {
@@ -58,12 +58,12 @@
       "id": "no-numbers",
       "prompt": "Behavioral round: \"Tell me about an AI system you shipped.\" The candidate gives a fluent two-minute story — problem, approach, launch — with zero numbers: no scale, no metric movement, no cost, no eval result. What's the gap?",
       "candidates": [
-        "Unquantified impact: without baseline → intervention → measured movement (and how it was measured), the story is unverifiable narrative — and 'overstated impact without metrics' is a named screening failure",
+        "Unquantified impact: without baseline → intervention → measured movement (and how it was measured), the story is unverifiable narrative — and overstated impact without metrics is a screening failure hiring managers explicitly cite",
         "The story was too short",
         "Behavioral rounds don't expect numbers",
         "The candidate should have name-dropped the model vendor"
       ],
-      "correct": "Unquantified impact: without baseline → intervention → measured movement (and how it was measured), the story is unverifiable narrative — and 'overstated impact without metrics' is a named screening failure",
+      "correct": "Unquantified impact: without baseline → intervention → measured movement (and how it was measured), the story is unverifiable narrative — and overstated impact without metrics is a screening failure hiring managers explicitly cite",
       "explanation": "The strongest behavioral answers about AI systems are eval stories wearing a narrative: here's the metric that defined success, the baseline, what I changed, what moved, and how I knew the movement was real (the same golden-set discipline as Chapter 5). 'Deflection went from 31% to 47% on a 400-ticket golden set, holding junk-answer rate flat' survives any follow-up; 'it worked great' invites one.",
       "principle": "Quantify the story: baseline, change, measured movement, and how you measured — or it didn't happen."
     }

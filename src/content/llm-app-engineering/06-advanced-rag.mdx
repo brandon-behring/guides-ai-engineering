@@ -35,12 +35,12 @@ los:
     threshold: true
   - id: LAE-6.2
     bloom: explain
-    statement: "Explain hybrid retrieval: why lexical and dense search fail in complementary ways, why RRF fuses rankings instead of normalizing scores, and why stemming/folding is just a vectorizer swap."
+    statement: "Explain hybrid retrieval and query rewriting: why lexical and dense search fail in complementary ways, why RRF fuses rankings instead of normalizing scores, why stemming/folding is just a vectorizer swap — and why expansion/HyDE attack the same gap from the query side."
     anchor: hybrid-fusion
     threshold: true
   - id: LAE-6.3
     bloom: analyze
-    statement: "Treat query rewriting (expansion, HyDE) and routing variants (Self-RAG, CRAG, Graph-RAG) as priced upgrades: match each to a measured failure and buy in cheapest-first order."
+    statement: "Treat the routing variants (Self-RAG, CRAG, adaptive routing, Graph-RAG) as priced upgrades: match each to a measured failure and buy in cheapest-first order, with the golden set ordering the queue."
     anchor: upgrade-judgment
     threshold: true
 ---
@@ -55,8 +55,8 @@ import upgradeData from '../../data/rag_upgrade_demo.json';
 
 <YouWillLearn prerequisites="Chapters 2–5 — you built the pipeline and a golden set that localized three failures to ranking quality.">
 - **Two-stage retrieval**: a cheap recall stage feeding an expensive precision stage — and why the reranker never sees the corpus.
-- **Hybrid + fusion**: complementary failure modes, Reciprocal Rank Fusion, and stemming as a one-line vectorizer swap.
-- **The judgment layer**: query rewriting and the routing zoo (Self-RAG, CRAG, Graph-RAG), each priced — and bought in the order your eval points to.
+- **Hybrid, fusion, and query rewriting**: complementary failure modes, Reciprocal Rank Fusion, stemming as a one-line vectorizer swap, and expansion/HyDE from the query side.
+- **The judgment layer**: the routing zoo (Self-RAG, CRAG, Graph-RAG), each priced — and bought in the order your eval points to.
 </YouWillLearn>
 
 ## The leaderboard reflex
@@ -88,8 +88,9 @@ query and each document **independently**: the document's vector was computed
 before your query existed. That's what makes it fast (embed once, search
 sub-linearly) and what caps its precision: it cannot read the *pair*. A
 **cross-encoder reranker** does exactly that — query and document go in
-together, attention reads them jointly — making it 5–10× better at judging
-relevance and far too slow to run over a corpus: it costs one forward pass
+together, attention reads them jointly — making it substantially better at
+judging relevance (typically worth +5–20 nDCG points over the first stage's
+ordering) and far too slow to run over a corpus: it costs one forward pass
 *per pair*.
 
 So production retrieval is a **cascade**: the cheap stage optimizes recall
@@ -116,10 +117,12 @@ candidates — so when you swap in the real thing, nothing else in the pipeline
 moves. Coverage is also exactly the signal the chatty-chunk failure needed: a
 document that covers 3 of 4 query terms now beats one that repeats "refund"
 five times, because the second stage reads the pair instead of trusting the
-corpus-wide statistics. Reranking is consistently the highest-ROI retrieval
-upgrade — typically +15–25% recall@5 for 50–100ms — *except* when your
-latency budget is already spent or first-stage recall is already ~95%+;
-it re-orders candidates, it cannot resurrect what stage one never found.
+corpus-wide statistics. Reranking is consistently reported as the highest-ROI
+retrieval upgrade — practitioner figures cluster around +15–25% recall@5 for
+50–100ms, a range to verify on your own golden set rather than import —
+*except* when your latency budget is already spent or first-stage recall is
+already ~95%+; it re-orders candidates, it cannot resurrect what stage one
+never found.
 
 ## Hybrid retrieval and rank fusion {/* anchor: hybrid-fusion */}
 
@@ -185,10 +188,11 @@ That generalizes far beyond retrieval, and it's Chapter 8.)
 ## See it: the same exam, after the upgrades
 
 Config B is Chapter 5's hardened baseline. Config C adds the kit you just
-built: folded vectorizer, query expansion, RRF fusion, coverage reranking,
-and a floor measured in coverage units. Predict before revealing: which of
-the four failures move to green — and which one survives *every* retrieval
-upgrade, and why?
+built — folded vectorizer, query expansion, RRF fusion, coverage reranking, a
+floor measured in coverage units — and reuses the same coverage scorer at
+answer-extraction time, so the upgrade reaches the last ranking decision too.
+Predict before revealing: which of the four red cells in B's column move to
+green — and which failure survives *every* retrieval upgrade, and why?
 
 <PipelineCompareExplorer client:visible data={upgradeData} />
 
@@ -251,7 +255,8 @@ recall@10, and scales to high QPS. Show the latency arithmetic.
 
 Config C ships. Quality holds. Then the invoice and the latency dashboard
 land in the same week: expansion doubled retrieval calls, the reranker added
-its milliseconds, p95 went from 180ms to 520ms, and cost per query tripled.
+its milliseconds, the retrieval stage went from 180ms to 520ms — and
+end-to-end p95 blew past the 2-second SLA while cost per query tripled.
 Nobody can say which stage spends what. Before anything gets cut, what would
 you *instrument* — per stage — and which three numbers decide what lives?
 That's Chapter 7: RAG in production, where latency budgets, token economics,

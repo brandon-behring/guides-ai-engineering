@@ -119,7 +119,7 @@ export default function RagPipelineExplorer({ data }: { data: Data }) {
             background: v.answer.supported ? '#dcfce7' : '#fef9c3',
           }}>
             <div style={{ fontSize: 11, opacity: 0.7 }}>
-              answer{v.answer.supported ? ` — quoted from chunk ${v.answer.source_chunk + 1}` : ' — abstained'}
+              answer{v.answer.supported ? ` — quoted from chunk id ${v.answer.source_chunk} (not list position)` : ' — abstained'}
             </div>
             <div style={{ fontSize: 14 }}>{v.answer.text}</div>
           </div>

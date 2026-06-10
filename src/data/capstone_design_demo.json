@@ -12,7 +12,7 @@
         "The candidate should have written code first"
       ],
       "correct": "Step 1 was skipped: no clarification of requirements (scale, latency SLO, what 'support' covers, the regulatory constraint) — the architecture might be right, but the candidate can't know that yet",
-      "explanation": "Jumping without clarifying is a top documented rejection reason, and in a bank scenario it's fatal: the unasked questions (Can the bot access account data? What's the hallucination tolerance? Escalation path?) change the entire design. You earn the right to draw boxes by framing the problem first — five minutes that determine whether the next forty are relevant.",
+      "explanation": "Jumping without clarifying is among the most-cited rejection reasons, and in a bank scenario it's fatal: the unasked questions (Can the bot access account data? What's the hallucination tolerance? Escalation path?) change the entire design. You earn the right to draw boxes by framing the problem first — five minutes that determine whether the next forty are relevant.",
       "principle": "Earn the right to draw boxes: clarify inputs, outputs, scale, SLOs, and the feared failure first."
     },
     {

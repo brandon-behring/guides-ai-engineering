@@ -1,5 +1,6 @@
 {
   "name": "The upgrade kit, judged by the same exam",
+  "predict": "config B is Chapter 5's hardened baseline; config C adds the upgrade kit (folding, expansion, RRF, coverage rerank + floor) and reuses the coverage scorer at answer-extraction time. Which of the four red cells in B's column move to green \u2014 and which failure survives every retrieval upgrade?",
   "note": "Config C = folded vectorizer + query expansion + RRF fusion + coverage rerank + a coverage floor; extraction reuses the working query and the coverage scorer. Every cell computed by mini_rag.",
   "verdict": "The ranking upgrades fix exactly what Chapter 5 localized to ranking: the paraphrase now finds the policy (expansion), the morphology trap is dead (folding), and the off-topic junk became an honest abstain (a floor in coverage units). The one residual failure is extraction \u2014 the toy generator quoting the wrong sentence from the right chunk. That stage's upgrade isn't more retrieval; it's a real LLM \u2014 which is why faithfulness measurement (guide 1, Ch 9) arrives the same day the LLM does.",
   "chunks": [
@@ -109,7 +110,7 @@
       "runs": {
         "B": {
           "outcome": "extraction-miss",
-          "why": "FP3 extraction \u2014 fact in context, wrong sentence quoted",
+          "why": "FP3 answer extraction \u2014 fact in context, wrong sentence quoted",
           "answer": "You may request a refund within 30 days of purchase, as long as the item is unopened and in its original packaging.",
           "supported": true,
           "included": [
@@ -121,7 +122,7 @@
         },
         "C": {
           "outcome": "extraction-miss",
-          "why": "FP3 extraction \u2014 fact in context, wrong sentence quoted",
+          "why": "FP3 answer extraction \u2014 fact in context, wrong sentence quoted",
           "answer": "Approved refunds are paid to the original payment method.",
           "supported": true,
           "included": [
@@ -140,8 +141,8 @@
       "note": "answerable by the corpus, but shares no token with it \u2014 Ch 2's paraphrase miss",
       "runs": {
         "B": {
-          "outcome": "abstain-safe",
-          "why": "the missing-context rule did its job",
+          "outcome": "abstain-unreachable",
+          "why": "honest abstain, but the corpus answers this \u2014 FP1: fix retrieval quality, not the floor",
           "answer": "I don't know \u2014 the retrieved context doesn't answer this.",
           "supported": false,
           "included": [],

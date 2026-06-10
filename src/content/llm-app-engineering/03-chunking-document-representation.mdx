@@ -81,10 +81,10 @@ something that ran *before either of them*?
 <Pitfall title="Chunking is not preprocessing">
 The default move — "split every 512 tokens and ship it" — treats chunking as a
 boring detail. But the chunker runs *before* the embedding model and decides
-what any vector can possibly say. A 10% better chunking strategy routinely
-beats a 2× more expensive embedding model, because no model can represent
-text that isn't in its chunk. Tune the cheap upstream decision before paying
-for the expensive downstream one.
+what any vector can possibly say. A better chunking strategy routinely beats a
+more expensive embedding model, because no model can represent text that isn't
+in its chunk. Tune the cheap upstream decision before paying for the expensive
+downstream one.
 </Pitfall>
 
 ## Retrieval ranks chunks, not documents {/* anchor: chunks-are-the-unit */}
@@ -104,9 +104,9 @@ a refund exists, the second knows a deadline exists, and **no chunk knows the
 refund has a deadline**. The damage is done before any embedding is computed,
 which is why no amount of model upgrading repairs it.
 
-One more thing runs even earlier: **extraction**. Chunking operates on text
-pulled out of PDFs, decks, and scans — and extraction quality is the ceiling
-for everything after it. A scanned PDF with no text layer extracts as an empty
+One more thing runs even earlier: **text extraction**. Chunking operates on
+text pulled out of PDFs, decks, and scans — and text-extraction quality is the
+ceiling for everything after it. A scanned PDF with no text layer extracts as an empty
 string; a two-column paper read in naive order interleaves its columns
 mid-sentence; a font-encoding glitch emits `(cid:117)` garbage that embeds into
 noise. Audit extracted text against the original *before* debugging anything
@@ -166,13 +166,14 @@ universal size.
 the exact instinct Chapter 2 trained you out of. Measure in three tiers, cheap
 to expensive:
 
-1. **Extraction audit** (before chunking exists): empty-extraction rate,
+1. **Text-extraction audit** (before chunking exists): empty-extraction rate,
    characters per page, `(cid:` artifacts, OCR confidence on scans. This is
    the ceiling; fix it first.
 2. **Boundary coherence** (one line of code): the fraction of chunks ending at
    sentence-terminal punctuation — `boundary_coherence` in the companion.
-   Fixed-size configs score 0.2–0.4; sentence/paragraph score 1.0 by
-   construction. A cheap smoke test, not a quality proof.
+   Fixed-size configs land well below 1.0 (the demo grid below spans
+   0.17–0.67); sentence/paragraph score 1.0 by construction. A cheap smoke
+   test, not a quality proof.
 3. **Golden-set retrieval** (the real test): the same labeled (query →
    relevant content) set from Chapter 2, re-scored per chunking config — does
    recall@k hold, and does the *answer-bearing span* survive inside the top
@@ -256,8 +257,8 @@ answer-span-intact rate 0.97, recall@5 holding at 0.91. A user asks *"Can I
 get a refund on a gift card I bought five weeks ago?"* — and the assistant
 answers *"Yes, within 30 days"*, which is wrong twice (gift cards are
 non-refundable, and five weeks is past the window). Both relevant chunks were
-retrieved: the 30-day rule ranked #1, the gift-card exclusion ranked #4. The
-failure isn't retrieval and isn't chunking. What does the *generator* actually
+retrieved — the 30-day rule near the top of the ranking, the gift-card
+exclusion near the bottom. The failure isn't retrieval and isn't chunking. What does the *generator* actually
 see, and which part of the system decides how retrieved chunks become an
 answer? That assembly step — context construction, grounding rules, and the
 prompt around them — is Chapter 4: the full retrieve → generate pipeline.

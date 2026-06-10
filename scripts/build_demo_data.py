@@ -587,12 +587,15 @@ def categorize_outcome(item: dict, *, supported: bool, answer_text: str,
         if not relevant or not item["reachable"]:
             return "junk", "FP1 retrieval — answered when it should abstain"
         if relevant <= included:
-            return "extraction-miss", "FP3 extraction — fact in context, wrong sentence quoted"
+            return "extraction-miss", "FP3 answer extraction — fact in context, wrong sentence quoted"
         if relevant & raw_ids:
             return "lost-in-assembly", "FP2 context window — retrieved, then cut by the budget or the floor"
         return "retrieval-miss", "FP1 retrieval — the needed chunk never ranked"
-    if not relevant or not item["reachable"]:
+    if not relevant:
         return "abstain-safe", "the missing-context rule did its job"
+    if not item["reachable"]:
+        return "abstain-unreachable", ("honest abstain, but the corpus answers this — "
+                                       "FP1: fix retrieval quality, not the floor")
     return "abstain-missed", "the fact was reachable; the floor/threshold ate it"
 
 
@@ -649,7 +652,8 @@ def rag_compare_demo() -> dict:
             "correct": outs.count("correct"),
             "harmful": sum(outs.count(o) for o in
                            ("junk", "extraction-miss", "lost-in-assembly", "retrieval-miss")),
-            "safe_abstain": outs.count("abstain-safe"),
+            "safe_abstain": (outs.count("abstain-safe")
+                             + outs.count("abstain-unreachable")),
             "missed_abstain": outs.count("abstain-missed"),
             "avg_context_recall": round(sum(recalls) / len(recalls), 2),
         }
@@ -658,6 +662,11 @@ def rag_compare_demo() -> dict:
         "name": "Two configs, one golden set",
         "note": ("Every cell is a real RagPipeline.run(); outcome categories are "
                  "authored ground truth; context recall via mini_eval.recall_at_k."),
+        "predict": ("config A maximizes coverage (no floor, tight budget); config B "
+                    "is hardened (floor 0.12, big budget). Six questions: three "
+                    "plainly answerable, one paraphrase, one out-of-scope, one "
+                    "morphology trap. Which config wins — and is there a question "
+                    "where both lose?"),
         "verdict": ("B is safer than A — the floor converts one junk answer into an "
                     "honest abstain — but the golden set's real finding is that "
                     "NEITHER config is shippable: the failures concentrate in ranking "
@@ -743,13 +752,19 @@ def rag_upgrade_demo() -> dict:
             "correct": outs.count("correct"),
             "harmful": sum(outs.count(o) for o in
                            ("junk", "extraction-miss", "lost-in-assembly", "retrieval-miss")),
-            "safe_abstain": outs.count("abstain-safe"),
+            "safe_abstain": (outs.count("abstain-safe")
+                             + outs.count("abstain-unreachable")),
             "missed_abstain": outs.count("abstain-missed"),
             "avg_context_recall": round(sum(recalls) / len(recalls), 2),
         }
 
     return {
         "name": "The upgrade kit, judged by the same exam",
+        "predict": ("config B is Chapter 5's hardened baseline; config C adds the "
+                    "upgrade kit (folding, expansion, RRF, coverage rerank + floor) "
+                    "and reuses the coverage scorer at answer-extraction time. Which "
+                    "of the four red cells in B's column move to green — and which "
+                    "failure survives every retrieval upgrade?"),
         "note": ("Config C = folded vectorizer + query expansion + RRF fusion + "
                  "coverage rerank + a coverage floor; extraction reuses the working "
                  "query and the coverage scorer. Every cell computed by mini_rag."),

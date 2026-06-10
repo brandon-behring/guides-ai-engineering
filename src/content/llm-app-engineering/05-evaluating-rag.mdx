@@ -40,7 +40,7 @@ los:
     threshold: true
   - id: LAE-5.3
     bloom: analyze
-    statement: "Decide between pipeline configs by categorizing per-question outcomes (correct, junk, lost-in-assembly, extraction-miss, abstains) against the golden set — and weigh coverage against harm for the product at hand."
+    statement: "Decide between pipeline configs by categorizing per-question outcomes (correct, junk, retrieval-miss, lost-in-assembly, answer-extraction miss, the abstain family) against the golden set — and weigh coverage against harm for the product at hand."
     anchor: config-decision
     threshold: true
 ---
@@ -61,8 +61,8 @@ import compareData from '../../data/rag_compare_demo.json';
 
 ## "B felt better"
 
-Chapter 4 ended with two candidate fixes: pipeline A reranks nothing but keeps
-the old tight budget; pipeline B adds a similarity floor and triples the
+Chapter 4 ended with two candidate fixes: pipeline A keeps the old tight
+budget and no floor; pipeline B adds a similarity floor and triples the
 budget. You read ten answers from each. B felt better. You wrote "B looks
 good" in the PR description.
 
@@ -160,9 +160,10 @@ row's outcome instead — these map one-to-one onto Chapter 4's failure points:
 | **junk** | answered when it should have abstained | FP1 + missing floor |
 | **retrieval-miss** | needed chunk never ranked | FP1 |
 | **lost-in-assembly** | retrieved, then cut by budget or floor | FP2 |
-| **extraction-miss** | fact in context, answer missed it | FP3 / FP4 |
-| **abstain (safe)** | declined an unanswerable question | working as designed |
-| **abstain (missed)** | declined an answerable one | floor/threshold too high |
+| **answer-extraction miss** | fact in context, answer missed it | FP3 / FP4 |
+| **abstain (safe)** | declined a question the corpus can't answer | working as designed |
+| **abstain (unreachable)** | declined one the corpus answers but this retriever can't reach | FP1 — fix retrieval, not the floor |
+| **abstain (missed)** | declined a reachable, answerable one | floor/threshold too high |
 
 Then the decision stops being aesthetic. Coverage (how often it answers) and
 harm (how often it answers *wrongly*) move in opposite directions as you raise
@@ -195,8 +196,9 @@ you bring to the meeting?
 - **Decompose the abstains** using the outcome categories: how many are
   *safe* (out-of-scope — working as designed; arguing them to zero means
   answering unanswerable questions), versus *missed* (answerable but floored —
-  a calibration problem), versus *paraphrase-unreachable* (a retrieval-quality
-  problem no floor setting can fix).
+  a calibration problem), versus *unreachable* (the corpus answers it but this
+  retriever can't reach it — a retrieval-quality problem no floor setting can
+  fix).
 - **Measure the floor as a curve, not a constant**: sweep it across the golden
   set and plot junk-rate vs abstain-rate at each value — the Evaluation
   guide's threshold-trade-off logic, applied to the pipeline. Bring the curve,
@@ -221,7 +223,7 @@ you bring to the meeting?
 - **Evaluation Rigor** — this chapter's weighted dimension: a versioned golden
   set with abstain rows, two-half measurement, outcome categories, and
   re-runs on every config change. "I read ten answers" never appears.
-- **Communication** — "B converts one junk answer into a safe abstain and
+- **Communication** — "B converts one junk answer into an honest abstain and
   loses nothing; both configs still fail the morphology trap — that's a
   ranking problem, here's the table" beats "B felt better."
 

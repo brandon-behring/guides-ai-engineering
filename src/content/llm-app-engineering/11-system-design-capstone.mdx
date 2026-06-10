@@ -34,14 +34,14 @@ los:
     anchor: five-steps
     threshold: true
   - id: LAE-11.2
-    bloom: analyze
-    statement: "Diagnose the critical gap in a partial design answer and map it to the framework step and rubric dimension it violates."
-    anchor: diagnose-gap
-    threshold: true
-  - id: LAE-11.3
     bloom: explain
     statement: "Articulate trade-offs the senior way — 'X over Y because Z; if Z changed, I'd reconsider' — and self-assess a design answer against the four-dimension rubric."
     anchor: tradeoff-talk
+    threshold: true
+  - id: LAE-11.3
+    bloom: analyze
+    statement: "Diagnose the critical gap in a partial design answer and map it to the framework step and rubric dimension it violates."
+    anchor: diagnose-gap
     threshold: true
 ---
 
@@ -56,9 +56,9 @@ import capstoneData from '../../data/capstone_design_demo.json';
 # Capstone: design an LLM application, under interview conditions
 
 <YouWillLearn prerequisites="Chapters 1–10 — this chapter assembles them.">
-- The **5-step framework** that drives the 45 minutes — and the time budget that keeps it honest.
-- A **worked mock** on the canonical scenario: the bank bot with zero hallucination tolerance.
+- The **5-step framework** that drives the 45 minutes — with the time budget that keeps it honest, and a worked bank-bot mock that runs it end to end.
 - **Trade-off articulation** as the senior signal, and the **four-dimension rubric** as your explicit scorecard.
+- **Gap diagnosis**: spotting the missing step in a partial design answer — the grading view of the same framework.
 </YouWillLearn>
 
 ## Forty-five minutes, one sentence

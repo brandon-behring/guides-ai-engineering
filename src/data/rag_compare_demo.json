@@ -1,6 +1,7 @@
 {
   "name": "Two configs, one golden set",
   "note": "Every cell is a real RagPipeline.run(); outcome categories are authored ground truth; context recall via mini_eval.recall_at_k.",
+  "predict": "config A maximizes coverage (no floor, tight budget); config B is hardened (floor 0.12, big budget). Six questions: three plainly answerable, one paraphrase, one out-of-scope, one morphology trap. Which config wins \u2014 and is there a question where both lose?",
   "verdict": "B is safer than A \u2014 the floor converts one junk answer into an honest abstain \u2014 but the golden set's real finding is that NEITHER config is shippable: the failures concentrate in ranking quality (morphology traps, run-up chunks outranking answers), which no budget or floor can fix. That is Chapter 6's job. Without this table, you'd have shipped A believing it worked.",
   "chunks": [
     {
@@ -120,7 +121,7 @@
         },
         "B": {
           "outcome": "extraction-miss",
-          "why": "FP3 extraction \u2014 fact in context, wrong sentence quoted",
+          "why": "FP3 answer extraction \u2014 fact in context, wrong sentence quoted",
           "answer": "You may request a refund within 30 days of purchase, as long as the item is unopened and in its original packaging.",
           "supported": true,
           "included": [
@@ -151,8 +152,8 @@
           "context_recall": 0.0
         },
         "B": {
-          "outcome": "abstain-safe",
-          "why": "the missing-context rule did its job",
+          "outcome": "abstain-unreachable",
+          "why": "honest abstain, but the corpus answers this \u2014 FP1: fix retrieval quality, not the floor",
           "answer": "I don't know \u2014 the retrieved context doesn't answer this.",
           "supported": false,
           "included": [],

@@ -1,7 +1,7 @@
 ---
 title: "Interview craft and transfer: the skill above the skills"
 slug: interview-craft-transfer
-description: "The meta-chapter: why communication outranks knowledge in documented rejection data, the craft loop that makes reasoning visible, the new AI-assisted coding round and the verification-under-automation skill it actually grades, and deliberate practice for transfer — mapping questions you've never seen onto the structures this guide built."
+description: "The meta-chapter: why communication outranks knowledge in documented rejection reviews, the craft loop that makes reasoning visible, the new AI-assisted coding round and the verification-under-automation skill it actually grades, and deliberate practice for transfer — mapping questions you've never seen onto the structures this guide built."
 freshness: literature-survey
 last_verified: 2026-06-10
 tags: [llm-app-engineering, interview-craft, ai-assisted-coding, transfer]
@@ -14,8 +14,8 @@ commitment: long-lived
 paradigms: [default]
 research_debt_addressed: |
   Interview prep treats craft as garnish — a "communication tips" listicle after the
-  real content — while hiring-manager data puts communication failures ahead of every
-  knowledge gap as the rejection reason. Meanwhile a genuinely new round (AI-assisted
+  real content — while documented hiring reviews put communication failures ahead of
+  every knowledge gap as the rejection reason. Meanwhile a genuinely new round (AI-assisted
   coding) is normalizing with almost no honest prep material: what's graded is
   directing and verifying an AI, not racing it. This chapter treats both as trainable
   engineering skills, and makes the guide's stretch-problem spine explicit as
@@ -63,17 +63,20 @@ import craftData from '../../data/interview_craft_demo.json';
 
 ## The rejection that wasn't about knowledge
 
-A friend — a genuinely strong engineer, who'd have aced every technical
-question in this guide — gets rejected from a loop and asks the recruiter for
-feedback. It comes back: *"solved the problem in silence,"* *"jumped in
+Chapter 11 closed by calling the interview itself a system — a loop with
+phases, failure modes, and an evaluator whose rubric you know. Here is that
+system's most common failure, in the wild. A friend — a genuinely strong
+engineer, who'd have aced every technical question in this guide — gets
+rejected from a loop and asks the recruiter for feedback. It comes back: *"solved the problem in silence,"* *"jumped in
 without clarifying requirements,"* *"we couldn't follow the reasoning."*
 Nothing about RAG, nothing about agents, nothing wrong with the architecture.
 
-That feedback is the norm, not the anecdote: in hiring-manager surveys,
-communication and articulation failures are the most-cited rejection reason
-(~40–45%), with jumping-in-without-clarifying close behind — both ahead of any
-knowledge gap. Predict: if the reasoning was *right*, what exactly was the
-interviewer unable to grade — and whose job was it to make that gradable?
+That feedback is the norm, not the anecdote: one published review of ~50
+hiring decisions put communication and articulation failures at ~40–45% of
+rejections, practitioner guides consistently rank them first — ahead of any
+knowledge gap — and jumping-in-without-clarifying runs close behind. Predict:
+if the reasoning was *right*, what exactly was the interviewer unable to
+grade — and whose job was it to make that gradable?
 
 <Pitfall title="Silent and right reads as lost">
 The interview's product is not the answer — it's your *visible reasoning*.
@@ -113,8 +116,9 @@ None of this is personality. It's a protocol, and protocols are practicable.
 
 The newest round changes what "coding interview" means: Meta runs a
 three-panel setup where you pick your model and work a 60-minute multi-file
-task; Google pilots "code comprehension" rounds with an assistant; startups
-hand you realistic, deliberately un-one-shottable problems. The assistant's
+task; Google has announced pilots of "code comprehension" rounds with an
+approved assistant; companies like Canva hand you realistic, deliberately
+un-one-shottable problems with the AI required. The assistant's
 presence isn't a perk — it's the *subject*. Four things are graded: strategic
 prompting and clarification, genuine code comprehension, **verification and
 debugging**, and communication while you automate. Meta's guidance is blunt:
@@ -181,7 +185,7 @@ The practice method, briefly and honestly:
 
 <NoteBox title="The four dimensions, one last time">
 Technical Correctness · Trade-off Awareness · Evaluation Rigor ·
-Communication. Twelve chapters graded you against them; interviews will too,
+Communication. Every chapter graded you against them; interviews will too,
 under different names. If you can be correct, price your choices, prove your
 claims, and be followed while doing it — the round format stops mattering.
 </NoteBox>
@@ -233,8 +237,9 @@ an artifact you can review (recording, written design, scored rubric).
   output verified before shipped — in the interview and in the stories you
   tell about your work.
 - **Communication** — this chapter's weighted dimension, and the guide's
-  closing argument: it is not garnish on engineering skill; in every
-  documented dataset, it *is* the differentiating engineering skill.
+  closing argument: it is not garnish on engineering skill; the documented
+  rejection evidence consistently ranks it as *the* differentiating
+  engineering skill.
 
 ### Industry variation
 
