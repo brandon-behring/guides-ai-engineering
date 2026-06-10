@@ -8,19 +8,19 @@ interview-prep-led, taught for transfer. Audience: engineers moving into AI-nati
 Direction: `~/guides/docs/plans/active/2026-06-04_session_handoff.md` (canonical) ·
 demand spine: `~/guides/docs/research/role_demand_and_interview_signals/`.
 
-## Status (2026-06-09)
+## Status (2026-06-10)
 
-- **Ch 0–1 authored** in the §5 shape; both reuse the `ScenarioQuiz` island (no fabricated
-  model outputs). Quiz data hand-authored: `src/data/llm_claims_demo.json`,
-  `src/data/prompt_robustness_demo.json`.
-- **`mini_rag` companion seeded** — `companion/src/mini_rag/search.py` (TF-IDF + cosine + top_k)
-  + `companion/tests/test_mini_rag.py`.
+- **Ch 0–2 authored** in the §5 shape. Ch 0–1 reuse the `ScenarioQuiz` island (hand-authored
+  quiz JSON: `llm_claims_demo.json`, `prompt_robustness_demo.json`); **Ch 2 ships the new
+  `RetrievalExplorer` island** (computed `retrieval_demo.json` — one TF-IDF index, four
+  queries with predict-before-reveal; emitted by `scripts/build_demo_data.py` via `mini_rag`).
+- **`mini_rag` companion** — `search.py` (TF-IDF + cosine + top_k), 7/7 tests; grows
+  per-chapter (chunk → pipeline → rerank) through Ch 6.
 - Multi-guide routing live: a `generateId` on the chapters glob namespaces each id by its
-  guide folder, so chapters serve at `/ai-engineering/chapters/<guide>/<slug>/` (e.g.
-  `…/chapters/llm-app-engineering/why-llm-app-engineering/`). Slugs only need to be unique
-  *within* a guide. (The `/chapters/` index still mixes both guides; per-guide grouping waits
-  on scaffold #15.)
-- **Next:** Ch 2 (Retrieval 101) — the first chapter to actually import `mini_rag`.
+  guide folder, so chapters serve at `/ai-engineering/chapters/<guide>/<slug>/`. Slugs only
+  need to be unique *within* a guide. (The `/chapters/` index still mixes both guides;
+  per-guide grouping waits on scaffold #15.)
+- **Next:** Ch 3 (Chunking & document representation) — adds `mini_rag.chunk`.
 
 ## Spine & outline (RAG-centric, ~13 ch)
 

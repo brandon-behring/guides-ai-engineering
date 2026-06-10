@@ -1,0 +1,169 @@
+{
+  "name": "One TF-IDF index, four queries",
+  "note": "All rankings computed by mini_rag (TF-IDF + cosine + top-k) over the corpus below; relevance labels are authored ground truth.",
+  "corpus": [
+    {
+      "id": "d0",
+      "text": "You may request a refund within 30 days of purchase."
+    },
+    {
+      "id": "d1",
+      "text": "We process each refund within 5 business days, paid to the original payment method."
+    },
+    {
+      "id": "d2",
+      "text": "To request a refund, include the original order number."
+    },
+    {
+      "id": "d3",
+      "text": "Gift cards and final-sale items are non-refundable."
+    },
+    {
+      "id": "d4",
+      "text": "Our customer service hours are 9am to 5pm, Monday to Friday."
+    },
+    {
+      "id": "d5",
+      "text": "Reach support any time through the in-app chat."
+    },
+    {
+      "id": "d6",
+      "text": "Standard shipping is free on orders over 50 dollars."
+    },
+    {
+      "id": "d7",
+      "text": "Returned items must be unopened and in original packaging."
+    },
+    {
+      "id": "d8",
+      "text": "The mobile app is available on iOS and Android."
+    },
+    {
+      "id": "d9",
+      "text": "Invoices include the order number, amount, and due date."
+    }
+  ],
+  "queries": [
+    {
+      "label": "Exact vocabulary",
+      "query": "How do I request a refund?",
+      "relevant": [
+        "d0",
+        "d1",
+        "d2"
+      ],
+      "lesson": "The query shares the corpus's own words \u2014 \"request\", \"refund\" \u2014 so all three refund documents surface. Lexical retrieval at its best.",
+      "hits": [
+        {
+          "id": "d2",
+          "score": 0.596,
+          "relevant": true
+        },
+        {
+          "id": "d0",
+          "score": 0.4865,
+          "relevant": true
+        },
+        {
+          "id": "d1",
+          "score": 0.1156,
+          "relevant": true
+        }
+      ],
+      "sweep": [
+        {
+          "k": 1,
+          "precision": 1.0,
+          "recall": 0.3333
+        },
+        {
+          "k": 2,
+          "precision": 1.0,
+          "recall": 0.6667
+        },
+        {
+          "k": 3,
+          "precision": 1.0,
+          "recall": 1.0
+        }
+      ]
+    },
+    {
+      "label": "Paraphrase",
+      "query": "Can I get my money back?",
+      "relevant": [
+        "d0",
+        "d1",
+        "d2"
+      ],
+      "lesson": "Zero matches \u2014 yet d0\u2013d2 answer this exactly. No query word appears anywhere in the corpus, so every TF-IDF score is 0. Meaning matched; spelling didn't. This miss is what dense embeddings fix.",
+      "hits": [],
+      "sweep": []
+    },
+    {
+      "label": "Partial match",
+      "query": "What are your support hours?",
+      "relevant": [
+        "d4",
+        "d5"
+      ],
+      "lesson": "\"hours\" and \"support\" find the right two documents \u2014 but \"are\" also drags in the gift-card policy as a junk tail hit. Shared tokens are similarity, not relevance.",
+      "hits": [
+        {
+          "id": "d4",
+          "score": 0.3157,
+          "relevant": true
+        },
+        {
+          "id": "d5",
+          "score": 0.217,
+          "relevant": true
+        },
+        {
+          "id": "d3",
+          "score": 0.156,
+          "relevant": false
+        }
+      ],
+      "sweep": [
+        {
+          "k": 1,
+          "precision": 1.0,
+          "recall": 0.5
+        },
+        {
+          "k": 2,
+          "precision": 1.0,
+          "recall": 1.0
+        },
+        {
+          "k": 3,
+          "precision": 0.6667,
+          "recall": 1.0
+        }
+      ]
+    },
+    {
+      "label": "Morphology miss",
+      "query": "Do you ship internationally?",
+      "relevant": [
+        "d6"
+      ],
+      "lesson": "\"ship\" \u2260 \"shipping\" \u2014 without stemming they are different terms, so the one shipping document scores 0. Meanwhile \"you\" appears in exactly one doc, making it a RARE token with high IDF \u2014 and an unrelated refund doc ranks first. Rare \u2260 meaningful.",
+      "hits": [
+        {
+          "id": "d0",
+          "score": 0.3441,
+          "relevant": false
+        }
+      ],
+      "sweep": [
+        {
+          "k": 1,
+          "precision": 0.0,
+          "recall": 0.0
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,301 @@
+---
+title: "Retrieval 101 — embeddings and vector search"
+slug: retrieval-101
+description: "Why retrieval exists, and how it actually works: vectorize, score by cosine, take the top k. You build the whole mechanism as a readable TF-IDF index, watch exactly where lexical matching misses (paraphrase, morphology), see what dense embeddings change — only the vectorizer — and scale the same idea honestly through ANN and vector stores chosen by constraints."
+freshness: literature-survey
+last_verified: 2026-06-10
+tags: [llm-app-engineering, retrieval, embeddings, vector-search, rag]
+sources: []
+draft: false
+mode: tutorial
+target: transfer
+ordering: problem-first
+commitment: long-lived
+paradigms: [default]
+research_debt_addressed: |
+  Retrieval is usually taught as a product tour — pick a vector DB, call .search(),
+  trust the magic. Engineers who can't say what a similarity score *is* can't debug
+  the retrieval failures that cause most RAG failures. This chapter builds the whole
+  mechanism in ~100 readable lines (TF-IDF + cosine + top-k), makes the failure modes
+  visible on real rankings, and only then introduces embeddings and ANN — as swaps
+  into a skeleton the reader already owns.
+task_classes: [retrieval-design, rag]
+provenance:
+  ai_tools: ["Claude Fable 5 (Anthropic)"]
+  audit_history:
+    - date: 2026-06-10
+      type: authored
+      file: src/content/llm-app-engineering/02-retrieval-101.mdx
+  citation_backstop: manual
+los:
+  - id: LAE-2.1
+    bloom: explain
+    statement: "Trace vector search end-to-end — text becomes a vector, cosine similarity scores it against every document, top-k keeps the best — through a TF-IDF index you can read line by line."
+    anchor: vector-search-mechanism
+    threshold: true
+  - id: LAE-2.2
+    bloom: analyze
+    statement: "Diagnose where lexical retrieval misses (paraphrase, morphology) and explain what dense embeddings change — the vectorizer — while the cosine-and-top-k half stays identical."
+    anchor: lexical-vs-semantic
+    threshold: true
+  - id: LAE-2.3
+    bloom: design
+    statement: "Scale the same mechanism honestly: exact search until it breaks, ANN with a measured recall@k cost, and a vector store chosen by constraints rather than fashion."
+    anchor: scaling-ann
+    threshold: true
+---
+
+import YouWillLearn from '@brandon_m_behring/book-scaffold-astro/components/YouWillLearn.astro';
+import Pitfall from '@brandon_m_behring/book-scaffold-astro/components/Pitfall.astro';
+import Practice from '@brandon_m_behring/book-scaffold-astro/components/Practice.astro';
+import RetrievalExplorer from '../../components/RetrievalExplorer.tsx';
+import retrievalData from '../../data/retrieval_demo.json';
+
+# Retrieval 101 — embeddings and vector search
+
+<YouWillLearn prerequisites="Chapters 0–1 — the LLM-app stack, and prompts as specs. Comfortable reading Python.">
+- How vector search works, end to end — by **building it**: TF-IDF vectors, cosine similarity, top-k.
+- Where lexical retrieval **misses** (paraphrase, morphology) and what dense embeddings change — only the vectorizer.
+- How the same mechanism **scales**: exact search until it breaks, then ANN — with recall@k as the price tag you measure.
+</YouWillLearn>
+
+## The spec that couldn't save you
+
+Chapter 1 left you with a hardened support assistant: a pinned spec, a validated
+output contract, a held-out test set. A customer asks *"Can I get my money back?"*
+and the assistant replies — exactly as designed — *"I don't know."*
+
+The refund policy is sitting right there in `policies/refunds.md`. You read the
+logs: the context the assistant received contained the shipping FAQ and two
+articles about gift cards. The model never saw the refund policy, so the
+missing-context rule fired. The prompt did its job. The layer that *chose the
+context* — keyword search over your help center — found nothing, because the
+policy says "refund" and the customer said "money back."
+
+Predict: what, specifically, would have to change so this query finds that
+document? Better prompt? Bigger model? Something else entirely?
+
+<Pitfall title="Just stuff everything in the window">
+The tempting fix is no retrieval at all: paste the whole help center into every
+call. Three things kill it. **Cost** — you pay per token, per call; a 50,000-chunk
+corpus is millions of tokens, re-billed on every question. **Limits** — it doesn't
+fit anyway. **Attention** — models reliably miss facts buried in the middle of
+huge contexts, so more text can mean *worse* answers. Retrieval exists because
+the job is choosing the few *right* chunks, not transporting all of them.
+</Pitfall>
+
+## Search is "vectorize, then measure angles" {/* anchor: vector-search-mechanism */}
+
+Every vector search system — from the toy you're about to build to a
+billion-vector production cluster — is the same three steps:
+
+1. **Vectorize** every document once, and the query at search time.
+2. **Score** the query vector against each document vector — usually cosine similarity.
+3. **Top-k**: return the k best scores.
+
+The honest starting vectorizer is TF-IDF, because you can read every line of it.
+A term that appears often in *this* document (TF) and rarely *across* documents
+(IDF) gets a big weight:
+
+$$
+w_{t,d} = \mathrm{tf}_{t,d} \cdot \left( \ln\frac{1+N}{1+\mathrm{df}_t} + 1 \right)
+\qquad
+\cos(q, d) = \frac{q \cdot d}{\lVert q \rVert \, \lVert d \rVert}
+$$
+
+where $N$ is the corpus size and $\mathrm{df}_t$ counts documents containing term
+$t$. Cosine measures the *angle* between the sparse vectors, so a long document
+can't win just by being long. In `mini_rag` (the companion you'll grow through
+this guide), the whole index is:
+
+```python
+class TfidfIndex:
+    """A tiny in-memory TF-IDF index — the "vector store" of a RAG system,
+    minus the scale."""
+
+    def __init__(self, corpus: list[str]) -> None:
+        self.docs = list(corpus)
+        corpus_tokens = [tokenize(d) for d in self.docs]
+        self.idf = idf(corpus_tokens)
+        self._vectors = [tfidf_vector(t, self.idf) for t in corpus_tokens]
+
+    def search(self, query: str, k: int = 5) -> list[Hit]:
+        qvec = tfidf_vector(tokenize(query), self.idf)
+        scored = [Hit(i, cosine_similarity(qvec, dvec), self.docs[i])
+                  for i, dvec in enumerate(self._vectors)]
+        scored = [h for h in scored if h.score > 0.0]
+        scored.sort(key=lambda h: (-h.score, h.index))
+        return scored[:k]
+```
+
+Worked example, small enough to check by hand. Three documents:
+
+- **A** — "You may request a refund within 30 days."
+- **B** — "Our support hours are 9am to 5pm."
+- **C** — "Refund requests need the order number."
+
+Query: **"refund order"**. With $N=3$: "refund" appears in two documents, so
+$\mathrm{idf} = \ln(4/3)+1 \approx 1.29$; "order" appears in one, so
+$\ln(4/2)+1 \approx 1.69$ — the rarer term carries more weight. Score each
+document: **C** shares *both* terms and wins with $\cos \approx 0.53$; **A**
+shares only "refund" and scores $\approx 0.17$; **B** shares nothing and scores
+exactly 0. Run `TfidfIndex(corpus).search("refund order")` in the companion and
+you'll get these numbers.
+
+Now trace one yourself before moving on: same corpus, query *"support hours"*.
+Which document wins, which score is exactly zero, and why does "hours" out-weigh
+nothing here? (You have everything you need: count document frequencies, then
+think about angles.)
+
+## When words don't match meaning {/* anchor: lexical-vs-semantic */}
+
+Run the opener's query against a real support corpus and the failure is exact,
+not vague. *"Can I get my money back?"* shares **zero tokens** with "You may
+request a refund within 30 days of purchase." — look at `tfidf_vector`: a query
+term that isn't in the corpus vocabulary contributes nothing, so the score is
+literally 0.0, and `search` returns an empty list. The relevant document wasn't
+*outranked*; it was invisible.
+
+Lexical retrieval misses in two characteristic ways:
+
+- **Paraphrase** — "money back" vs "refund": same meaning, disjoint spelling.
+- **Morphology** — "ship" vs "shipping", "refund" vs "refundable": our tokenizer
+  does no stemming, so near-identical words are different terms. (Stemming
+  patches the easy cases and does nothing for paraphrase.)
+
+**Dense embeddings** fix this by replacing the vectorizer — and only the
+vectorizer. An embedding model is a neural encoder trained so that texts that
+*mean* similar things land near each other in a ~1,000-dimensional space:
+"money back" and "refund policy" end up close because the model learned from
+how language is used, not how it's spelled. The search half is unchanged —
+vectorize, cosine, top-k. That's why you built the TF-IDF version: it's the
+same skeleton with a swappable first step.
+
+The trade runs both directions, though:
+
+| | Sparse (TF-IDF / BM25) | Dense (embeddings) |
+|---|---|---|
+| Paraphrase, concepts | misses | **catches** |
+| Exact rare tokens — error codes, SKUs, names | **exact match** | can blur |
+| Cost to build | trivial, no model | embedding model per doc + query |
+| Explainability | inspect shared terms | opaque similarity |
+
+Production systems usually run **both** and merge the rankings — hybrid search.
+That, plus reranking the candidates with a stronger model, is Chapter 6; here it's
+enough to know neither side dominates. When you pick an embedding model, frame it
+by constraints — dimensionality drives storage, per-query latency, and cost; a
+leaderboard (MTEB) tells you about benchmark text, not your domain's acronyms —
+"I'd benchmark a 1,024-dim open model against the API default on *our* queries"
+beats naming this month's winner.
+
+## From a list to a hundred million vectors {/* anchor: scaling-ann */}
+
+`mini_rag` scores the query against *every* document — exact search, $O(n \cdot d)$
+per query. Honest advice: this is fine for longer than you'd guess. At 100K
+vectors it's milliseconds; our toy's real sin at scale is rebuilding the index
+per call, not the linear scan.
+
+When latency does break, **approximate nearest neighbor (ANN)** indexes trade a
+little correctness for a lot of speed. The workhorse is **HNSW**: a layered graph
+where sparse upper layers make long hops and dense lower layers refine locally;
+search greedily descends in roughly $O(\log n)$. The price is in the name —
+*approximate*: the true best match is sometimes not returned. That price has a
+metric, **recall@k** — the fraction of the true top-k your index actually
+returns — and you measure it against a golden set, then tune (HNSW's `ef_search`
+buys recall with latency). Accepting an ANN index without measuring recall@k is
+shipping a known unknown.
+
+Storage is the other budget, and it's arithmetic, not folklore. Half a million
+10-page documents chunk to roughly 4.5M chunks; at 1,024 dimensions of float32:
+
+$$
+4.5\text{M} \times 1024 \times 4 \text{ bytes} \approx 18\,\text{GB}
+\;\;\xrightarrow{\;\times 1.5 \text{ HNSW overhead}\;}\; \approx 28\,\text{GB}
+$$
+
+— fits in RAM on one node, and that calculation (not the leaderboard) is what
+should pick your embedding dimension.
+
+Where the vectors *live* is a constraints question:
+
+- **Already run Postgres?** `pgvector` adds a vector column + HNSW index to the
+  database you operate today — no new system. The right default below ~5–10M vectors.
+- **Dedicated vector DB** (Qdrant, Weaviate, Pinecone, …) when you need what
+  Postgres can't give: managed scale, built-in hybrid search, sub-10ms ANN at
+  high QPS.
+- **Access control lives in the store**, not the app: filter by `tenant_id` /
+  `project_id` *inside* the search query. Filtering after retrieval means the
+  wrong tenant's chunks existed in a candidate list — a security incident, not
+  a relevance bug.
+
+## See it: four queries, one index
+
+The explorer below runs the corpus through `mini_rag` exactly as built above.
+For each query, **predict before revealing**: which document ranks #1, and how
+many match at all? Then slide k and watch precision@k and recall@k fight. The
+paraphrase and morphology tabs are the lexical misses from this chapter —
+explain each ranking using only "shared tokens × rarity" and you've got the
+mechanism.
+
+<RetrievalExplorer client:visible data={retrievalData} />
+
+<Practice id="retrieval-design-support-bot" difficulty={2}>
+Your support bot's corpus is 30,000 chunks across 40 enterprise tenants. p95
+retrieval latency must stay under 200ms, and a tenant must never see another
+tenant's documents. Design the retrieval layer: exact or ANN? where do the
+vectors live? what k do you pass to the generator? And name the measurements
+that would make you accept it.
+
+<details>
+<summary>One defensible answer</summary>
+
+- **Exact search, not ANN.** 30K vectors is exact-search territory — single-digit
+  milliseconds, recall is 1.0 by construction, nothing to tune. ANN earns its
+  complexity around the million-vector mark, not here.
+- **pgvector if Postgres already exists** (it almost certainly does): one
+  `vector` column, no new infrastructure, and the tenant rule becomes
+  `WHERE tenant_id = $1` *inside* the search query — enforced by the database,
+  not by post-filtering in app code.
+- **k = 5–8**: enough to cover multi-part questions without flooding the context
+  window; the real ceiling is your token budget per call.
+- **Acceptance measurements**: a golden set of ~50 labeled (query → relevant
+  chunks) pairs per major topic; recall@5 ≥ 0.9 on it; p95 latency under load;
+  and a red-team check that a tenant-A query with tenant-B's document planted
+  returns nothing. Re-run all three on every retrieval change.
+</details>
+</Practice>
+
+## How this is graded
+
+- **Technical Correctness** — you can trace TF-IDF and cosine by hand, and you
+  say precisely what changes when moving to embeddings: the vectorizer, not the
+  search.
+- **Trade-off Awareness** — this chapter's weighted dimension: sparse vs dense by
+  content type, exact vs ANN by scale, pgvector vs dedicated store by team
+  constraints — each named *with its cost*.
+- **Evaluation Rigor** — you refuse "the results look right": a golden set,
+  recall@k against it, and re-measurement when the index or model changes.
+- **Communication** — "30K vectors — exact search in pgvector, tenant filter in
+  the query, recall@5 ≥ 0.9 on a golden set" beats a tour of vector databases.
+
+### Industry variation
+
+- **Startups** — the whole layer is pgvector on the Postgres you already run;
+  adding a dedicated vector DB before ~5M vectors is résumé-driven infrastructure.
+- **Enterprise** — compartmented data makes store-level filtering non-negotiable
+  (legal, healthcare, defense); "filter in the app" fails the security review.
+- **Latency-SLA shops** (marketplaces, search products) — ANN parameters are
+  tuned against p95 budgets, and recall@k is tracked per release like a test
+  suite. Relatedly: "build a tiny vector store" is now a live-coding interview
+  classic — normalize at index time, score in one pass, justify your top-k.
+
+## Stretch: the right document, the wrong slice
+
+You swap in dense embeddings and the paraphrase miss disappears — recall on the
+golden set jumps. Yet refund answers *still* come back wrong: the chunk that
+matches "money back" ends with "…you may request a refund" and the 30-day limit
+sits in the *next* chunk, which didn't make the top k. Nothing is wrong with the
+vectors. What single upstream decision — made before any embedding was computed —
+caused this, and what would you change about it? That decision is **chunking**,
+and it's Chapter 3: how you cut documents determines what a vector can even
+represent.

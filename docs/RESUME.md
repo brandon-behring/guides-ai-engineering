@@ -52,3 +52,69 @@ guides mixed (interim; per-guide index / first-class multibook = scaffold **#15*
    v0.3 presentation-modes set — open design item; chapters use `[default]`.
 5. **LOS↔anchor lint** — the build does not enforce `los[].anchor` ↔ prose `{/* anchor */}`
    bijection; enhancement filed as book-scaffold-astro **#130**. Enforce by eye until it ships.
+
+---
+
+## Guide-2 completion push (2026-06-10, in flight) — self-contained work order
+
+Goal: author Ch 2–12, grow the companion, pass the guide-1-style independent 5-dim review →
+guide #2 **complete** → the launch workstream (roadmap v2 §5) opens. Work in chapter order;
+**commit per chapter-block**; update the status table in `docs/guide-02-llm-app-engineering.md`
+as each chapter lands.
+
+### Chapter conventions (copy from `01-prompt-engineering-discipline.mdx` — the template)
+- **File**: `src/content/llm-app-engineering/<NN>-<slug>.mdx`. Frontmatter: `title`, `slug`,
+  `description`, `freshness: literature-survey`, `last_verified`, `tags`, `sources: []`,
+  `draft: false`, `mode: tutorial`, `target: transfer`, `ordering: problem-first`,
+  `commitment: long-lived`, `paradigms: [default]`, `research_debt_addressed: |`,
+  `task_classes`, `provenance` (ai_tools + audit_history + citation_backstop: manual), `los[]`.
+- **LOS ids**: `LAE-<ch>.<n>` (e.g. LAE-2.1), each with `bloom`, `statement`, `anchor`,
+  `threshold`. **Every `los[].anchor` needs exactly one `{/* anchor: <slug> */}` on a `##`
+  heading** — bijective, checked by eye.
+- **Body shape (§5)**: `<YouWillLearn prerequisites=…>` (3 bullets mirroring the LOS) →
+  productive-failure opener (concrete scenario, "Predict:" prompt) → `<Pitfall title=…>` →
+  principle sections (anchored; code/KaTeX only where it carries load; companion code imported
+  conceptually, shown as Python) → **island demo** (`client:visible`, frozen data) → `<Practice
+  id=… difficulty={n}>` with `<details><summary>One defensible answer</summary>` → `## How this
+  is graded` (4 bullets: Technical Correctness · Trade-off Awareness · Evaluation Rigor ·
+  Communication — name the chapter's weighted dimension) → `### Industry variation` (3 bullets
+  from: startup velocity · enterprise maturity/compliance · fintech · marketplace latency ·
+  frontier-lab; + AI-assisted-interview note where apt) → `## Stretch: …` (PFL — related-but-
+  unseen problem, hands off to the next chapter).
+- **Voice**: second person, concrete, failure-first; no fabricated model outputs anywhere —
+  quiz items are hand-authored claims/scenarios, computed demos come from companion code.
+
+### Demo conventions
+- **Computed** JSON → add a `<name>_demo()` function to `scripts/build_demo_data.py` (seeded
+  `random.Random(<n>)`, round floats, import from companion) + register in `main()`.
+- **Authored** JSON (ScenarioQuiz) → hand-write `src/data/<name>_demo.json` matching
+  `ScenarioQuiz.tsx`'s shape (check the TSX before authoring; existing examples:
+  `prompt_robustness_demo.json`, `llm_claims_demo.json`).
+- New islands: Preact `.tsx` in `src/components/`, props `{ data }`, imported with
+  `client:visible`; theme via CSS vars like existing explorers. Prefer **reusing** existing
+  islands (`ScenarioQuiz`, `RagEvalExplorer`) over new ones unless interactivity is the lesson.
+
+### Seed map (transform, not port; agnosticize insurance/company framing)
+`V9 = ~/interview_prep_series/vol09_ai_engineering/chapters/`,
+`V8 = ~/interview_prep_series/vol08_llm_foundations/chapters/`,
+`AIES = ~/interview_prep_series/vol_ai_eng_interview/` (chapter files inside).
+| Ch | Slug | Seeds | Companion work | Demo |
+|----|------|-------|----------------|------|
+| 2 | retrieval-101 | V9/05_vector_databases.tex · V8/10_retrieval.tex | `mini_rag.search` (built) | NEW retrieval explorer (computed) |
+| 3 | chunking-document-representation | V9/04_document_processing.tex | NEW `mini_rag.chunk` | chunk-size sweep (computed) |
+| 4 | rag-end-to-end | V9/06_rag_production.tex · V8/04_rag_architecture.tex | NEW `mini_rag.pipeline` | step-through or ScenarioQuiz |
+| 5 | evaluating-rag | V9/09_evaluation_topology.tex | bridge to `mini_eval.retrieval` (no new code) | reuse RagEvalExplorer (`rag_demo.json`) |
+| 6 | advanced-rag | V9/06 · V8/10 | NEW `mini_rag.rerank` | rerank before/after (computed) |
+| 7 | rag-in-production | V9/15_serving_inference.tex · V9/16_observability.tex | NEW `mini_rag` cost/latency model | budget explorer (computed) |
+| 8 | agents-tool-use | V8/08_agents.tex · V9/07_agentic_architectures.tex · V9/11_mcp.tex | NEW `mini_agent.loop` (mock tools, scripted policy, no LLM) | agent-trace step-through (frozen trace) |
+| 9 | multi-agent-orchestration | V9/12_multi_agent_systems.tex · V9/10_llm_frameworks.tex | extend `mini_agent` (orchestrator/workers) | reuse trace island or ScenarioQuiz |
+| 10 | finetune-vs-rag-vs-prompt | V9/13_finetuning.tex (lightweight) | — | ScenarioQuiz (authored decisions) |
+| 11 | system-design-capstone | V9/18_system_design.tex · AIES ch5–6 | — | rubric-scored capstone (capstone_demo pattern) |
+| 12 | interview-craft-transfer | V9/19 + V9/20 · AIES ch11 · demand-spine AI-assisted-coding deep-dive | — | ScenarioQuiz |
+
+### Completion gate (after Ch 12)
+Independent **5-dim review** by a fresh agent (math / demo-honesty / factual / pedagogy-shape /
+island+MDX integrity) → `docs/REVIEW_FINDINGS_<date>.md` → apply ALL fixes → LOS↔anchor
+bijection across all 13 → `npm run build` + validate + both test files green → update README
+guide table + this file + guide-02 doc → commit + push. Then tell the user the **launch
+workstream is unblocked** (roadmap v2 §5 — their Cloudflare dashboard session).

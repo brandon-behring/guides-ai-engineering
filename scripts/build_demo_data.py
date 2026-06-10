@@ -24,6 +24,7 @@ from mini_eval import (  # noqa: E402
     mean_pass_at_k,
     Response, PairwiseJudge, position_flip_rate,
 )
+from mini_rag import TfidfIndex  # noqa: E402
 
 OUT = os.path.join(os.path.dirname(__file__), "..", "src", "data")
 
@@ -277,6 +278,95 @@ def rag_demo() -> dict:
     }
 
 
+def retrieval_demo() -> dict:
+    """One TF-IDF index over a 10-doc support corpus, four queries with four
+    lessons, for the guide-2 Ch 2 island: exact-vocabulary success, the
+    paraphrase zero-hit ("money back" vs "refund"), stopword junk in the tail,
+    and a morphology miss ("ship" vs "shipping") where a rare shared token
+    ranks an unrelated doc. Everything computed by mini_rag.search; relevance
+    labels authored."""
+    corpus = [
+        ("d0", "You may request a refund within 30 days of purchase."),
+        ("d1", "We process each refund within 5 business days, paid to the original payment method."),
+        ("d2", "To request a refund, include the original order number."),
+        ("d3", "Gift cards and final-sale items are non-refundable."),
+        ("d4", "Our customer service hours are 9am to 5pm, Monday to Friday."),
+        ("d5", "Reach support any time through the in-app chat."),
+        ("d6", "Standard shipping is free on orders over 50 dollars."),
+        ("d7", "Returned items must be unopened and in original packaging."),
+        ("d8", "The mobile app is available on iOS and Android."),
+        ("d9", "Invoices include the order number, amount, and due date."),
+    ]
+    ids = [c[0] for c in corpus]
+    index = TfidfIndex([c[1] for c in corpus])
+
+    queries = [
+        {
+            "label": "Exact vocabulary",
+            "query": "How do I request a refund?",
+            "relevant": ["d0", "d1", "d2"],
+            "lesson": ("The query shares the corpus's own words — \"request\", \"refund\" — "
+                       "so all three refund documents surface. Lexical retrieval at its best."),
+        },
+        {
+            "label": "Paraphrase",
+            "query": "Can I get my money back?",
+            "relevant": ["d0", "d1", "d2"],
+            "lesson": ("Zero matches — yet d0–d2 answer this exactly. No query word appears "
+                       "anywhere in the corpus, so every TF-IDF score is 0. Meaning matched; "
+                       "spelling didn't. This miss is what dense embeddings fix."),
+        },
+        {
+            "label": "Partial match",
+            "query": "What are your support hours?",
+            "relevant": ["d4", "d5"],
+            "lesson": ("\"hours\" and \"support\" find the right two documents — but \"are\" "
+                       "also drags in the gift-card policy as a junk tail hit. Shared tokens "
+                       "are similarity, not relevance."),
+        },
+        {
+            "label": "Morphology miss",
+            "query": "Do you ship internationally?",
+            "relevant": ["d6"],
+            "lesson": ("\"ship\" ≠ \"shipping\" — without stemming they are different terms, so "
+                       "the one shipping document scores 0. Meanwhile \"you\" appears in exactly "
+                       "one doc, making it a RARE token with high IDF — and an unrelated refund "
+                       "doc ranks first. Rare ≠ meaningful."),
+        },
+    ]
+
+    out_queries = []
+    for q in queries:
+        hits = index.search(q["query"], k=10)
+        retrieved = [ids[h.index] for h in hits]
+        relevant = set(q["relevant"])
+        sweep = [{
+            "k": k,
+            "precision": round(precision_at_k(retrieved, relevant, k), 4),
+            "recall": round(recall_at_k(retrieved, relevant, k), 4),
+        } for k in range(1, len(hits) + 1)]
+        out_queries.append({
+            "label": q["label"],
+            "query": q["query"],
+            "relevant": q["relevant"],
+            "lesson": q["lesson"],
+            "hits": [{
+                "id": ids[h.index],
+                "score": round(h.score, 4),
+                "relevant": ids[h.index] in relevant,
+            } for h in hits],
+            "sweep": sweep,
+        })
+
+    return {
+        "name": "One TF-IDF index, four queries",
+        "note": ("All rankings computed by mini_rag (TF-IDF + cosine + top-k) over the corpus "
+                 "below; relevance labels are authored ground truth."),
+        "corpus": [{"id": i, "text": t} for i, t in corpus],
+        "queries": out_queries,
+    }
+
+
 def agent_demo() -> dict:
     """pass@k curves for a flaky vs a reliable agent, for the Ch 10 island. Each
     suite is 40 tasks sampled K times; pass@k rises with attempts, but pass@1 (the
@@ -336,6 +426,7 @@ def main() -> None:
         ("confidence_demo", confidence_demo()),
         ("calibration_demo", calibration_demo()),
         ("rag_demo", rag_demo()),
+        ("retrieval_demo", retrieval_demo()),
         ("agent_demo", agent_demo()),
         ("monitoring_demo", monitoring_demo()),
     ]:
