@@ -48,7 +48,12 @@ demand spine: `~/guides/docs/research/role_demand_and_interview_signals/`.
   incl. broken ones; 7/7 tests) + `AgentTraceExplorer` island (computed
   `agent_loop_demo.json`: 4 real traces — happy/gate-holds/hallucinated-tool/stuck-loop).
   `policy_lookup` reuses mini_rag (RAG-as-a-tool).
-- **Next:** Ch 9 (Multi-agent orchestration) — extends `mini_agent`.
+- **Ch 9 authored** — `mini_agent.orchestrate` (Worker/Assignment/HandoffRecord/
+  OrchestraTrace, run_supervisor w/ failure isolation + handoff budget, dependency_order
+  deadlock preventer) + `mini_agent.crew` (3 least-privilege specialists, scripted
+  triage_router, sick_day variant; tests 12/12) + `OrchestraExplorer` island (computed
+  `orchestra_demo.json`: triage day + failure-isolation sick day, expandable inner loops).
+- **Next:** Ch 10 (Fine-tune vs RAG vs prompt) — judgment chapter, no new companion.
 
 ## Spine & outline (RAG-centric, ~13 ch)
 

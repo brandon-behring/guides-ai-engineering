@@ -927,6 +927,77 @@ def agent_loop_demo() -> dict:
     }
 
 
+def orchestra_demo() -> dict:
+    """Two real run_supervisor runs for the guide-2 Ch 9 island: the triage
+    day (three tickets, three specialists, clean contexts) and the sick day
+    (the refund worker loops; the failure is isolated and the ticket rerouted
+    to a human). Scripted router + policies — every handoff and inner step is
+    actual output."""
+    import mini_agent.tools as agent_tools
+    from mini_agent import (run_supervisor, make_support_crew, sick_day_crew,
+                            triage_router)
+
+    def serialize(trace) -> dict:
+        return {
+            "status": trace.status,
+            "summary": trace.summary,
+            "handoffs": [{
+                "n": i + 1,
+                "thought": h.thought,
+                "worker": h.worker,
+                "goal": h.goal,
+                "worker_status": h.trace.status,
+                "worker_answer": h.trace.answer,
+                "inner_steps": [{
+                    "thought": s.thought,
+                    "tool": s.action.tool if s.action else None,
+                    "args": (", ".join(f"{k}={v!r}" for k, v in s.action.args.items())
+                             if s.action else ""),
+                    "observation": s.observation,
+                } for s in h.trace.steps],
+            } for i, h in enumerate(trace.handoffs)],
+        }
+
+    agent_tools._REFUNDS_STARTED.clear()
+    happy = run_supervisor("Handle the queue: T1, T2, T3",
+                           make_support_crew(), triage_router)
+    agent_tools._REFUNDS_STARTED.clear()
+    sick = run_supervisor("Handle the queue: T1, T2, T3",
+                          sick_day_crew(), triage_router)
+
+    crew = make_support_crew()
+    return {
+        "name": "One supervisor, three specialists",
+        "note": ("Both runs are real run_supervisor output over scripted "
+                 "router/policies. Expand a handoff to read the worker's inner "
+                 "loop — each worker's context contains ONLY its own ticket."),
+        "workers": [{"name": w.name, "description": w.description,
+                     "n_tools": len(w.tools)} for w in crew],
+        "scenarios": [
+            {"key": "triage", "label": "Triage day",
+             "task": "Handle the queue: T1 (policy question) · T2 (refund request) · T3 (wants a human)",
+             "predict": ("Three tickets, three specialists with different tools. "
+                         "Who gets what — and does any worker ever see another "
+                         "worker's ticket?"),
+             "lesson": ("Each specialist ran with a clean context (only its own "
+                        "ticket), least-privilege tools, and returned through the "
+                        "supervisor — no worker-to-worker chatter. The supervisor's "
+                        "lane plus the inner traces is the whole debugging story."),
+             **serialize(happy)},
+            {"key": "sickday", "label": "Sick day (failure isolation)",
+             "task": "Same queue — but the refund worker is stuck in Chapter 8's loop",
+             "predict": ("The refund specialist will fail (loop guard). Does the "
+                         "whole queue fail with it?"),
+             "lesson": ("Failure isolation: the worker's loop_detected status became "
+                        "a record the router could read, the ticket was rerouted to "
+                        "the front desk, and the queue still completed — degraded, "
+                        "not dead. One agent's failure should cost one handoff, "
+                        "never the run."),
+             **serialize(sick)},
+        ],
+    }
+
+
 def agent_demo() -> dict:
     """pass@k curves for a flaky vs a reliable agent, for the Ch 10 island. Each
     suite is 40 tasks sampled K times; pass@k rises with attempts, but pass@1 (the
@@ -993,6 +1064,7 @@ def main() -> None:
         ("rag_upgrade_demo", rag_upgrade_demo()),
         ("budget_demo", budget_demo()),
         ("agent_loop_demo", agent_loop_demo()),
+        ("orchestra_demo", orchestra_demo()),
         ("agent_demo", agent_demo()),
         ("monitoring_demo", monitoring_demo()),
     ]:

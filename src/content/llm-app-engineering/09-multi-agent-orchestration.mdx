@@ -1,0 +1,244 @@
+---
+title: "Multi-agent orchestration: when one loop becomes a team"
+slug: multi-agent-orchestration
+description: "Multi-agent earns its cost in exactly three currencies — specialization, parallelism, and clean-context decomposition — and charges for it in coordination. Build the supervisor pattern (workers with least-privilege tools and single-ticket contexts), make failure isolation real (one worker's loop costs one handoff, not the run), and learn the coordination failures by name: deadlock, livelock, contention."
+freshness: literature-survey
+last_verified: 2026-06-10
+tags: [llm-app-engineering, agents, multi-agent, orchestration]
+sources: []
+draft: false
+mode: tutorial
+target: transfer
+ordering: problem-first
+commitment: long-lived
+paradigms: [default]
+research_debt_addressed: |
+  Multi-agent content is where hype density peaks: crews, swarms, and org-charts of
+  agents presented as inherently better than one. The interview signal runs the
+  opposite way — the senior move is questioning the premise, justifying the
+  architecture in specific currencies, and knowing the distributed-systems failure
+  modes it imports. This chapter builds the supervisor pattern small enough to read,
+  runs a real failure-isolation trace, and prices the whole thing honestly.
+task_classes: [agent-design, system-design]
+provenance:
+  ai_tools: ["Claude Fable 5 (Anthropic)"]
+  audit_history:
+    - date: 2026-06-10
+      type: authored
+      file: src/content/llm-app-engineering/09-multi-agent-orchestration.mdx
+  citation_backstop: manual
+los:
+  - id: LAE-9.1
+    bloom: analyze
+    statement: "Justify (or refuse) a multi-agent architecture in its three real currencies — specialization, parallelism, context decomposition — knowing one agent with good tools often beats three poorly coordinated ones."
+    anchor: justify-multiagent
+    threshold: true
+  - id: LAE-9.2
+    bloom: design
+    statement: "Design the supervisor pattern: a router that decomposes and assigns, specialists with least-privilege tools and clean single-task contexts, explicit handoff contracts, and a synthesizer."
+    anchor: supervisor-pattern
+    threshold: true
+  - id: LAE-9.3
+    bloom: analyze
+    statement: "Name and prevent the coordination failures — deadlock (dependency ordering), livelock (handoff budgets), contention, conflicting results — and design failure isolation so one worker's death degrades the run instead of killing it."
+    anchor: coordination-failures
+    threshold: true
+---
+
+import YouWillLearn from '@brandon_m_behring/book-scaffold-astro/components/YouWillLearn.astro';
+import Pitfall from '@brandon_m_behring/book-scaffold-astro/components/Pitfall.astro';
+import Practice from '@brandon_m_behring/book-scaffold-astro/components/Practice.astro';
+import OrchestraExplorer from '../../components/OrchestraExplorer.tsx';
+import orchestraData from '../../data/orchestra_demo.json';
+
+# Multi-agent orchestration: when one loop becomes a team
+
+<YouWillLearn prerequisites="Chapter 8 — the agent loop, tools, and guards. The crew here is built from exactly those parts.">
+- The **justification test**: the three currencies multi-agent actually pays in, and the premise question seniors ask first.
+- The **supervisor pattern** built from Chapter 8's parts: clean-context workers, least-privilege tools, explicit handoffs, synthesis.
+- The **coordination failures** by name — deadlock, livelock, contention, conflicts — and failure isolation as the property that makes a team shippable.
+</YouWillLearn>
+
+## Ticket 3's anger leaks into ticket 9's refund
+
+Chapter 8 closed on Black Friday: forty tickets, one agent, serial processing.
+By ticket 12 the trace is a stew — the gift-card reasoning from ticket 3 is
+visibly contaminating ticket 9's refund decision, the furious customer in
+ticket 7 still hasn't seen a human, and wall-clock latency grows linearly with
+the queue. Someone proposes the fashionable fix: "let's make it multi-agent —
+a planner, a researcher, a writer, a critic, a manager…"
+
+Predict before reading: which of those five would actually help this queue —
+and what are the only *kinds* of reasons that ever justify splitting one agent
+into several?
+
+<Pitfall title="An org chart is not an architecture">
+The most common multi-agent failure is using it where a single agent with
+good tools wins: a supervisor delegating to one worker is strictly slower and
+more expensive than the worker alone, and a sequential chain renamed
+"planner → executor → reviewer" gains nothing from the costume. Multi-agent
+pays in exactly three currencies — **specialization** (different tools and
+instructions per job), **parallelism** (independent subtasks at the same
+time), and **context decomposition** (each worker reasons over a clean,
+single-task context). If a proposal can't name which currency it's buying,
+it's buying complexity.
+</Pitfall>
+
+## The justification test {/* anchor: justify-multiagent */}
+
+Run the queue through the three currencies. *Specialization*: policy
+questions need one read-only tool; refunds need the full toolset including a
+gated write; escalations need a human-ready summary and no tools at all —
+three genuinely different jobs, three different least-privilege toolsets.
+*Parallelism*: tickets are independent; forty of them serialized through one
+loop is a wall-clock choice, not a necessity. *Context decomposition*: the
+stew was the bug — ticket 3's reasoning had no business in ticket 9's
+context, and the fix is structural, not promptly. The queue passes the test
+on all three. (Most proposals pass on zero.)
+
+What the architecture *costs*, name it before building: N× the loops to pay
+for and debug, a router that can itself fail, handoff contracts to design,
+and a class of coordination failures imported wholesale from distributed
+systems. The senior signal in interviews isn't knowing the patterns — it's
+asking "should this be multi-agent at all?" before drawing boxes.
+
+## The supervisor pattern {/* anchor: supervisor-pattern */}
+
+The default topology — and usually the last one you need — is a **supervisor**:
+a router decomposes the task and assigns work; specialists execute and return;
+nobody talks peer-to-peer; a synthesizer writes the ending. In
+`mini_agent.orchestrate` the whole thing is Chapter 8's parts, one level up:
+
+```python
+for _ in range(max_handoffs):                       # the supervisor's own budget
+    thought, decision = router(task, trace.handoffs)  # the router's seat
+    if isinstance(decision, Finish):
+        return trace                                  # synthesis
+    worker = registry.get(decision.worker)            # unknown worker? a record,
+    inner = run_agent(decision.goal, worker.tools,    #   not a crash
+                      worker.policy)                  # a CLEAN inner loop
+    trace.handoffs.append(HandoffRecord(thought, worker.name,
+                                        decision.goal, inner))
+```
+
+Three design choices carry the weight. The **handoff contract is the goal
+string** — the *only* context a worker receives. That's the clean-context
+currency, enforced structurally: ticket 3 cannot leak into ticket 9's
+reasoning because it was never in ticket 9's context. **Least-privilege
+tools** per worker: the policy worker physically cannot start a refund — an
+entire failure class deleted, for free, at crew definition. And **everything
+is recorded twice**: the supervisor's lane (thoughts, assignments, statuses)
+plus each worker's full inner trace — because debugging a team means finding
+*which* loop went wrong before asking *why*.
+
+The other topologies are escalations you should be able to name and mostly
+decline: **hierarchical** (supervisors of supervisors — for tasks too big for
+one router's context, at linear latency cost per level), **peer-to-peer**
+(agents negotiating directly — real deadlock risk, justified only when
+bidirectional negotiation is the task), and **shared state** (parallel workers
+writing one store — bring locks; two unsynchronized writers lose one write
+silently). Frameworks package these: LangGraph when you need typed state and
+dynamic routing in production; CrewAI for fast fixed-role prototypes. Either
+way, the concepts above are what you're configuring.
+
+## Coordination failures, by name {/* anchor: coordination-failures */}
+
+A multi-agent system is a small distributed system whose nodes are stochastic.
+Its failures have classical names and classical preventions:
+
+| Failure | What it looks like | Prevention |
+|---|---|---|
+| **Deadlock** | A waits on B's result; B waits on A's approval | explicit dependency order — `dependency_order(deps)` topo-sorts and raises on cycles *at design time* |
+| **Livelock** | the router keeps re-delegating; everyone's busy, nothing finishes | a handoff budget (`max_handoffs`) — Chapter 8's loop guard, one level up |
+| **Contention** | N workers hammer one rate limit / connection pool | queueing, backoff with jitter, per-worker budgets |
+| **Conflicting results** | two specialists disagree | a designated resolver: the synthesizer rules, with the disagreement *recorded* — never silently pick the last writer |
+
+And the property that makes the whole thing shippable: **failure isolation**.
+One worker's death must cost one handoff, not the run. In the loop above, a
+worker that hits Chapter 8's loop guard returns a `loop_detected` trace — a
+*record the router can read* — and the router's move is graceful degradation:
+reroute that ticket to the front desk, note the failure in the synthesis,
+keep the queue moving. No customer interaction ends in a dead end; they get
+resolution, partial help, or a warm human handoff — in that order of
+preference. You'll watch exactly this happen in the demo's sick-day run.
+
+## See it: triage day, and the sick day
+
+Both runs are real `run_supervisor` output. Predict, reveal the supervisor's
+lane, then open the handoffs — each worker's inner loop contains only its own
+ticket. Then switch to the sick day: the refund worker loops, the guard fires,
+and the queue survives it.
+
+<OrchestraExplorer client:visible data={orchestraData} />
+
+<Practice id="multiagent-justify-design" difficulty={3}>
+A teammate proposes a five-agent crew for your document pipeline: Planner,
+Researcher, Extractor, Reviewer, and Manager, in sequence. Throughput target:
+200 documents/day, each needing metadata extraction, a compliance check, and
+a summary. Apply the justification test, then propose the architecture you'd
+actually build — including what happens when the compliance check fails on a
+document.
+
+<details>
+<summary>One defensible answer</summary>
+
+- **Justification test on the proposal**: it's a *sequence* — no parallelism
+  (each agent waits on the last), no context decomposition (the same document
+  flows through all five), and the "specializations" are stages of one job.
+  It pays full coordination cost to buy nothing; as proposed, it's a pipeline
+  wearing five hats.
+- **Where multi-agent IS justified here**: across *documents* (200/day are
+  independent — parallelize the queue) and across the three *checks* within a
+  document (metadata, compliance, summary are independent reads —
+  specialization + parallelism). So: a supervisor fans each document out to
+  three least-privilege specialists in parallel, then a synthesizer merges —
+  with `dependency_order` making the synthesizer's dependence explicit.
+- **Failure handling**: a failed compliance check is a *result* (route the
+  document to human review with the trace attached); a failed compliance
+  *worker* (timeout, loop) is an isolation event — record it, retry once,
+  then degrade to the human queue. The run never dies for one document.
+- **What stays deterministic**: ingestion, format detection, and the final
+  routing rules — pipeline-with-agent-decision-points, exactly as Chapter 8
+  left it.
+</details>
+</Practice>
+
+## How this is graded
+
+- **Technical Correctness** — you can build a supervisor from a single-agent
+  loop, state the handoff contract precisely, and explain why clean contexts
+  are enforced structurally rather than by prompt.
+- **Trade-off Awareness** — this chapter's weighted dimension: every box in
+  the diagram justified in one of the three currencies, with the N× cost and
+  the coordination tax stated next to it.
+- **Evaluation Rigor** — team claims come from the two-level trace (supervisor
+  lane + inner loops); failure isolation is *tested* (kill a worker, assert
+  the run degrades) — the sick-day scenario is a test case, not a slide.
+- **Communication** — "tickets are independent and the three checks need
+  different tools, so: parallel fan-out, least-privilege specialists,
+  human-degraded failures — and here's the handoff record" beats naming a
+  framework.
+
+### Industry variation
+
+- **Enterprise document/compliance flows** — the supervisor pattern with
+  audit-grade handoff records; conflicting specialist results escalate to
+  humans by policy, not by tie-break.
+- **Frontier-lab and research tooling** — orchestrator/worker fleets for
+  parallel exploration (search, evals, codebase sweeps), where the
+  orchestrator's job is mostly budget allocation and dedup across workers.
+- **Startups** — one good agent with good tools, for as long as humanly
+  possible; the crew arrives when the queue's wall-clock or a genuine
+  specialization split forces it, and not a sprint earlier.
+
+## Stretch: the exec question
+
+The crew ships. Latency drops, the trace UI is beautiful, the failure
+isolation demo lands in the all-hands. Then the CTO asks the question that
+outranks all of it: *"We're paying per token for prompting, retrieval, and
+all this orchestration. Wouldn't it be cheaper and better to just fine-tune
+our own model on two years of support transcripts — and delete half this
+machinery?"* It's a fair question with a real budget attached, and "no,
+fine-tuning is hard" is not an answer that survives the meeting. What
+evidence, what arithmetic, and what decision framework would you bring?
+That's Chapter 10: prompt vs RAG vs fine-tuning — the judgment chapter.
