@@ -1,0 +1,4 @@
+# Cloudflare Pages redirects.
+# The site builds with base=/ai-engineering/ (proxied at that path from the hub
+# domain), so the bare pages.dev root would otherwise 404. Send it to the app root.
+/ /ai-engineering/ 302
