@@ -1,0 +1,45 @@
+{
+  "name": "Spot the production myth",
+  "note": "Each line is something a smart team says the week after a successful AI-feature launch. Pick the sharpest reason it fails before production teaches it to you.",
+  "items": [
+    {
+      "id": "offline-eval-done",
+      "prompt": "We built a golden set and the system scored 0.92 before launch. Evaluation is done — now it's just normal ops.",
+      "candidates": [
+        "An offline score is a snapshot of one traffic distribution and one model version — real queries, the corpus, and the provider's model all shift after launch, and none of those shifts rerun your golden set",
+        "0.92 is too low a score to launch with",
+        "Golden sets only work for classification tasks",
+        "You should have used a bigger eval set"
+      ],
+      "correct": "An offline score is a snapshot of one traffic distribution and one model version — real queries, the corpus, and the provider's model all shift after launch, and none of those shifts rerun your golden set",
+      "explanation": "Offline evaluation certifies the system you launched on the traffic you imagined. Production traffic drifts, your documents change, and hosted models get updated under you. Evaluation in production — sampled scoring of live traffic plus a regression gate that reruns the golden set on every change — is a standing process, not a launch checkbox. That is this guide's Ch 6–7.",
+      "principle": "Offline eval certifies the launch; only eval-in-prod certifies the system you're running today."
+    },
+    {
+      "id": "dashboards-cover-it",
+      "prompt": "We already have dashboards — latency, error rate, uptime. If the AI feature breaks, we'll see it like any other service.",
+      "candidates": [
+        "Infra metrics only catch failures that look like outages — an LLM feature can return 200 OK, on time, and be confidently wrong on a third of queries without moving a single dashboard",
+        "Dashboards are too slow to detect anything",
+        "AI systems can't be monitored with standard tools at all",
+        "Uptime doesn't matter for AI features"
+      ],
+      "correct": "Infra metrics only catch failures that look like outages — an LLM feature can return 200 OK, on time, and be confidently wrong on a third of queries without moving a single dashboard",
+      "explanation": "Classical observability watches the request, not the answer. AI systems add a quality layer that infra metrics are blind to: groundedness, correctness, refusal behavior. The observability stack for AI is metrics, logs, traces, AND evals — the fourth pillar is what makes the silent failure visible (Ch 5–6).",
+      "principle": "Green dashboards measure that you answered — not that you answered well."
+    },
+    {
+      "id": "users-will-tell-us",
+      "prompt": "If quality ever drops, users will complain and we'll fix it. That's our detection mechanism.",
+      "candidates": [
+        "Most users don't report bad AI answers — they silently stop trusting the feature, and the complaints you do get arrive weeks after the regression, with no signal pointing to what changed",
+        "Users complain too much for this to be useful",
+        "Support tickets are too expensive to process",
+        "Users can't tell when an answer is wrong"
+      ],
+      "correct": "Most users don't report bad AI answers — they silently stop trusting the feature, and the complaints you do get arrive weeks after the regression, with no signal pointing to what changed",
+      "explanation": "Complaint-driven detection has two fatal lags: selection bias (the users who hit bad answers mostly churn quietly) and attribution loss (by the time a complaint lands, the deploy, corpus change, or model update that caused it is buried). Sampled evaluation of live traffic plus drift detection on rolling windows catches the decay in days, with the change that caused it still in view (Ch 7).",
+      "principle": "By the time users tell you, the regression is weeks old and the cause is cold."
+    }
+  ]
+}

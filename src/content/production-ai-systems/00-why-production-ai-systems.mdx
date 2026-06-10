@@ -1,0 +1,214 @@
+---
+title: "Why production is where AI systems live or die"
+slug: why-production-ai-systems
+description: "The demo worked, the offline eval passed, the dashboards are green — and the system is failing anyway. The production loop — deploy, serve, observe, evaluate, respond — what each stage owns, why AI systems fail silently in ways classical services don't, and the three post-launch myths that let them."
+freshness: literature-survey
+last_verified: 2026-06-10
+tags: [orientation, production, observability, reliability]
+sources: []
+draft: false
+mode: explanation
+target: transfer
+ordering: problem-first
+commitment: long-lived
+paradigms: [default]
+research_debt_addressed: |
+  Public material on "LLMs in production" is either vendor marketing for an
+  observability product or MLOps content written for batch ML models that never
+  answers the question AI-eng interviews actually ask: how do you know your AI
+  feature still works *today*? Interview demand (2025–26) puts production/cost-latency
+  at ~18% of signal, and two of the top documented failure modes — "no production
+  experience" and "ignoring ops/cost/eval" — land exactly here. This chapter frames
+  the production loop the rest of the guide builds, stage by stage.
+task_classes: [orientation]
+provenance:
+  ai_tools: ["Claude Fable 5 (Anthropic)"]
+  audit_history:
+    - date: 2026-06-10
+      type: authored
+      file: src/content/production-ai-systems/00-why-production-ai-systems.mdx
+  citation_backstop: manual
+los:
+  - id: PAS-0.1
+    bloom: explain
+    statement: "Explain why AI systems fail silently in production in ways classical services don't — a green-dashboard service can be confidently wrong — and why offline evaluation doesn't transfer to run-time assurance."
+    anchor: silent-failure
+    threshold: true
+  - id: PAS-0.2
+    bloom: explain
+    statement: "Name the five stages of the production loop (deploy, serve, observe, evaluate, respond), what each owns, and locate a given production failure at the right stage."
+    anchor: production-loop
+    threshold: true
+  - id: PAS-0.3
+    bloom: analyze
+    statement: "Diagnose why three post-launch myths — 'offline eval was done', 'our dashboards cover it', 'users will tell us' — fail, and what standing process each one is avoiding."
+    anchor: prod-myths
+    threshold: true
+---
+
+import YouWillLearn from '@brandon_m_behring/book-scaffold-astro/components/YouWillLearn.astro';
+import Pitfall from '@brandon_m_behring/book-scaffold-astro/components/Pitfall.astro';
+import Practice from '@brandon_m_behring/book-scaffold-astro/components/Practice.astro';
+import ScenarioQuiz from '../../components/ScenarioQuiz.tsx';
+import productionMythsData from '../../data/production_myths_demo.json';
+
+# Why production is where AI systems live or die
+
+<YouWillLearn prerequisites="You can build and evaluate an LLM feature (guides 1–2, or equivalent experience). This guide is about what happens after it ships.">
+- Why AI systems fail **silently** in production — green dashboards, confidently wrong answers — in ways classical services don't.
+- The **production loop**: deploy, serve, observe, evaluate, respond — and what each stage owns.
+- Why three post-launch myths ("offline eval was done", "dashboards cover it", "users will tell us") fail.
+</YouWillLearn>
+
+## The launch that worked
+
+Pick up the support bot from the LLM-app-engineering guide: retrieval over the help
+center, a gated order-status tool, a golden set it scored 0.92 on. It launches.
+Week one is great.
+
+Three weeks later, three things have happened that nobody planned a meeting about: a
+promo **10×'d traffic** and p99 latency quietly crossed the SLA; the help center got
+**reorganized** and a third of the chunk index now points at stale sections; and the
+model provider **updated the hosted model**, which now refuses two phrasings your
+golden set never covered. Cost is up 4×. The bot answers confidently from the stale
+sections. Every dashboard is green.
+
+Predict, before reading on: **which of those three would your current setup catch,
+and how many days later?** For most teams the honest answer is "the latency one,
+eventually" — and that's the cheapest of the three.
+
+<Pitfall title="A working AI system is a snapshot, not a state">
+"It works" was certified against one traffic distribution, one corpus, one model
+version — all three of which started drifting the day you launched. Classical
+services mostly break *loudly* (errors, timeouts). AI systems break *silently*: the
+HTTP layer keeps succeeding while the answers stop being right. Production AI
+engineering is the discipline of noticing.
+</Pitfall>
+
+## The silent failure {/* anchor: silent-failure */}
+
+Classical reliability engineering watches the **request**: did it return, how fast,
+with what status code. For an LLM feature, every one of those signals can be healthy
+while the system fails at the only layer the user cares about — the **answer**.
+A 200-OK response in 800 ms that cites a deprecated policy is, to your entire
+monitoring stack, a success.
+
+This is the structural difference this guide is built around: AI systems add a
+**quality dimension that infra telemetry cannot see**, and that dimension decays on
+its own — traffic drifts, corpora change, hosted models get swapped under you. So
+"is it up?" and "is it right?" are separate engineering problems, with separate
+tooling, and interviews increasingly probe whether you know the second one exists.
+The tell is one question:
+
+> "Your dashboards are green. How do you know your AI feature still works?"
+
+Weak answers re-describe the dashboards. Strong answers describe a **loop** that
+keeps re-certifying quality against live traffic — which is the rest of this chapter.
+
+## The production loop {/* anchor: production-loop */}
+
+Production AI work is one loop with five stages. The skill — and the interview
+signal — is knowing which stage owns a given failure, and which stage's absence let
+it through.
+
+| Stage | Owns | This guide |
+| --- | --- | --- |
+| **Deploy** | getting change out safely — shadow, canary, flags, fallback | Ch 1 |
+| **Serve** | latency, throughput, and cost at scale | Ch 2–4 |
+| **Observe** | seeing what the system actually does — metrics, logs, traces, *and evals* | Ch 5 |
+| **Evaluate** | re-certifying quality on live traffic; catching drift | Ch 6–7 |
+| **Respond** | the bad day — guardrails, incidents, degradation modes | Ch 8–9 |
+
+Run the support bot's three failures through it. The latency breach lives at
+**serve** (capacity and batching under 10× load). The stale-index failure lives at
+**evaluate** — a corpus change should have re-run the golden set and failed a gate.
+The provider-update refusals live at **deploy** — an upstream model version is a
+*change*, and changes go through the same shadow-then-promote machinery as your own
+code. None of them lives at "the model got worse," which is where teams without the
+loop file everything.
+
+Two stages get a chapter block each because they're where the demand evidence says
+candidates fail: **serve** (cost/latency is ~18% of AI-eng interview signal) and
+**evaluate** (the silent failure above). The judgment chapter (Ch 10), capstone
+(Ch 11), and craft chapter (Ch 12) then make the loop demonstrable in an interview.
+
+## Three post-launch myths {/* anchor: prod-myths */}
+
+Each of these is a real position a competent team takes the week after a successful
+launch — and each one is a decision to skip a stage of the loop. **Predict** the
+sharpest reason each fails before you reveal it.
+
+<ScenarioQuiz client:visible data={productionMythsData} />
+
+Now *explain* the pattern: every myth assumes some other mechanism is already doing
+a loop stage's job. "Offline eval was done" assumes launch-time evaluation covers
+run-time (it can't — the inputs moved). "Dashboards cover it" assumes infra
+observability sees quality (it can't — wrong layer). "Users will tell us" assumes
+detection can be outsourced to the people churning silently (it can't — too late,
+no attribution). The rest of this guide builds the stages those myths skip.
+
+<Practice id="place-the-failure" difficulty={1}>
+Four production incidents. For each, name the production-loop stage that **owns the
+fix** (one sentence of justification each):
+
+1. A prompt tweak shipped Friday doubles the refusal rate; nobody notices until Tuesday.
+2. p99 latency triples every day between 9 and 10 a.m.
+3. The bot starts recommending a competitor's product for one query phrasing.
+4. Answer quality has been sliding for a month; no single change explains it.
+
+<details>
+<summary>One defensible answer</summary>
+
+1. **Deploy** — a Friday prompt change is a release; a canary with a golden-set gate
+   would have caught the refusal spike before full traffic did.
+2. **Serve** — a predictable load peak is a capacity/batching problem (and an
+   autoscaling or queueing fix), not a quality problem.
+3. **Respond** — an output guardrail owns "never say this" classes of failure;
+   detection alone doesn't stop the bleeding while you debug the cause.
+4. **Evaluate** — slow, cause-less decay is drift; only rolling-window quality
+   measurement against live traffic makes it visible, let alone attributable.
+
+If you also said "and observe underlies all four" — yes. Traces and evals are how
+every other stage sees anything at all (Ch 5).
+</details>
+</Practice>
+
+## How this is graded
+
+The same four dimensions as the rest of the series — with their production accents:
+
+- **Technical Correctness** — you place a failure at the right loop stage and name the
+  mechanism (canary gate, batching, output guardrail, drift window), rather than
+  saying "add monitoring" to everything.
+- **Trade-off Awareness** — you weigh detection cost against failure cost: sampling
+  rates, eval spend per query, when a startup's monitoring debt is rational.
+- **Evaluation Rigor** — you treat "still works" as a measured, continuously
+  re-certified claim — sampled live-traffic evals and regression gates, not a
+  launch-day score.
+- **Communication** — "the dashboards watch the request; we also have to watch the
+  answer, so we sample 5% of traffic through the same judge we gate releases with" is
+  the sentence that signals you've operated one of these.
+
+### Industry variation
+
+- **Startups** — some monitoring debt is rational; the senior skill is naming *which*
+  debt (skip the tracing UI, never skip the regression gate on deploys).
+- **Enterprise B2B** — change control, audit trails, and per-tenant isolation dominate;
+  "who saw what answer when" is a compliance question before it's a debugging one.
+- **Regulated (fintech, health)** — incidents carry disclosure duties; explainability
+  and incident response are designed in, not bolted on.
+- **Frontier labs** — the loop is assumed infrastructure; the bar is how fast new
+  capabilities move through it without breaking it.
+
+## Stretch: the one-line answer that ends the interview
+
+"Your dashboards are green — how do you know the feature still works?" The junior
+answer re-describes the dashboards. Sketch the senior answer in three sentences that
+walk the loop. (Hint: *changes* — yours and the provider's — pass a golden-set gate
+before full traffic; *live traffic* is sampled and scored continuously, with drift
+tests on rolling windows; when quality does break, *guardrails and degradation modes*
+bound the blast radius while you attribute the cause. Chapters 1–9 turn each sentence
+into machinery.)
+
+Next: **Chapter 1 — Deploying AI safely**, where the loop starts: getting change into
+production — including the changes you didn't make — without letting it surprise you.
