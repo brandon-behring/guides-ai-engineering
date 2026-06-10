@@ -1,0 +1,257 @@
+---
+title: "RAG end-to-end: retrieve, assemble, ground, generate"
+slug: rag-end-to-end
+description: "Assemble the full RAG pipeline and own every stage of it: retrieval feeds a budgeted context assembly, a grounded prompt wraps the survivors, and a generator answers — or abstains. Build it with a per-stage trace, learn the four failure points (retrieval, context window, extraction, generation), and diagnose upstream-first instead of blaming the model."
+freshness: literature-survey
+last_verified: 2026-06-10
+tags: [llm-app-engineering, rag, grounding, pipelines]
+sources: []
+draft: false
+mode: tutorial
+target: transfer
+ordering: problem-first
+commitment: long-lived
+paradigms: [default]
+research_debt_addressed: |
+  RAG is usually shown as a 20-line happy path — retrieve, paste, generate — with the
+  failure analysis left as production folklore. Engineers then debug wrong answers by
+  prompt-tweaking the last stage, when most failures happen upstream in glue code they
+  own. This chapter builds the pipeline with the trace as a first-class output, makes
+  three failure modes happen on real runs, and installs the four-failure-points
+  framework as the debugging discipline.
+task_classes: [rag, pipeline-design]
+provenance:
+  ai_tools: ["Claude Fable 5 (Anthropic)"]
+  audit_history:
+    - date: 2026-06-10
+      type: authored
+      file: src/content/llm-app-engineering/04-rag-end-to-end.mdx
+  citation_backstop: manual
+los:
+  - id: LAE-4.1
+    bloom: design
+    statement: "Assemble the full RAG pipeline — retrieve → budgeted context assembly → grounded prompt → generate — and keep a per-stage trace so every wrong answer is attributable to a stage."
+    anchor: pipeline-you-own
+    threshold: true
+  - id: LAE-4.2
+    bloom: explain
+    statement: "Explain grounding: why the prompt carries answer-only-from-context, missing-context, and citation rules — and why a real LLM needs them when a quote-only toy doesn't."
+    anchor: grounding
+    threshold: true
+  - id: LAE-4.3
+    bloom: analyze
+    statement: "Diagnose a wrong RAG answer to one of four failure points — retrieval, context window, extraction, generation — and fix upstream first."
+    anchor: four-failure-points
+    threshold: true
+---
+
+import YouWillLearn from '@brandon_m_behring/book-scaffold-astro/components/YouWillLearn.astro';
+import Pitfall from '@brandon_m_behring/book-scaffold-astro/components/Pitfall.astro';
+import Practice from '@brandon_m_behring/book-scaffold-astro/components/Practice.astro';
+import RagPipelineExplorer from '../../components/RagPipelineExplorer.tsx';
+import pipelineData from '../../data/rag_pipeline_demo.json';
+
+# RAG end-to-end: retrieve, assemble, ground, generate
+
+<YouWillLearn prerequisites="Chapters 1–3 — prompts as specs, vector search, chunking. Comfortable reading Python.">
+- The full pipeline as **code you own** — retrieve → assemble under a budget → grounded prompt → generate — with a per-stage **trace**.
+- What **grounding** actually is: rules that remove the generator's freedom to improvise, plus a floor and an abstain path.
+- The **four failure points** of any RAG system, their symptoms, and why you fix **upstream first**.
+</YouWillLearn>
+
+## Retrieval was perfect. The answer was still wrong.
+
+Chapter 3 closed with this trace, and now you get to resolve it. A user asks
+*"Can I get a refund on a gift card I bought five weeks ago?"* and your
+assistant answers *"Yes — within 30 days"*: wrong twice. You check retrieval —
+it worked. The 30-day rule ranked #1; the gift-card exclusion was retrieved
+too, at rank #4. Recall on the golden set: unchanged. Chunking: coherence 1.0.
+The model: same model that aces every other question.
+
+So you read the *assembled context* — the thing the model actually received —
+and there it is. Your assembly step packs retrieved chunks into a fixed word
+budget, in rank order, until they stop fitting. Rank #4 didn't fit. The
+exclusion was retrieved, scored, and then silently dropped by four lines of
+glue code nobody had looked at since the prototype.
+
+Predict: which stage of *your* pipeline would you instrument first, and what
+would you log to catch this class of bug before users do?
+
+<Pitfall title="The model gets the blame; the pipeline has the bug">
+When a RAG answer is wrong, the reflex is to tune the prompt or upgrade the
+model — the visible, glamorous last stage. But RAG is not a model. It's a
+pipeline of decisions you own: what was retrieved, what fit the budget, what
+the prompt demanded. Most wrong answers are manufactured upstream and merely
+*delivered* by the generator. Debug the pipe before re-negotiating with the
+model.
+</Pitfall>
+
+## The pipeline is code you own {/* anchor: pipeline-you-own */}
+
+RAG exists because models have a knowledge cutoff and an imagination: grounding
+answers in retrieved documents fixes staleness and squeezes out fabrication.
+The mechanism is five stages — and in `mini_rag.pipeline` each one returns its
+intermediate state, because the intermediates are where the bugs live:
+
+```python
+class RagPipeline:
+    def __init__(self, chunks, k=4, budget_words=120, min_score=0.0):
+        self.index = TfidfIndex(chunks)
+        ...
+
+    def run(self, question: str) -> RagTrace:
+        hits = [h for h in self.index.search(question, k=self.k)
+                if h.score >= self.min_score]              # retrieve (+ floor)
+        included, excluded = assemble_context(hits, self.budget_words)
+        context = [h.doc for h in included]
+        prompt = build_prompt(question, context)            # ground
+        answer = extractive_answer(question, context)       # generate
+        return RagTrace(question, hits, included, excluded, prompt, answer)
+```
+
+`assemble_context` is the four lines from the opener — include hits in rank
+order while they fit the budget, exclude the rest — except here the exclusions
+are *returned*, not swallowed. The `RagTrace` is the chapter's real deliverable:
+when an answer is wrong, the trace answers "which stage?" mechanically. Empty
+`hits` → retrieval. The needed chunk sitting in `excluded` → context window.
+Everything present and the answer still wrong → look at the generator.
+
+Notice the pipeline has **three different knobs** that beginners conflate:
+`k` (how many chunks retrieval may return), `budget_words` (how many survive
+into the context), and `min_score` (the similarity floor). They fail
+differently: a small `k` loses facts before ranking ends, a small budget loses
+them after, and a missing floor lets junk *in* — the next section makes that
+one bite.
+
+## Grounding: removing the freedom to improvise {/* anchor: grounding */}
+
+The prompt is Chapter 1's spec applied to RAG — every clause deletes a degree
+of freedom:
+
+```python
+def build_prompt(question, context_chunks):
+    numbered = "\n".join(f"[{i+1}] {c}" for i, c in enumerate(context_chunks))
+    return (
+        "You are a support assistant. Answer ONLY from the numbered context "
+        "chunks below; if the answer isn't there, say \"I don't know\". "
+        "Cite the chunk you used, like [2].\n\n"
+        f"Context:\n{numbered}\n\nQuestion: {question}\n\n"
+        "Answer (one or two sentences, with citation):"
+    )
+```
+
+*Answer ONLY from the context* blocks parametric memory; the *I-don't-know
+rule* makes missing context a safe failure instead of an invented answer; the
+*citation* makes every claim checkable after the fact.
+
+The companion's generator makes the point by contrast. `extractive_answer`
+indexes the *sentences* of the assembled context and quotes the single best
+match — retrieval again, one level down. It is **faithful by construction**:
+it cannot say anything the context doesn't contain. A real LLM is the
+opposite — it synthesizes fluently across chunks (which you want) and just as
+fluently beyond them (which you don't). That asymmetry is exactly why the
+grounding rules exist for real models, and why faithfulness gets *measured*
+rather than assumed — Chapter 5's job.
+
+Two numbers in this pipeline are policies, not defaults. The abstain
+**threshold** in the generator and the similarity **floor** in retrieval both
+draw the line between "answer" and "I don't know" — and both must be
+*calibrated* against labeled examples, because shared filler words give junk
+real, nonzero scores. You'll watch an uncalibrated pipeline confidently quote
+boilerplate in the demo below.
+
+## The four failure points {/* anchor: four-failure-points */}
+
+Every wrong RAG answer traces to one of four places. Learn the symptoms and
+the pipe debugs itself:
+
+| # | Failure point | Symptom | First fixes |
+|---|---|---|---|
+| 1 | **Retrieval** | context is irrelevant or empty; answer says "based on the context" about the wrong thing | chunking, hybrid search, query expansion, the floor |
+| 2 | **Context window** | the right chunk was retrieved but the answer misses it | rerank before assembly, raise/spend the budget smarter, fewer-but-better chunks |
+| 3 | **Extraction** | the right chunk is *in* the context; the answer still misses the detail | tighter instructions ("extract specifically…"), citations, chain-of-thought |
+| 4 | **Generation** | the answer contradicts or invents beyond the context | grounding rules, lower temperature, few-shot "not found" examples |
+
+Two disciplines turn the table into practice. **Diagnose before fixing** — a
+"30% wrong answers" system is almost never one cause; measure each stage
+(retrieval precision, coverage, groundedness) and read the numbers *together*
+like a dashboard, not a scorecard. And **fix upstream first** — the majority
+of RAG failures are retrieval failures wearing a generation costume: if the
+right document never reached the context, no prompt engineering can save the
+answer, and an upstream fix cascades (better retrieval reduces hallucination
+*and* vagueness downstream).
+
+## See it: one pipeline, three traces
+
+Each scenario below is a real `RagPipeline.run()` over the same chunked policy
+document. Predict before revealing, then toggle the knob that matters: the
+similarity floor in the retrieval-failure scenario, the word budget in the
+context-window one. Open the exact prompt — that string is what the generator
+actually saw, and it settles every argument about "what the model knew."
+
+<RagPipelineExplorer client:visible data={pipelineData} />
+
+<Practice id="rag-diagnose-dashboard" difficulty={3}>
+A literature-Q&A RAG system answers wrong 30% of the time. Its eval dashboard
+reads: faithfulness 0.92 · answer relevancy 0.65 · context precision 0.45 ·
+context recall 0.50. Diagnose the failure point, propose fixes in priority
+order, and say what you expect each metric to do after the first fix.
+
+<details>
+<summary>One defensible answer</summary>
+
+- **Read the dashboard**: faithfulness 0.92 means that *when the model has
+  context, it sticks to it* — generation is fine. Precision 0.45 means most
+  retrieved chunks are irrelevant; recall 0.50 means half the needed
+  information never arrives. This is **failure point 1: retrieval**, and the
+  weak relevancy (0.65) is its downstream echo, not a separate disease.
+- **Fixes, upstream first**: (1) hybrid search — lexical + dense — since pure
+  vector search misses exact terminology; (2) re-examine chunking against a
+  golden set (split facts depress both precision and recall); (3) add a
+  reranker before assembly so the budget is spent on the best candidates;
+  (4) query expansion for vocabulary mismatch. Prompt work comes last — the
+  prompt isn't the problem.
+- **Expected movement**: after hybrid search, precision and recall rise
+  first; relevancy follows them up; faithfulness should stay roughly flat
+  (it was never broken) — if it *drops*, the new context is confusing the
+  generator and you check assembly order next.
+</details>
+</Practice>
+
+## How this is graded
+
+- **Technical Correctness** — this chapter's weighted dimension: you can walk
+  the pipeline stage by stage, name what `k`, the budget, and the floor each
+  control, and attribute a wrong answer to a stage using the trace.
+- **Trade-off Awareness** — abstaining vs answering junk, budget size vs
+  dilution and cost, floor height vs false abstentions — each line has a price
+  on both sides.
+- **Evaluation Rigor** — you diagnose with per-stage measurements before
+  fixing, and you treat thresholds as calibrated choices, not defaults.
+- **Communication** — "the exclusion chunk was retrieved at rank 4 and dropped
+  by the 60-word budget; I'd rerank before assembly and re-run the golden set"
+  beats "the model hallucinated."
+
+### Industry variation
+
+- **Startups** — the trace *is* the observability story: log retrieved ids,
+  scores, included/excluded, and the prompt hash from day one; it costs an
+  afternoon and pays for itself at the first incident.
+- **Enterprise** — citations are mandatory, not pedagogical: auditors ask
+  "which document said this?", grounded prompts are reviewed artifacts, and
+  an uncited answer is a compliance bug even when it's correct.
+- **High-volume consumer products** — the budget knob is simultaneously a
+  cost and latency lever (every context word is paid tokens); teams tune
+  budget/k/floor against answer quality *and* unit economics — that
+  trade-off becomes Chapter 7.
+
+## Stretch: which pipeline is better?
+
+You fix the opener's bug two ways: pipeline A reranks before assembly;
+pipeline B doubles the budget. Both pass your five spot-checked questions.
+They disagree on cost, latency, and — you suspect — quality, but "I read ten
+answers and B felt better" won't survive review. Design the decision: what
+labeled data, which metrics for each half of the system (the retrieval half
+and the generation half), and what would make the comparison *fair*? That's
+Chapter 5 — evaluating RAG with golden sets, ranked-list metrics, and
+faithfulness — where this guide shakes hands with the Evaluation guide.

@@ -1,0 +1,217 @@
+{
+  "name": "One pipeline, three traces",
+  "note": "Every variant is a real mini_rag RagPipeline.run() over the same paragraph-chunked policy doc; verdicts are authored.",
+  "chunks": [
+    {
+      "id": 0,
+      "words": 35,
+      "text": "Thanks for shopping with ACME. This page explains our return and refund policies for standard orders, gift cards, and final-sale items. If anything here is unclear, our support team can walk you through the details."
+    },
+    {
+      "id": 1,
+      "words": 40,
+      "text": "Most items qualify for a full refund. To start, open your order history, choose the order that contains the item, and select the item you want to send back. If your order shipped in several packages, return each item separately."
+    },
+    {
+      "id": 2,
+      "words": 22,
+      "text": "You may request a refund within 30 days of purchase, as long as the item is unopened and in its original packaging."
+    },
+    {
+      "id": 3,
+      "words": 39,
+      "text": "Once your return arrives at our warehouse, we inspect it within two business days. Approved refunds are paid to the original payment method. Bank processing times vary, so allow up to five business days for the money to appear."
+    },
+    {
+      "id": 4,
+      "words": 29,
+      "text": "Gift cards and final-sale items are non-refundable. Items marked as clearance may be exchanged for store credit instead. Shipping fees are refunded only when the return is our error."
+    }
+  ],
+  "scenarios": [
+    {
+      "key": "happy",
+      "label": "Happy path",
+      "question": "How long after purchase can I request a refund?",
+      "predict": "Four chunks compete. Which one ranks #1, and will the answer carry a citation?",
+      "variants": [
+        {
+          "label": "k=4 \u00b7 budget 200",
+          "k": 4,
+          "budget": 200,
+          "floor": 0.0,
+          "hits": [
+            {
+              "chunk": 2,
+              "score": 0.44,
+              "status": "included"
+            },
+            {
+              "chunk": 0,
+              "score": 0.119,
+              "status": "included"
+            },
+            {
+              "chunk": 1,
+              "score": 0.073,
+              "status": "included"
+            }
+          ],
+          "prompt": "You are a support assistant. Answer ONLY from the numbered context chunks below; if the answer isn't there, say \"I don't know\". Cite the chunk you used, like [2].\n\nContext:\n[1] You may request a refund within 30 days of purchase, as long as the item is unopened and in its original packaging.\n[2] Thanks for shopping with ACME. This page explains our return and refund policies for standard orders, gift cards, and final-sale items. If anything here is unclear, our support team can walk you through the details.\n[3] Most items qualify for a full refund. To start, open your order history, choose the order that contains the item, and select the item you want to send back. If your order shipped in several packages, return each item separately.\n\nQuestion: How long after purchase can I request a refund?\n\nAnswer (one or two sentences, with citation):",
+          "answer": {
+            "text": "You may request a refund within 30 days of purchase, as long as the item is unopened and in its original packaging.",
+            "supported": true,
+            "source_chunk": 2
+          },
+          "verdict": "Every stage did its job: the 30-day chunk ranked #1, fit the budget, and the grounded prompt + extractive generator quoted the fact with its citation. Boring is the goal."
+        }
+      ]
+    },
+    {
+      "key": "junk",
+      "label": "Retrieval failure",
+      "question": "Can I get my money back?",
+      "predict": "No corpus chunk shares a meaningful word with this query (Ch 2's paraphrase miss). Will the pipeline abstain \u2014 or answer anyway?",
+      "variants": [
+        {
+          "label": "no similarity floor",
+          "k": 4,
+          "budget": 200,
+          "floor": 0.0,
+          "hits": [
+            {
+              "chunk": 0,
+              "score": 0.107,
+              "status": "included"
+            },
+            {
+              "chunk": 3,
+              "score": 0.091,
+              "status": "included"
+            },
+            {
+              "chunk": 1,
+              "score": 0.087,
+              "status": "included"
+            }
+          ],
+          "prompt": "You are a support assistant. Answer ONLY from the numbered context chunks below; if the answer isn't there, say \"I don't know\". Cite the chunk you used, like [2].\n\nContext:\n[1] Thanks for shopping with ACME. This page explains our return and refund policies for standard orders, gift cards, and final-sale items. If anything here is unclear, our support team can walk you through the details.\n[2] Once your return arrives at our warehouse, we inspect it within two business days. Approved refunds are paid to the original payment method. Bank processing times vary, so allow up to five business days for the money to appear.\n[3] Most items qualify for a full refund. To start, open your order history, choose the order that contains the item, and select the item you want to send back. If your order shipped in several packages, return each item separately.\n\nQuestion: Can I get my money back?\n\nAnswer (one or two sentences, with citation):",
+          "answer": {
+            "text": "If anything here is unclear, our support team can walk you through the details.",
+            "supported": true,
+            "source_chunk": 0
+          },
+          "verdict": "Failure point 1 \u2014 retrieval. Nothing answers this query, but shared filler words (\"can\", \"i\") gave three chunks real nonzero scores, and the pipeline confidently assembled junk. The generator then did its job on garbage: it quoted support-team boilerplate. Similarity is not relevance."
+        },
+        {
+          "label": "floor = 0.12",
+          "k": 4,
+          "budget": 200,
+          "floor": 0.12,
+          "hits": [
+            {
+              "chunk": 0,
+              "score": 0.107,
+              "status": "floored"
+            },
+            {
+              "chunk": 3,
+              "score": 0.091,
+              "status": "floored"
+            },
+            {
+              "chunk": 1,
+              "score": 0.087,
+              "status": "floored"
+            }
+          ],
+          "prompt": "You are a support assistant. Answer ONLY from the numbered context chunks below; if the answer isn't there, say \"I don't know\". Cite the chunk you used, like [2].\n\nContext:\n(no chunks retrieved)\n\nQuestion: Can I get my money back?\n\nAnswer (one or two sentences, with citation):",
+          "answer": {
+            "text": "I don't know \u2014 the retrieved context doesn't answer this.",
+            "supported": false,
+            "source_chunk": -1
+          },
+          "verdict": "The similarity floor turned all-junk retrieval into honest emptiness, and the missing-context rule fired: \"I don't know\" beats confident boilerplate. 0.12 is not a magic number \u2014 you calibrate the floor against a golden set (Chapter 5)."
+        }
+      ]
+    },
+    {
+      "key": "omission",
+      "label": "Context-window failure",
+      "question": "Can I get a refund on gift cards?",
+      "predict": "The chunk that answers (\"Gift cards \u2026 are non-refundable\") exists. Retrieval will find it \u2014 but will the generator get to see it?",
+      "variants": [
+        {
+          "label": "budget = 60 words",
+          "k": 4,
+          "budget": 60,
+          "floor": 0.0,
+          "hits": [
+            {
+              "chunk": 0,
+              "score": 0.277,
+              "status": "included"
+            },
+            {
+              "chunk": 2,
+              "score": 0.144,
+              "status": "included"
+            },
+            {
+              "chunk": 4,
+              "score": 0.14,
+              "status": "excluded"
+            },
+            {
+              "chunk": 1,
+              "score": 0.09,
+              "status": "excluded"
+            }
+          ],
+          "prompt": "You are a support assistant. Answer ONLY from the numbered context chunks below; if the answer isn't there, say \"I don't know\". Cite the chunk you used, like [2].\n\nContext:\n[1] Thanks for shopping with ACME. This page explains our return and refund policies for standard orders, gift cards, and final-sale items. If anything here is unclear, our support team can walk you through the details.\n[2] You may request a refund within 30 days of purchase, as long as the item is unopened and in its original packaging.\n\nQuestion: Can I get a refund on gift cards?\n\nAnswer (one or two sentences, with citation):",
+          "answer": {
+            "text": "This page explains our return and refund policies for standard orders, gift cards, and final-sale items.",
+            "supported": true,
+            "source_chunk": 0
+          },
+          "verdict": "Failure point 2 \u2014 the context window. The answer WAS retrieved, at rank #3 \u2014 and then excluded by the word budget. The generator can only quote what assembly let through, so it returned an overview sentence that mentions gift cards without answering. Retrieval metrics look fine; the answer is still wrong."
+        },
+        {
+          "label": "budget = 200 words",
+          "k": 4,
+          "budget": 200,
+          "floor": 0.0,
+          "hits": [
+            {
+              "chunk": 0,
+              "score": 0.277,
+              "status": "included"
+            },
+            {
+              "chunk": 2,
+              "score": 0.144,
+              "status": "included"
+            },
+            {
+              "chunk": 4,
+              "score": 0.14,
+              "status": "included"
+            },
+            {
+              "chunk": 1,
+              "score": 0.09,
+              "status": "included"
+            }
+          ],
+          "prompt": "You are a support assistant. Answer ONLY from the numbered context chunks below; if the answer isn't there, say \"I don't know\". Cite the chunk you used, like [2].\n\nContext:\n[1] Thanks for shopping with ACME. This page explains our return and refund policies for standard orders, gift cards, and final-sale items. If anything here is unclear, our support team can walk you through the details.\n[2] You may request a refund within 30 days of purchase, as long as the item is unopened and in its original packaging.\n[3] Gift cards and final-sale items are non-refundable. Items marked as clearance may be exchanged for store credit instead. Shipping fees are refunded only when the return is our error.\n[4] Most items qualify for a full refund. To start, open your order history, choose the order that contains the item, and select the item you want to send back. If your order shipped in several packages, return each item separately.\n\nQuestion: Can I get a refund on gift cards?\n\nAnswer (one or two sentences, with citation):",
+          "answer": {
+            "text": "Gift cards and final-sale items are non-refundable.",
+            "supported": true,
+            "source_chunk": 4
+          },
+          "verdict": "Same retrieval, bigger budget: the exclusion chunk made it into the context and the generator extracted it. Before blaming the model, check what it actually saw \u2014 the trace is the debugging surface."
+        }
+      ]
+    }
+  ]
+}

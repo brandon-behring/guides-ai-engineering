@@ -10,6 +10,7 @@ from mini_rag import (  # noqa: E402
     tokenize, idf, cosine_similarity, TfidfIndex, top_k, Hit,
     split_sentences, chunk_fixed, chunk_sentences, chunk_paragraphs,
     boundary_coherence,
+    ABSTAIN, assemble_context, build_prompt, extractive_answer, RagPipeline,
 )
 
 
@@ -125,6 +126,72 @@ def test_boundary_coherence_scores():
     assert boundary_coherence([]) == 0.0
     assert boundary_coherence(["Ends well.", "cut mid"]) == 0.5
     assert boundary_coherence(["Done!", "Sure?"]) == 1.0
+
+
+def _hits(*docs):
+    return [Hit(i, 1.0 - i * 0.1, d) for i, d in enumerate(docs)]
+
+
+def test_assemble_context_respects_budget_in_rank_order():
+    hits = _hits("one two three", "four five six", "seven eight nine")
+    included, excluded = assemble_context(hits, budget_words=6)
+    assert [h.doc for h in included] == ["one two three", "four five six"]
+    assert [h.doc for h in excluded] == ["seven eight nine"]
+    included, excluded = assemble_context(hits, budget_words=2)
+    assert included == [] and len(excluded) == 3   # nothing fits -> nothing included
+
+
+def test_build_prompt_carries_rules_and_numbered_chunks():
+    p = build_prompt("How long?", ["Refunds take 30 days.", "Support is 9 to 5."])
+    assert "ONLY from the numbered context" in p
+    assert '"I don\'t know"' in p
+    assert "[1] Refunds take 30 days." in p and "[2] Support is 9 to 5." in p
+    assert "Question: How long?" in p
+    assert "(no chunks retrieved)" in build_prompt("q", [])
+
+
+def test_extractive_answer_quotes_best_sentence_with_source():
+    chunks = [
+        "Our office is in Berlin. Support hours are 9am to 5pm.",
+        "You may request a refund within 30 days of purchase.",
+    ]
+    a = extractive_answer("How long do I have to request a refund?", chunks)
+    assert a.supported and a.source_chunk == 1
+    assert "30 days" in a.text
+    assert a.text in chunks[1]                      # quoted, not synthesized
+
+
+def test_extractive_answer_abstains_without_support():
+    a = extractive_answer("Why?", ["Shipping is free over 50 dollars."])
+    assert not a.supported and a.source_chunk == -1
+    assert a.text == ABSTAIN
+    # a shared stopword ("is") still clears the default threshold — the toy is
+    # honest about this; calibrating thresholds/floors is the chapter's point
+    junk = extractive_answer("What is the meaning of life?",
+                             ["Shipping is free over 50 dollars."])
+    assert junk.supported
+
+
+def test_pipeline_trace_end_to_end_and_budget_failure():
+    chunks = [
+        "You may request a refund within 30 days of purchase.",
+        "Gift cards and final-sale items are non-refundable.",
+        "Standard shipping is free on orders over 50 dollars.",
+    ]
+    roomy = RagPipeline(chunks, k=3, budget_words=100).run("Are gift cards refundable?")
+    assert roomy.answer.supported and "non-refundable" in roomy.answer.text
+    assert roomy.prompt.startswith("You are a support assistant.")
+    # tight budget: only the top-ranked chunk fits -> the next hit is excluded
+    tight = RagPipeline(chunks, k=3, budget_words=8).run("refund for gift cards")
+    assert len(tight.hits) >= 2
+    assert len(tight.included) == 1 and len(tight.excluded) >= 1
+    # retrieval failure: nothing matches -> empty hits -> abstain
+    miss = RagPipeline(chunks, k=3, budget_words=100).run("Coverage for warranty claims?")
+    assert miss.hits == [] and miss.answer.text == ABSTAIN
+    # similarity floor: junk-overlap hits are filtered before assembly
+    floored = RagPipeline(chunks, k=3, budget_words=100, min_score=0.5).run(
+        "Are gift cards refundable?")
+    assert floored.hits == [] or all(h.score >= 0.5 for h in floored.hits)
 
 
 def _run_all():

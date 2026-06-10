@@ -26,7 +26,28 @@ from mini_eval import (  # noqa: E402
 )
 from mini_rag import (  # noqa: E402
     TfidfIndex, chunk_fixed, chunk_sentences, chunk_paragraphs, boundary_coherence,
+    RagPipeline,
 )
+
+# The ACME refund policy — shared by the Ch 3 chunking demo and the Ch 4
+# pipeline demo (continuity: same document, deeper failure modes).
+POLICY_DOC = "\n\n".join([
+    ("Thanks for shopping with ACME. This page explains our return and refund "
+     "policies for standard orders, gift cards, and final-sale items. If anything "
+     "here is unclear, our support team can walk you through the details."),
+    ("Most items qualify for a full refund. To start, open your order history, "
+     "choose the order that contains the item, and select the item you want to "
+     "send back. If your order shipped in several packages, return each item "
+     "separately. You may request a refund within 30 days of purchase, as long "
+     "as the item is unopened and in its original packaging."),
+    ("Once your return arrives at our warehouse, we inspect it within two "
+     "business days. Approved refunds are paid to the original payment method. "
+     "Bank processing times vary, so allow up to five business days for the "
+     "money to appear."),
+    ("Gift cards and final-sale items are non-refundable. Items marked as "
+     "clearance may be exchanged for store credit instead. Shipping fees are "
+     "refunded only when the return is our error."),
+])
 
 OUT = os.path.join(os.path.dirname(__file__), "..", "src", "data")
 
@@ -378,23 +399,7 @@ def chunking_demo() -> dict:
     days" at sizes 40 and 80; overlap rescues 40 but not 80 (the refund-heavy
     run-up chunk outranks the answer). Sentence/paragraph packing never cuts
     mid-fact. All computed by mini_rag; nothing hand-simulated."""
-    doc = "\n\n".join([
-        ("Thanks for shopping with ACME. This page explains our return and refund "
-         "policies for standard orders, gift cards, and final-sale items. If anything "
-         "here is unclear, our support team can walk you through the details."),
-        ("Most items qualify for a full refund. To start, open your order history, "
-         "choose the order that contains the item, and select the item you want to "
-         "send back. If your order shipped in several packages, return each item "
-         "separately. You may request a refund within 30 days of purchase, as long "
-         "as the item is unopened and in its original packaging."),
-        ("Once your return arrives at our warehouse, we inspect it within two "
-         "business days. Approved refunds are paid to the original payment method. "
-         "Bank processing times vary, so allow up to five business days for the "
-         "money to appear."),
-        ("Gift cards and final-sale items are non-refundable. Items marked as "
-         "clearance may be exchanged for store credit instead. Shipping fees are "
-         "refunded only when the return is our error."),
-    ])
+    doc = POLICY_DOC
     query = "How long after purchase can I request a refund?"
     limit_phrase = "30 days"
     sizes = [40, 60, 80]
@@ -440,6 +445,110 @@ def chunking_demo() -> dict:
         "strategies": [{"key": k, "label": l} for k, l, _ in strategies],
         "sizes": sizes,
         "combos": combos,
+    }
+
+
+def rag_pipeline_demo() -> dict:
+    """Three runs of the full mini_rag pipeline over the paragraph-chunked
+    policy doc, for the guide-2 Ch 4 island: a happy path, a retrieval failure
+    (junk stopword hits vs a similarity floor), and a context-window failure
+    (the answer-bearing chunk retrieved at rank #3 but excluded by the word
+    budget). Each variant is a real RagPipeline.run(); verdicts are authored."""
+    chunks = chunk_paragraphs(POLICY_DOC, 40)
+
+    def run_variant(question: str, label: str, k: int, budget: int,
+                    floor: float, verdict: str) -> dict:
+        raw = TfidfIndex(chunks).search(question, k=k)
+        trace = RagPipeline(chunks, k=k, budget_words=budget,
+                            min_score=floor).run(question)
+        included_ids = {h.index for h in trace.included}
+        kept_ids = {h.index for h in trace.hits}
+        hits = [{
+            "chunk": h.index,
+            "score": round(h.score, 3),
+            "status": ("floored" if h.index not in kept_ids
+                       else "included" if h.index in included_ids else "excluded"),
+        } for h in raw]
+        return {
+            "label": label,
+            "k": k, "budget": budget, "floor": floor,
+            "hits": hits,
+            "prompt": trace.prompt,
+            "answer": {
+                "text": trace.answer.text,
+                "supported": trace.answer.supported,
+                "source_chunk": (trace.included[trace.answer.source_chunk].index
+                                 if trace.answer.source_chunk >= 0 else -1),
+            },
+            "verdict": verdict,
+        }
+
+    scenarios = [
+        {
+            "key": "happy", "label": "Happy path",
+            "question": "How long after purchase can I request a refund?",
+            "predict": "Four chunks compete. Which one ranks #1, and will the answer carry a citation?",
+            "variants": [run_variant(
+                "How long after purchase can I request a refund?",
+                "k=4 · budget 200", 4, 200, 0.0,
+                ("Every stage did its job: the 30-day chunk ranked #1, fit the "
+                 "budget, and the grounded prompt + extractive generator quoted "
+                 "the fact with its citation. Boring is the goal."))],
+        },
+        {
+            "key": "junk", "label": "Retrieval failure",
+            "question": "Can I get my money back?",
+            "predict": ("No corpus chunk shares a meaningful word with this query "
+                        "(Ch 2's paraphrase miss). Will the pipeline abstain — or "
+                        "answer anyway?"),
+            "variants": [
+                run_variant("Can I get my money back?", "no similarity floor",
+                            4, 200, 0.0,
+                            ("Failure point 1 — retrieval. Nothing answers this query, "
+                             "but shared filler words (\"can\", \"i\") gave three chunks "
+                             "real nonzero scores, and the pipeline confidently assembled "
+                             "junk. The generator then did its job on garbage: it quoted "
+                             "support-team boilerplate. Similarity is not relevance.")),
+                run_variant("Can I get my money back?", "floor = 0.12",
+                            4, 200, 0.12,
+                            ("The similarity floor turned all-junk retrieval into honest "
+                             "emptiness, and the missing-context rule fired: \"I don't "
+                             "know\" beats confident boilerplate. 0.12 is not a magic "
+                             "number — you calibrate the floor against a golden set "
+                             "(Chapter 5).")),
+            ],
+        },
+        {
+            "key": "omission", "label": "Context-window failure",
+            "question": "Can I get a refund on gift cards?",
+            "predict": ("The chunk that answers (\"Gift cards … are non-refundable\") "
+                        "exists. Retrieval will find it — but will the generator get "
+                        "to see it?"),
+            "variants": [
+                run_variant("Can I get a refund on gift cards?", "budget = 60 words",
+                            4, 60, 0.0,
+                            ("Failure point 2 — the context window. The answer WAS "
+                             "retrieved, at rank #3 — and then excluded by the word "
+                             "budget. The generator can only quote what assembly let "
+                             "through, so it returned an overview sentence that mentions "
+                             "gift cards without answering. Retrieval metrics look fine; "
+                             "the answer is still wrong.")),
+                run_variant("Can I get a refund on gift cards?", "budget = 200 words",
+                            4, 200, 0.0,
+                            ("Same retrieval, bigger budget: the exclusion chunk made it "
+                             "into the context and the generator extracted it. Before "
+                             "blaming the model, check what it actually saw — the trace "
+                             "is the debugging surface.")),
+            ],
+        },
+    ]
+
+    return {
+        "name": "One pipeline, three traces",
+        "note": ("Every variant is a real mini_rag RagPipeline.run() over the same "
+                 "paragraph-chunked policy doc; verdicts are authored."),
+        "chunks": [{"id": i, "words": len(c.split()), "text": c} for i, c in enumerate(chunks)],
+        "scenarios": scenarios,
     }
 
 
@@ -504,6 +613,7 @@ def main() -> None:
         ("rag_demo", rag_demo()),
         ("retrieval_demo", retrieval_demo()),
         ("chunking_demo", chunking_demo()),
+        ("rag_pipeline_demo", rag_pipeline_demo()),
         ("agent_demo", agent_demo()),
         ("monitoring_demo", monitoring_demo()),
     ]:
