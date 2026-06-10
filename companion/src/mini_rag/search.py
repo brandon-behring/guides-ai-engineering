@@ -84,11 +84,16 @@ class Hit:
 
 class TfidfIndex:
     """A tiny in-memory TF-IDF index — the "vector store" of a RAG system, minus the
-    scale. Build it once over a corpus, then ``search`` it with any query."""
+    scale. Build it once over a corpus, then ``search`` it with any query.
 
-    def __init__(self, corpus: list[str]) -> None:
+    ``tokenizer`` is the swappable vectorizer seam (Chapter 2's lesson made
+    literal): pass a folding tokenizer (Chapter 6) and "items" matches "item"
+    with no other change to the search machinery."""
+
+    def __init__(self, corpus: list[str], tokenizer=tokenize) -> None:
         self.docs = list(corpus)
-        corpus_tokens = [tokenize(d) for d in self.docs]
+        self.tokenizer = tokenizer
+        corpus_tokens = [self.tokenizer(d) for d in self.docs]
         self.idf = idf(corpus_tokens)
         self._vectors = [tfidf_vector(t, self.idf) for t in corpus_tokens]
 
@@ -99,7 +104,7 @@ class TfidfIndex:
         never padding."""
         if k <= 0:
             return []
-        qvec = tfidf_vector(tokenize(query), self.idf)
+        qvec = tfidf_vector(self.tokenizer(query), self.idf)
         scored = [
             Hit(i, cosine_similarity(qvec, dvec), self.docs[i])
             for i, dvec in enumerate(self._vectors)

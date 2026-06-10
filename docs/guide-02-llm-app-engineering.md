@@ -32,7 +32,13 @@ demand spine: `~/guides/docs/research/role_demand_and_interview_signals/`.
   config decisions via outcome categories) + `PipelineCompareExplorer` island (computed
   `rag_compare_demo.json`: A-vs-B on a 6-row golden set; both configs fail the morphology
   trap — the Ch 6 hook). No new companion code (by design — reuse is the lesson).
-- **Next:** Ch 6 (Advanced RAG) — adds `mini_rag.rerank`.
+- **Ch 6 authored** — `mini_rag.rerank` (fold-stemming as a vectorizer swap, query
+  expansion, RRF fusion, coverage rerank, `hybrid_search` w/ coverage floor; tests 25/25)
+  + reuses `PipelineCompareExplorer` with `rag_upgrade_demo.json` (B-vs-C on the same
+  golden set: context recall 0.6 → 1.0; residual failure = extraction, the toy
+  generator's ceiling). `TfidfIndex`/`extractive_answer` gained an optional `tokenizer`
+  seam (backward-compatible).
+- **Next:** Ch 7 (RAG in production) — latency/cost model in the companion.
 
 ## Spine & outline (RAG-centric, ~13 ch)
 

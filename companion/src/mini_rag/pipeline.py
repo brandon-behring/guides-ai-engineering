@@ -91,11 +91,12 @@ def build_prompt(question: str, context_chunks: list[str]) -> str:
 
 
 def extractive_answer(question: str, context_chunks: list[str],
-                      threshold: float = 0.05) -> Answer:
+                      threshold: float = 0.05, tokenizer=None) -> Answer:
     """A no-model generator: index the context's *sentences*, retrieve the one
     that best matches the question, and quote it with its chunk citation.
     Abstains when nothing scores above ``threshold`` — the missing-context
-    rule as code, not as a hope."""
+    rule as code, not as a hope. ``tokenizer`` passes through to the sentence
+    index (same vectorizer seam as ``TfidfIndex``)."""
     sentences: list[tuple[int, str]] = []
     for ci, chunk in enumerate(context_chunks):
         for s in split_sentences(chunk):
@@ -103,7 +104,8 @@ def extractive_answer(question: str, context_chunks: list[str],
     if not sentences:
         return Answer(ABSTAIN, False, -1, 0.0)
 
-    hits = TfidfIndex([s for _, s in sentences]).search(question, k=1)
+    kwargs = {"tokenizer": tokenizer} if tokenizer else {}
+    hits = TfidfIndex([s for _, s in sentences], **kwargs).search(question, k=1)
     if not hits or hits[0].score < threshold:
         return Answer(ABSTAIN, False, -1, hits[0].score if hits else 0.0)
     chunk_idx, sentence = sentences[hits[0].index]

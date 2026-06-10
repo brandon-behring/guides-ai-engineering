@@ -1,0 +1,240 @@
+{
+  "name": "The upgrade kit, judged by the same exam",
+  "note": "Config C = folded vectorizer + query expansion + RRF fusion + coverage rerank + a coverage floor; extraction reuses the working query and the coverage scorer. Every cell computed by mini_rag.",
+  "verdict": "The ranking upgrades fix exactly what Chapter 5 localized to ranking: the paraphrase now finds the policy (expansion), the morphology trap is dead (folding), and the off-topic junk became an honest abstain (a floor in coverage units). The one residual failure is extraction \u2014 the toy generator quoting the wrong sentence from the right chunk. That stage's upgrade isn't more retrieval; it's a real LLM \u2014 which is why faithfulness measurement (guide 1, Ch 9) arrives the same day the LLM does.",
+  "chunks": [
+    {
+      "id": 0,
+      "text": "Thanks for shopping with ACME. This page explains our return and refund policies for standard orders, gift cards, and final-sale items. If anything here is unclear, our support team can walk you through the details."
+    },
+    {
+      "id": 1,
+      "text": "Most items qualify for a full refund. To start, open your order history, choose the order that contains the item, and select the item you want to send back. If your order shipped in several packages, return each item separately."
+    },
+    {
+      "id": 2,
+      "text": "You may request a refund within 30 days of purchase, as long as the item is unopened and in its original packaging."
+    },
+    {
+      "id": 3,
+      "text": "Once your return arrives at our warehouse, we inspect it within two business days. Approved refunds are paid to the original payment method. Bank processing times vary, so allow up to five business days for the money to appear."
+    },
+    {
+      "id": 4,
+      "text": "Gift cards and final-sale items are non-refundable. Items marked as clearance may be exchanged for store credit instead. Shipping fees are refunded only when the return is our error."
+    }
+  ],
+  "configs": [
+    {
+      "key": "B",
+      "label": "B \u2014 hardened (Ch 5)",
+      "detail": "TF-IDF \u00b7 floor 0.12 \u00b7 budget 200"
+    },
+    {
+      "key": "C",
+      "label": "C \u2014 upgraded (Ch 6)",
+      "detail": "fold + expand + RRF + coverage rerank"
+    }
+  ],
+  "questions": [
+    {
+      "q": "How long after purchase can I request a refund?",
+      "relevant": [
+        2
+      ],
+      "fact": "30 days",
+      "note": "",
+      "runs": {
+        "B": {
+          "outcome": "correct",
+          "why": "",
+          "answer": "You may request a refund within 30 days of purchase, as long as the item is unopened and in its original packaging.",
+          "supported": true,
+          "included": [
+            2
+          ],
+          "context_recall": 1.0
+        },
+        "C": {
+          "outcome": "correct",
+          "why": "",
+          "answer": "You may request a refund within 30 days of purchase, as long as the item is unopened and in its original packaging.",
+          "supported": true,
+          "included": [
+            2
+          ],
+          "context_recall": 1.0
+        }
+      }
+    },
+    {
+      "q": "Are gift cards refundable?",
+      "relevant": [
+        4
+      ],
+      "fact": "non-refundable",
+      "note": "",
+      "runs": {
+        "B": {
+          "outcome": "correct",
+          "why": "",
+          "answer": "Gift cards and final-sale items are non-refundable.",
+          "supported": true,
+          "included": [
+            4,
+            0
+          ],
+          "context_recall": 1.0
+        },
+        "C": {
+          "outcome": "correct",
+          "why": "",
+          "answer": "Gift cards and final-sale items are non-refundable.",
+          "supported": true,
+          "included": [
+            4,
+            0
+          ],
+          "context_recall": 1.0
+        }
+      }
+    },
+    {
+      "q": "How long until the money appears after a refund is approved?",
+      "relevant": [
+        3
+      ],
+      "fact": "five business days",
+      "note": "",
+      "runs": {
+        "B": {
+          "outcome": "extraction-miss",
+          "why": "FP3 extraction \u2014 fact in context, wrong sentence quoted",
+          "answer": "You may request a refund within 30 days of purchase, as long as the item is unopened and in its original packaging.",
+          "supported": true,
+          "included": [
+            2,
+            3,
+            1
+          ],
+          "context_recall": 1.0
+        },
+        "C": {
+          "outcome": "extraction-miss",
+          "why": "FP3 extraction \u2014 fact in context, wrong sentence quoted",
+          "answer": "Approved refunds are paid to the original payment method.",
+          "supported": true,
+          "included": [
+            3
+          ],
+          "context_recall": 1.0
+        }
+      }
+    },
+    {
+      "q": "Can I get my money back?",
+      "relevant": [
+        2
+      ],
+      "fact": "30 days",
+      "note": "answerable by the corpus, but shares no token with it \u2014 Ch 2's paraphrase miss",
+      "runs": {
+        "B": {
+          "outcome": "abstain-safe",
+          "why": "the missing-context rule did its job",
+          "answer": "I don't know \u2014 the retrieved context doesn't answer this.",
+          "supported": false,
+          "included": [],
+          "context_recall": 0.0
+        },
+        "C": {
+          "outcome": "correct",
+          "why": "",
+          "answer": "You may request a refund within 30 days of purchase, as long as the item is unopened and in its original packaging.",
+          "supported": true,
+          "included": [
+            2,
+            0,
+            1,
+            3
+          ],
+          "context_recall": 1.0
+        }
+      }
+    },
+    {
+      "q": "Do you offer gift wrapping?",
+      "relevant": [],
+      "fact": null,
+      "note": "out of scope \u2014 the only right answer is an abstain",
+      "runs": {
+        "B": {
+          "outcome": "junk",
+          "why": "FP1 retrieval \u2014 answered when it should abstain",
+          "answer": "If anything here is unclear, our support team can walk you through the details.",
+          "supported": true,
+          "included": [
+            0,
+            4
+          ],
+          "context_recall": null
+        },
+        "C": {
+          "outcome": "abstain-safe",
+          "why": "the missing-context rule did its job",
+          "answer": "I don't know \u2014 the retrieved context doesn't answer this.",
+          "supported": false,
+          "included": [],
+          "context_recall": null
+        }
+      }
+    },
+    {
+      "q": "Can I exchange a clearance item?",
+      "relevant": [
+        4
+      ],
+      "fact": "store credit",
+      "note": "morphology trap: \"item\" \u2260 \"items\", \"exchange\" \u2260 \"exchanged\"",
+      "runs": {
+        "B": {
+          "outcome": "lost-in-assembly",
+          "why": "FP2 context window \u2014 retrieved, then cut by the budget or the floor",
+          "answer": "Most items qualify for a full refund.",
+          "supported": true,
+          "included": [
+            1,
+            2
+          ],
+          "context_recall": 0.0
+        },
+        "C": {
+          "outcome": "correct",
+          "why": "",
+          "answer": "Items marked as clearance may be exchanged for store credit instead.",
+          "supported": true,
+          "included": [
+            4
+          ],
+          "context_recall": 1.0
+        }
+      }
+    }
+  ],
+  "aggregates": {
+    "B": {
+      "correct": 2,
+      "harmful": 3,
+      "safe_abstain": 1,
+      "missed_abstain": 0,
+      "avg_context_recall": 0.6
+    },
+    "C": {
+      "correct": 4,
+      "harmful": 1,
+      "safe_abstain": 1,
+      "missed_abstain": 0,
+      "avg_context_recall": 1.0
+    }
+  }
+}

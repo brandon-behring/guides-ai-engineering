@@ -26,7 +26,9 @@ from mini_eval import (  # noqa: E402
 )
 from mini_rag import (  # noqa: E402
     TfidfIndex, chunk_fixed, chunk_sentences, chunk_paragraphs, boundary_coherence,
-    RagPipeline,
+    RagPipeline, split_sentences,
+    fold_tokenize, expand_query, coverage_score, hybrid_search,
+    assemble_context, ABSTAIN,
 )
 
 # The ACME refund policy — shared by the Ch 3 chunking demo and the Ch 4
@@ -552,6 +554,47 @@ def rag_pipeline_demo() -> dict:
     }
 
 
+# The Ch 5 golden set — also re-run by the Ch 6 upgrade demo.
+GOLDEN_SET = [
+    {"q": "How long after purchase can I request a refund?",
+     "relevant": [2], "fact": "30 days", "reachable": True},
+    {"q": "Are gift cards refundable?",
+     "relevant": [4], "fact": "non-refundable", "reachable": True},
+    {"q": "How long until the money appears after a refund is approved?",
+     "relevant": [3], "fact": "five business days", "reachable": True},
+    {"q": "Can I get my money back?",
+     "relevant": [2], "fact": "30 days", "reachable": False,
+     "note": "answerable by the corpus, but shares no token with it — Ch 2's paraphrase miss"},
+    {"q": "Do you offer gift wrapping?",
+     "relevant": [], "fact": None, "reachable": False,
+     "note": "out of scope — the only right answer is an abstain"},
+    {"q": "Can I exchange a clearance item?",
+     "relevant": [4], "fact": "store credit", "reachable": True,
+     "note": "morphology trap: \"item\" ≠ \"items\", \"exchange\" ≠ \"exchanged\""},
+]
+
+
+def categorize_outcome(item: dict, *, supported: bool, answer_text: str,
+                       included: set, raw_ids: set) -> tuple[str, str]:
+    """Map one golden-set run to an outcome category + failure point (shared
+    by the Ch 5 and Ch 6 demos). ``raw_ids`` are pre-floor candidate ids, so a
+    chunk eaten by a floor reports as lost-in-assembly, not a ranking miss."""
+    relevant = set(item["relevant"])
+    if supported:
+        if item["fact"] and item["fact"] in answer_text:
+            return "correct", ""
+        if not relevant or not item["reachable"]:
+            return "junk", "FP1 retrieval — answered when it should abstain"
+        if relevant <= included:
+            return "extraction-miss", "FP3 extraction — fact in context, wrong sentence quoted"
+        if relevant & raw_ids:
+            return "lost-in-assembly", "FP2 context window — retrieved, then cut by the budget or the floor"
+        return "retrieval-miss", "FP1 retrieval — the needed chunk never ranked"
+    if not relevant or not item["reachable"]:
+        return "abstain-safe", "the missing-context rule did its job"
+    return "abstain-missed", "the fact was reachable; the floor/threshold ate it"
+
+
 def rag_compare_demo() -> dict:
     """Two pipeline configs judged on one golden set, for the guide-2 Ch 5
     island. Six questions over the policy corpus — three answerable, one
@@ -563,51 +606,13 @@ def rag_compare_demo() -> dict:
     RagPipeline.run()."""
     chunks = chunk_paragraphs(POLICY_DOC, 40)
 
-    golden = [
-        {"q": "How long after purchase can I request a refund?",
-         "relevant": [2], "fact": "30 days", "reachable": True},
-        {"q": "Are gift cards refundable?",
-         "relevant": [4], "fact": "non-refundable", "reachable": True},
-        {"q": "How long until the money appears after a refund is approved?",
-         "relevant": [3], "fact": "five business days", "reachable": True},
-        {"q": "Can I get my money back?",
-         "relevant": [2], "fact": "30 days", "reachable": False,
-         "note": "answerable by the corpus, but shares no token with it — Ch 2's paraphrase miss"},
-        {"q": "Do you offer gift wrapping?",
-         "relevant": [], "fact": None, "reachable": False,
-         "note": "out of scope — the only right answer is an abstain"},
-        {"q": "Can I exchange a clearance item?",
-         "relevant": [4], "fact": "store credit", "reachable": True,
-         "note": "morphology trap: \"item\" ≠ \"items\", \"exchange\" ≠ \"exchanged\""},
-    ]
+    golden = GOLDEN_SET
     configs = [
         {"key": "A", "label": "A — ship-it", "detail": "k=4 · budget 60 · no floor",
          "params": dict(k=4, budget_words=60, min_score=0.0)},
         {"key": "B", "label": "B — hardened", "detail": "k=4 · budget 200 · floor 0.12",
          "params": dict(k=4, budget_words=200, min_score=0.12)},
     ]
-
-    def categorize(item: dict, trace, raw_ids: set) -> tuple[str, str]:
-        """Map one (question, trace) to an outcome category + failure point.
-        ``raw_ids`` are the pre-floor hit ids, so a chunk eaten by the floor
-        is reported as lost-in-assembly, not as a ranking miss."""
-        relevant = set(item["relevant"])
-        included = {h.index for h in trace.included}
-        ans = trace.answer
-        if ans.supported:
-            if item["fact"] and item["fact"] in ans.text:
-                return "correct", ""
-            if not relevant or not item["reachable"]:
-                return "junk", "FP1 retrieval — answered when it should abstain"
-            if relevant <= included:
-                return "extraction-miss", "FP3 extraction — fact in context, wrong sentence quoted"
-            if relevant & raw_ids:
-                return "lost-in-assembly", "FP2 context window — retrieved, then cut by the budget or the floor"
-            return "retrieval-miss", "FP1 retrieval — the needed chunk never ranked"
-        # abstained
-        if not relevant or not item["reachable"]:
-            return "abstain-safe", "the missing-context rule did its job"
-        return "abstain-missed", "the fact was reachable; the floor/threshold ate it"
 
     questions = []
     raw_index = TfidfIndex(chunks)
@@ -617,7 +622,9 @@ def rag_compare_demo() -> dict:
                "fact": item["fact"], "note": item.get("note", ""), "runs": {}}
         for cfg in configs:
             trace = RagPipeline(chunks, **cfg["params"]).run(item["q"])
-            outcome, why = categorize(item, trace, raw_ids)
+            outcome, why = categorize_outcome(
+                item, supported=trace.answer.supported, answer_text=trace.answer.text,
+                included={h.index for h in trace.included}, raw_ids=raw_ids)
             relevant = set(item["relevant"])
             included_ids = [h.index for h in trace.included]
             ctx_recall = (recall_at_k(included_ids, relevant, max(len(included_ids), 1))
@@ -656,6 +663,103 @@ def rag_compare_demo() -> dict:
                     "quality (morphology traps, run-up chunks outranking answers), "
                     "which no budget or floor can fix. That is Chapter 6's job. "
                     "Without this table, you'd have shipped A believing it worked."),
+        "chunks": [{"id": i, "text": c} for i, c in enumerate(chunks)],
+        "configs": [{k: c[k] for k in ("key", "label", "detail")} for c in configs],
+        "questions": questions,
+        "aggregates": aggregates,
+    }
+
+
+def rag_upgrade_demo() -> dict:
+    """Before/after for the guide-2 Ch 6 island: config B (Ch 5's hardened
+    baseline) vs config C (the upgrade kit: folded vectorizer + query
+    expansion + RRF fusion + coverage rerank + coverage floor, with extraction
+    reusing the working query and the coverage scorer). Same golden set, same
+    outcome categories — every cell computed by mini_rag."""
+    chunks = chunk_paragraphs(POLICY_DOC, 40)
+    synonyms = {"get my money back": "request a refund"}
+
+    def run_b(question: str) -> dict:
+        trace = RagPipeline(chunks, k=4, budget_words=200, min_score=0.12).run(question)
+        raw_ids = {h.index for h in TfidfIndex(chunks).search(question, k=4)}
+        return {
+            "supported": trace.answer.supported, "answer": trace.answer.text,
+            "included": [h.index for h in trace.included], "raw_ids": raw_ids,
+        }
+
+    def run_c(question: str) -> dict:
+        index = TfidfIndex(chunks, tokenizer=fold_tokenize)
+        pool = hybrid_search(index, question, synonyms=synonyms, k=4, min_coverage=0.0)
+        hits = [h for h in pool if h.score >= 0.34]
+        included, _ = assemble_context(hits, 200)
+        variants = expand_query(question, synonyms)
+        workq = (max(variants, key=lambda v: coverage_score(v, hits[0].doc))
+                 if hits else question)
+        # extraction with the same coverage scorer, over the working query
+        best_text, best_score, best_chunk = ABSTAIN, 0.0, -1
+        for ci, h in enumerate(included):
+            for s in split_sentences(h.doc):
+                sc = coverage_score(workq, s)
+                if sc > best_score:
+                    best_text, best_score, best_chunk = s, sc, ci
+        supported = best_score >= 0.3
+        return {
+            "supported": supported,
+            "answer": best_text if supported else ABSTAIN,
+            "included": [h.index for h in included],
+            "raw_ids": {h.index for h in pool},
+        }
+
+    configs = [
+        {"key": "B", "label": "B — hardened (Ch 5)", "detail": "TF-IDF · floor 0.12 · budget 200", "run": run_b},
+        {"key": "C", "label": "C — upgraded (Ch 6)", "detail": "fold + expand + RRF + coverage rerank", "run": run_c},
+    ]
+
+    questions = []
+    for item in GOLDEN_SET:
+        row = {"q": item["q"], "relevant": item["relevant"],
+               "fact": item["fact"], "note": item.get("note", ""), "runs": {}}
+        for cfg in configs:
+            r = cfg["run"](item["q"])
+            outcome, why = categorize_outcome(
+                item, supported=r["supported"], answer_text=r["answer"],
+                included=set(r["included"]), raw_ids=r["raw_ids"])
+            row["runs"][cfg["key"]] = {
+                "outcome": outcome, "why": why, "answer": r["answer"],
+                "supported": r["supported"], "included": r["included"],
+                "context_recall": (round(recall_at_k(
+                    r["included"], set(item["relevant"]),
+                    max(len(r["included"]), 1)), 2) if item["relevant"] else None),
+            }
+        questions.append(row)
+
+    aggregates = {}
+    for cfg in configs:
+        outs = [q["runs"][cfg["key"]]["outcome"] for q in questions]
+        recalls = [q["runs"][cfg["key"]]["context_recall"] for q in questions
+                   if q["runs"][cfg["key"]]["context_recall"] is not None]
+        aggregates[cfg["key"]] = {
+            "correct": outs.count("correct"),
+            "harmful": sum(outs.count(o) for o in
+                           ("junk", "extraction-miss", "lost-in-assembly", "retrieval-miss")),
+            "safe_abstain": outs.count("abstain-safe"),
+            "missed_abstain": outs.count("abstain-missed"),
+            "avg_context_recall": round(sum(recalls) / len(recalls), 2),
+        }
+
+    return {
+        "name": "The upgrade kit, judged by the same exam",
+        "note": ("Config C = folded vectorizer + query expansion + RRF fusion + "
+                 "coverage rerank + a coverage floor; extraction reuses the working "
+                 "query and the coverage scorer. Every cell computed by mini_rag."),
+        "verdict": ("The ranking upgrades fix exactly what Chapter 5 localized to "
+                    "ranking: the paraphrase now finds the policy (expansion), the "
+                    "morphology trap is dead (folding), and the off-topic junk became "
+                    "an honest abstain (a floor in coverage units). The one residual "
+                    "failure is extraction — the toy generator quoting the wrong "
+                    "sentence from the right chunk. That stage's upgrade isn't more "
+                    "retrieval; it's a real LLM — which is why faithfulness measurement "
+                    "(guide 1, Ch 9) arrives the same day the LLM does."),
         "chunks": [{"id": i, "text": c} for i, c in enumerate(chunks)],
         "configs": [{k: c[k] for k in ("key", "label", "detail")} for c in configs],
         "questions": questions,
@@ -726,6 +830,7 @@ def main() -> None:
         ("chunking_demo", chunking_demo()),
         ("rag_pipeline_demo", rag_pipeline_demo()),
         ("rag_compare_demo", rag_compare_demo()),
+        ("rag_upgrade_demo", rag_upgrade_demo()),
         ("agent_demo", agent_demo()),
         ("monitoring_demo", monitoring_demo()),
     ]:

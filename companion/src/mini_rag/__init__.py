@@ -8,10 +8,11 @@ FAISS / a managed vector DB and RAGAS. Module map:
 - ``mini_rag.chunk``    — fixed / sentence / paragraph chunking + boundary_coherence (Ch 3).
 - ``mini_rag.pipeline`` — retrieve -> assemble -> grounded prompt -> extractive answer,
   with a full per-stage trace (Ch 4).
+- ``mini_rag.rerank``   — the ranking-quality upgrade kit: fold-stemming (a vectorizer
+  swap), query expansion, RRF fusion, coverage reranking, hybrid_search (Ch 6).
 
-More modules land as the guide grows (reranking). Retrieval *quality* is graded
-separately in ``mini_eval.retrieval`` from the Evaluation guide: mini_rag is the
-mechanism, mini_eval is the measurement.
+Retrieval *quality* is graded separately in ``mini_eval.retrieval`` from the
+Evaluation guide: mini_rag is the mechanism, mini_eval is the measurement.
 """
 
 from .search import (
@@ -39,6 +40,15 @@ from .pipeline import (
     extractive_answer,
     RagPipeline,
 )
+from .rerank import (
+    fold,
+    fold_tokenize,
+    expand_query,
+    rrf_fuse,
+    coverage_score,
+    coverage_rerank,
+    hybrid_search,
+)
 
 __all__ = [
     "tokenize",
@@ -60,6 +70,13 @@ __all__ = [
     "build_prompt",
     "extractive_answer",
     "RagPipeline",
+    "fold",
+    "fold_tokenize",
+    "expand_query",
+    "rrf_fuse",
+    "coverage_score",
+    "coverage_rerank",
+    "hybrid_search",
 ]
 
 __version__ = "0.1.0"

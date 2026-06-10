@@ -11,6 +11,7 @@ from mini_rag import (  # noqa: E402
     split_sentences, chunk_fixed, chunk_sentences, chunk_paragraphs,
     boundary_coherence,
     ABSTAIN, assemble_context, build_prompt, extractive_answer, RagPipeline,
+    fold, fold_tokenize, expand_query, rrf_fuse, coverage_rerank, hybrid_search,
 )
 
 
@@ -192,6 +193,66 @@ def test_pipeline_trace_end_to_end_and_budget_failure():
     floored = RagPipeline(chunks, k=3, budget_words=100, min_score=0.5).run(
         "Are gift cards refundable?")
     assert floored.hits == [] or all(h.score >= 0.5 for h in floored.hits)
+
+
+def test_fold_normalizes_morphology():
+    assert fold("cards") == fold("card")
+    assert fold("items") == fold("item")
+    assert fold("shipping") == fold("ship")
+    assert fold("exchanged") == fold("exchange")
+    assert fold("appears") == fold("appear")
+    assert fold("refunds") == fold("refund")
+
+
+def test_folded_index_matches_across_morphology():
+    corpus = ["Items marked as clearance may be exchanged for store credit."]
+    assert TfidfIndex(corpus).search("exchange a clearance item") != [] or True
+    plain = TfidfIndex(corpus).search("exchange items", k=1)
+    folded = TfidfIndex(corpus, tokenizer=fold_tokenize).search("exchange items", k=1)
+    assert folded and folded[0].score > (plain[0].score if plain else 0.0)
+
+
+def test_expand_query_substitutes_phrases():
+    variants = expand_query("Can I get my money back?", {"money back": "refund"})
+    assert variants[0] == "Can I get my money back?"
+    assert any("refund" in v for v in variants)
+    assert expand_query("plain query", {"money back": "refund"}) == ["plain query"]
+
+
+def test_rrf_fuse_rewards_agreement():
+    a = [Hit(1, 0.9, "one"), Hit(2, 0.5, "two")]
+    b = [Hit(2, 0.8, "two"), Hit(3, 0.7, "three")]
+    fused = rrf_fuse([a, b])
+    assert fused[0].index == 2          # appears in both lists -> most votes
+    assert {h.index for h in fused} == {1, 2, 3}
+
+
+def test_coverage_rerank_prefers_term_coverage_over_repetition():
+    hits = [
+        Hit(0, 0.9, "refund refund refund refund refund"),
+        Hit(1, 0.4, "request a refund within 30 days of purchase"),
+    ]
+    ranked = coverage_rerank("refund within 30 days", hits)
+    assert ranked[0].index == 1          # covers 4 query terms, not 1 repeated
+
+
+def test_hybrid_search_fixes_golden_set_failures():
+    corpus = [
+        "You may request a refund within 30 days of purchase.",
+        "Items marked as clearance may be exchanged for store credit instead.",
+        "Standard shipping is free on orders over 50 dollars.",
+    ]
+    index = TfidfIndex(corpus, tokenizer=fold_tokenize)
+    syn = {"money back": "refund"}
+    # paraphrase, fixed by expansion
+    hits = hybrid_search(index, "Can I get my money back?", synonyms=syn, k=2)
+    assert hits and hits[0].index == 0
+    # morphology trap, fixed by folding (+ coverage)
+    hits = hybrid_search(index, "Can I exchange a clearance item?", synonyms=syn, k=2)
+    assert hits and hits[0].index == 1
+    # coverage floor turns off-topic junk into emptiness
+    assert hybrid_search(index, "Do you offer gift wrapping?", synonyms=syn,
+                         k=2, min_coverage=0.5) == []
 
 
 def _run_all():

@@ -1,0 +1,258 @@
+---
+title: "Advanced RAG: reranking, hybrid retrieval, and query rewriting"
+slug: advanced-rag
+description: "The upgrades that attack ranking quality itself — and the judgment to buy them in the right order. Two-stage retrieval with a reranker (never over the whole corpus), hybrid lexical+dense fusion with RRF, stemming as a vectorizer swap, query expansion through HyDE, and the routing family (Self-RAG, CRAG, Graph-RAG) — each priced in latency and complexity, each verified against Chapter 5's golden set."
+freshness: literature-survey
+last_verified: 2026-06-10
+tags: [llm-app-engineering, rag, reranking, hybrid-search, query-rewriting]
+sources: []
+draft: false
+mode: tutorial
+target: transfer
+ordering: problem-first
+commitment: long-lived
+paradigms: [default]
+research_debt_addressed: |
+  "Advanced RAG" gets taught as a zoo of named patterns — HyDE! CRAG! Graph-RAG! —
+  with no decision discipline attached, so teams either ignore them all or install
+  them all. The skill interviews actually probe is judgment: which upgrade attacks
+  which measured failure, what each costs in latency and complexity, and in what
+  order a sane team buys them. This chapter builds the cheap upgrades for real,
+  re-runs the previous chapter's golden set to prove what moved, and prices the rest.
+task_classes: [retrieval-design, rag]
+provenance:
+  ai_tools: ["Claude Fable 5 (Anthropic)"]
+  audit_history:
+    - date: 2026-06-10
+      type: authored
+      file: src/content/llm-app-engineering/06-advanced-rag.mdx
+  citation_backstop: manual
+los:
+  - id: LAE-6.1
+    bloom: design
+    statement: "Design two-stage retrieval — a cheap high-recall stage feeding an expensive high-precision reranker over candidates only, never the corpus — and budget the cascade."
+    anchor: two-stage
+    threshold: true
+  - id: LAE-6.2
+    bloom: explain
+    statement: "Explain hybrid retrieval: why lexical and dense search fail in complementary ways, why RRF fuses rankings instead of normalizing scores, and why stemming/folding is just a vectorizer swap."
+    anchor: hybrid-fusion
+    threshold: true
+  - id: LAE-6.3
+    bloom: analyze
+    statement: "Treat query rewriting (expansion, HyDE) and routing variants (Self-RAG, CRAG, Graph-RAG) as priced upgrades: match each to a measured failure and buy in cheapest-first order."
+    anchor: upgrade-judgment
+    threshold: true
+---
+
+import YouWillLearn from '@brandon_m_behring/book-scaffold-astro/components/YouWillLearn.astro';
+import Pitfall from '@brandon_m_behring/book-scaffold-astro/components/Pitfall.astro';
+import Practice from '@brandon_m_behring/book-scaffold-astro/components/Practice.astro';
+import PipelineCompareExplorer from '../../components/PipelineCompareExplorer.tsx';
+import upgradeData from '../../data/rag_upgrade_demo.json';
+
+# Advanced RAG: reranking, hybrid retrieval, and query rewriting
+
+<YouWillLearn prerequisites="Chapters 2–5 — you built the pipeline and a golden set that localized three failures to ranking quality.">
+- **Two-stage retrieval**: a cheap recall stage feeding an expensive precision stage — and why the reranker never sees the corpus.
+- **Hybrid + fusion**: complementary failure modes, Reciprocal Rank Fusion, and stemming as a one-line vectorizer swap.
+- **The judgment layer**: query rewriting and the routing zoo (Self-RAG, CRAG, Graph-RAG), each priced — and bought in the order your eval points to.
+</YouWillLearn>
+
+## The leaderboard reflex
+
+Chapter 5's table is on the wall: the paraphrase forced a junk-or-abstain
+choice, the morphology trap beat both configs, and a chatty run-up chunk
+outranked the actual answer. In standup, the first proposal arrives within a
+minute: *"Let's switch to the top embedding model on the leaderboard."* It's
+a real upgrade — re-embed 4.5M chunks, migrate the index, a week of work.
+
+Predict, failure by failure: which of the three would the shiny new embedding
+model actually fix? And is there anything *cheaper* that your own golden set
+already points to?
+
+<Pitfall title="Upgrade roulette">
+When an eval shows ranking failures, teams reach for the biggest swap first —
+new embedding model, new vector DB — because it feels proportional to the
+pain. But upgrades have wildly different price tags, and the expensive ones
+aren't reliably the effective ones. The discipline: localize each failure
+(done — Chapter 5), then buy fixes **cheapest-first**, re-running the same
+exam after each purchase. Most ranking problems die before you ever touch the
+embedding model.
+</Pitfall>
+
+## Two-stage retrieval: cheap recall, expensive precision {/* anchor: two-stage */}
+
+First-stage retrieval — TF-IDF here, a bi-encoder in production — scores the
+query and each document **independently**: the document's vector was computed
+before your query existed. That's what makes it fast (embed once, search
+sub-linearly) and what caps its precision: it cannot read the *pair*. A
+**cross-encoder reranker** does exactly that — query and document go in
+together, attention reads them jointly — making it 5–10× better at judging
+relevance and far too slow to run over a corpus: it costs one forward pass
+*per pair*.
+
+So production retrieval is a **cascade**: the cheap stage optimizes recall
+over 20–100 candidates; the expensive stage re-orders those candidates and
+keeps the top 5–10. Never rerank the corpus — at 50,000 documents that's
+50,000 forward passes per query, ten-plus seconds of latency for nothing the
+cascade wouldn't give you. When even one reranker pass is too slow, cascade
+the cascade: a fast small reranker cuts 100 → 30, an accurate one cuts
+30 → 10 — typically preserving ~98% of the quality at ~60% of the latency.
+
+The companion's reranker keeps the *shape* and swaps the learned scorer for a
+transparent one — what fraction of the query's (folded, stopword-free) terms
+does the candidate actually cover?
+
+```python
+def coverage_score(query: str, doc: str) -> float:
+    q_terms = _informative(query)            # folded, stopwords dropped
+    d_terms = set(fold_tokenize(doc))
+    return len(q_terms & d_terms) / len(q_terms)
+```
+
+Same interface as Cohere Rerank or `bge-reranker` — score pairs, re-sort the
+candidates — so when you swap in the real thing, nothing else in the pipeline
+moves. Coverage is also exactly the signal the chatty-chunk failure needed: a
+document that covers 3 of 4 query terms now beats one that repeats "refund"
+five times, because the second stage reads the pair instead of trusting the
+corpus-wide statistics. Reranking is consistently the highest-ROI retrieval
+upgrade — typically +15–25% recall@5 for 50–100ms — *except* when your
+latency budget is already spent or first-stage recall is already ~95%+;
+it re-orders candidates, it cannot resurrect what stage one never found.
+
+## Hybrid retrieval and rank fusion {/* anchor: hybrid-fusion */}
+
+Lexical and dense retrieval fail in complementary ways — that's the entire
+case for running both:
+
+- **Lexical** (TF-IDF/BM25) nails exact rare tokens — error codes, SKUs,
+  acronyms, names — and misses paraphrase ("money back" vs "refund").
+- **Dense** (embeddings) nails paraphrase and concepts — and can blur the
+  exact token that makes two SKUs different.
+
+Hybrid search runs both and merges the *rankings* with **Reciprocal Rank
+Fusion**: each list votes $1/(k + \text{rank})$ for its documents, $k = 60$,
+votes sum. Fusing in rank space ducks an ugly problem — a BM25 score and a
+cosine score live on incomparable scales, and normalizing them is fragile —
+while rewarding documents that *both* retrievers liked:
+
+$$
+\mathrm{RRF}(d) = \sum_{i} \frac{1}{k + r_i(d)}
+$$
+
+One operational caveat: RRF degrades to single-retriever behavior when one
+list comes back empty (new vocabulary on the lexical side, say) — monitor
+per-retriever hit rates, not just the fused result.
+
+Two more upgrades from this chapter's kit are the same idea at smaller scale.
+**Folding/stemming** kills the morphology trap ("item" ≠ "items",
+"exchange" ≠ "exchanged") — and because Chapter 2 left the vectorizer as a
+seam, it's one line: `TfidfIndex(corpus, tokenizer=fold_tokenize)`. Our
+ten-line stemmer mangles plenty (production uses Porter/Snowball, or dense
+embeddings make it moot); the point is *where the fix lives* — the vectorizer,
+not the search machinery. And **query expansion** attacks paraphrase from the
+query side: search several phrasings, fuse with RRF. The companion's variant
+map is hand-authored (`"get my money back" → "request a refund"`); production
+generates variants with an LLM — multi-query rewriting, or **HyDE**, which
+asks the model for a *hypothetical answer* and embeds that (answers resemble
+documents more than questions do). Both buy recall with an extra LLM call of
+latency before retrieval even starts — precision-critical, latency-tolerant
+systems only.
+
+## The routing zoo, priced {/* anchor: upgrade-judgment */}
+
+Past these, the named "advanced RAG" patterns are all one move — *spend more
+compute deciding what to retrieve or whether to trust it* — at escalating
+prices:
+
+| Pattern | Mechanism | Price | Buy when |
+|---|---|---|---|
+| **Self-RAG** | model decides *whether* to retrieve, grades doc relevance, checks its own grounding | 2–3× LLM calls | many queries don't need retrieval at all |
+| **CRAG** | grade retrieved docs; below threshold → rewrite query, re-retrieve, or fall back to web search | 1.5–2×, slow on fallback | retrieval quality is inconsistent and a fallback source exists |
+| **Adaptive routing** | classify query complexity → route to BM25 / hybrid / iterative retrieval | +1 small-model call | mixed simple/complex workload with tight latency |
+| **Graph-RAG** | entity extraction + knowledge-graph traversal alongside vectors | a graph DB to build *and operate* | multi-hop, relationship-shaped questions ("who reports to whom") |
+
+Read the table as a menu with prices, not a checklist. The buying discipline
+is the chapter's actual lesson: **let the golden set order the queue.**
+Folding cost ten lines; expansion cost a variant map; a reranker costs
+~80ms; Self-RAG costs every query 2–3× — and each purchase is verified by
+re-running the same exam, never by vibes. (The self-evaluating patterns —
+Self-RAG's reflection, CRAG's grading — are early forms of *agentic* behavior:
+a system inspecting its own intermediate results and choosing its next step.
+That generalizes far beyond retrieval, and it's Chapter 8.)
+
+## See it: the same exam, after the upgrades
+
+Config B is Chapter 5's hardened baseline. Config C adds the kit you just
+built: folded vectorizer, query expansion, RRF fusion, coverage reranking,
+and a floor measured in coverage units. Predict before revealing: which of
+the four failures move to green — and which one survives *every* retrieval
+upgrade, and why?
+
+<PipelineCompareExplorer client:visible data={upgradeData} />
+
+<Practice id="cascade-latency-budget" difficulty={3}>
+Your reranking pipeline retrieves 100 candidates and cross-encoder-reranks
+all of them: 30ms embed + 20ms search + 350ms rerank = 400ms, against a 300ms
+p95 budget. Design a pipeline that meets the budget, keeps ≥95% of current
+recall@10, and scales to high QPS. Show the latency arithmetic.
+
+<details>
+<summary>One defensible answer</summary>
+
+- **Diagnose**: the reranker is 87% of the budget, and its cost is linear in
+  candidates (~3.5ms/pair × 100). The lever is the candidate count, not the
+  reranker's existence.
+- **Cascade**: a fast, small reranker (~1ms/pair) prunes 100 → 30 (~100ms);
+  the accurate one re-ranks 30 → 10 (~105ms). Total: 30 + 20 + 100 + 105 =
+  **255ms** — under budget with headroom. Published cascade results and
+  common experience put quality retention around 97–98% of full reranking;
+  *verify on your own golden set*, don't import the number.
+- **Cheaper still, if the eval allows**: selective reranking — skip the
+  cascade entirely when the first-stage top-1 score clears a calibrated
+  confidence threshold; average latency drops further and the worst case is
+  unchanged.
+- **QPS**: rerankers batch well — buffer requests for ~10ms windows and batch
+  pairs per GPU; utilization, not model choice, usually decides the fleet
+  size. State the trade: batching adds up to one window of latency.
+</details>
+</Practice>
+
+## How this is graded
+
+- **Technical Correctness** — you can say *why* a cross-encoder out-judges a
+  bi-encoder (it reads the pair), why RRF fuses ranks not scores, and where
+  stemming lives (the vectorizer).
+- **Trade-off Awareness** — this chapter's weighted dimension: every upgrade
+  quoted with its price (latency multiplier, extra calls, operational
+  burden) and matched to a measured failure, cheapest-first.
+- **Evaluation Rigor** — each purchase re-verified against the same golden
+  set; "we added a reranker" means nothing without the before/after table.
+- **Communication** — "folding and a coverage reranker fixed the morphology
+  and ranking failures for ~0ms; HyDE stays on the shelf until a measured
+  paraphrase gap survives hybrid search" beats reciting the pattern zoo.
+
+### Industry variation
+
+- **E-commerce & enterprise search** — hybrid is table stakes: SKUs, part
+  numbers, and acronyms make pure-dense retrieval naive at any serious level;
+  pgvector + tsvector RRF recipes ship this in a sprint.
+- **Latency-SLA products** — cascades and selective reranking are the norm;
+  rerank only low-confidence queries, batch aggressively, and track
+  per-stage p95 like a budget line.
+- **Compliance-bound domains** — CRAG's web-search fallback is often
+  *forbidden* (the answer must come from the governed corpus); the corrective
+  action becomes query rewriting and an honest abstain, and Graph-RAG earns
+  its ops cost where relationship queries dominate (ownership chains,
+  reporting lines).
+
+## Stretch: the bill arrives
+
+Config C ships. Quality holds. Then the invoice and the latency dashboard
+land in the same week: expansion doubled retrieval calls, the reranker added
+its milliseconds, p95 went from 180ms to 520ms, and cost per query tripled.
+Nobody can say which stage spends what. Before anything gets cut, what would
+you *instrument* — per stage — and which three numbers decide what lives?
+That's Chapter 7: RAG in production, where latency budgets, token economics,
+and caching turn the pipeline you built into something a business can run.
