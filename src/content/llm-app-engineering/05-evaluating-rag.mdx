@@ -1,0 +1,251 @@
+---
+title: "Evaluating RAG: the builder's loop"
+slug: evaluating-rag
+description: "The Evaluation guide teaches the metrics; this chapter wires them into the build. Construct a golden set from your own corpus (including should-abstain rows), evaluate the retrieval half and the generation half of your pipeline separately, and decide between configs with outcome categories instead of vibes — the instrument that turns 'B felt better' into an engineering call."
+freshness: literature-survey
+last_verified: 2026-06-10
+tags: [llm-app-engineering, rag, evaluation, golden-set]
+sources: []
+draft: false
+mode: tutorial
+target: transfer
+ordering: problem-first
+commitment: long-lived
+paradigms: [default]
+research_debt_addressed: |
+  RAG evaluation gets taught as a metrics catalog, divorced from the build loop where
+  it earns its keep. Builders spot-check five answers, ship, and discover the failure
+  distribution from users. The missing skill is operational: constructing a golden set
+  cheaply (with abstain rows — almost always forgotten), splitting measurement across
+  the two pipeline halves you own, and using outcome categories to make config
+  decisions defensible. This chapter is that loop, run live on the companion pipeline.
+task_classes: [rag-evaluation, regression-discipline]
+provenance:
+  ai_tools: ["Claude Fable 5 (Anthropic)"]
+  audit_history:
+    - date: 2026-06-10
+      type: authored
+      file: src/content/llm-app-engineering/05-evaluating-rag.mdx
+  citation_backstop: manual
+los:
+  - id: LAE-5.1
+    bloom: design
+    statement: "Build a golden set from your own corpus — questions with relevant-chunk labels and expected behavior, including should-abstain and out-of-scope rows — cheaply enough that it actually gets built and versioned."
+    anchor: golden-set
+    threshold: true
+  - id: LAE-5.2
+    bloom: calculate
+    statement: "Evaluate the two halves of your pipeline separately — ranked-list metrics on retrieval traces, faithfulness on generation — and read them together as a dashboard."
+    anchor: two-half-eval
+    threshold: true
+  - id: LAE-5.3
+    bloom: analyze
+    statement: "Decide between pipeline configs by categorizing per-question outcomes (correct, junk, lost-in-assembly, extraction-miss, abstains) against the golden set — and weigh coverage against harm for the product at hand."
+    anchor: config-decision
+    threshold: true
+---
+
+import YouWillLearn from '@brandon_m_behring/book-scaffold-astro/components/YouWillLearn.astro';
+import Pitfall from '@brandon_m_behring/book-scaffold-astro/components/Pitfall.astro';
+import Practice from '@brandon_m_behring/book-scaffold-astro/components/Practice.astro';
+import PipelineCompareExplorer from '../../components/PipelineCompareExplorer.tsx';
+import compareData from '../../data/rag_compare_demo.json';
+
+# Evaluating RAG: the builder's loop
+
+<YouWillLearn prerequisites="Chapter 4 (the pipeline and its trace). The metrics themselves are the Evaluation guide's Chapter 9 — skim it if precision@k and faithfulness are new.">
+- How to **build a golden set** from your corpus — including the rows everyone forgets: paraphrases, traps, and questions whose only right answer is *"I don't know."*
+- How to evaluate the **two halves** separately — ranked-list metrics on your retrieval traces, faithfulness on generation — and read them as one dashboard.
+- How to turn a config argument into a **decision**: per-question outcome categories, aggregated, with the coverage-vs-harm trade-off made explicit.
+</YouWillLearn>
+
+## "B felt better"
+
+Chapter 4 ended with two candidate fixes: pipeline A reranks nothing but keeps
+the old tight budget; pipeline B adds a similarity floor and triples the
+budget. You read ten answers from each. B felt better. You wrote "B looks
+good" in the PR description.
+
+Your reviewer asks three questions you can't answer: *Better on what? How
+often does each one answer when it shouldn't? Which questions does B get wrong
+that A gets right?* The honest reply to all three is "I don't know" — you
+sampled ten happy-path questions and a feeling.
+
+Predict: what's the smallest artifact that would let you answer all three
+questions mechanically — and roughly how long would it take to build?
+
+<Pitfall title="Five spot-checks sample the happy path">
+Manual spot-checks draw from the questions you'd naturally think to ask —
+which are exactly the questions your system handles well. The failures live
+in the distribution's edges: paraphrases that share no tokens, plural/singular
+traps, questions your corpus can't answer at all. A spot-check can't find
+what you didn't think to check; a golden set is the list of things you decided
+to check *once*, written down, so every future config faces the same exam.
+</Pitfall>
+
+## The golden set: your corpus, your exam {/* anchor: golden-set */}
+
+A golden set for RAG is a versioned file of rows like:
+
+```python
+{"q": "Are gift cards refundable?",
+ "relevant": [4],                  # chunk ids that answer it
+ "fact": "non-refundable",         # substring the answer must carry
+ "reachable": True}                # our retriever *should* find this
+```
+
+Three design rules separate a useful set from a vanity one:
+
+1. **Cover the edge classes, not just the FAQ.** For every handful of plainly
+   answerable questions, include: a *paraphrase* row (answerable by the corpus,
+   phrased like a user — "Can I get my money back?"), a *trap* row (morphology,
+   near-miss vocabulary — "Can I exchange a clearance item?"), and **abstain
+   rows** — out-of-scope questions whose only correct behavior is *"I don't
+   know."* Abstain rows are the most commonly omitted and the cheapest to
+   write, and without them you cannot measure the difference between a system
+   that knows its limits and one that answers everything.
+2. **Label behavior, not prose.** A relevant-chunk id set plus a must-contain
+   fact is enough to score mechanically; a hand-written "ideal answer" invites
+   string-matching theater. (Bootstraps when labels are expensive: generate
+   questions *from* known chunks — free relevance labels — and mine real user
+   queries from logs; the Evaluation guide's Chapter 9 stretch covers the
+   biases each shortcut buys.)
+3. **Small, versioned, and in CI.** Thirty to a hundred rows, next to the
+   code, re-run on every retrieval-affecting change — chunking config,
+   embedding model, floor, budget. The set is to your pipeline what the test
+   suite is to your code; "we'll label a thousand examples next quarter" is
+   how teams end up with zero.
+
+## Two halves, one dashboard {/* anchor: two-half-eval */}
+
+Chapter 4's trace makes the split mechanical. The **retrieval half** is a
+ranking problem, and `mini_eval` (the Evaluation guide's companion) already
+speaks ranked lists — this is where the two guides shake hands:
+
+```python
+from mini_eval import recall_at_k, precision_at_k     # measurement (guide 1)
+from mini_rag import RagPipeline                       # mechanism (this guide)
+
+trace = pipe.run(row["q"])
+included = [h.index for h in trace.included]           # what the model SAW
+recall_at_k(included, set(row["relevant"]), k=len(included))   # context recall
+```
+
+Score the *included* context, not just the raw hits — Chapter 4 taught why: a
+chunk retrieved at rank #3 and cut by the budget never happened, as far as the
+generator is concerned.
+
+The **generation half** is a grounding problem: faithfulness (are the answer's
+claims supported by the context?), answer relevance, and the Type-I/Type-II
+hallucination split — all built and graded in the Evaluation guide's Chapter 9;
+this chapter doesn't repeat it. One builder's note belongs here: our companion
+generator is *faithful by construction* (it can only quote), so its
+faithfulness column is trivially green. The moment you swap in a real LLM,
+faithfulness becomes a measured number with an LLM-as-judge behind it (RAGAS
+is the production bridge) — budget for it the day you swap, not after the
+first fabricated refund policy ships.
+
+Read the halves **together**: high faithfulness + low context recall means the
+generator is honestly summarizing the wrong inputs; the fix is upstream, and
+no prompt work will move it.
+
+## From scores to a decision {/* anchor: config-decision */}
+
+Aggregate scores hide the texture a decision needs. Categorize each golden-set
+row's outcome instead — these map one-to-one onto Chapter 4's failure points:
+
+| Outcome | Meaning | Failure point |
+|---|---|---|
+| **correct** | answered, fact present | — |
+| **junk** | answered when it should have abstained | FP1 + missing floor |
+| **retrieval-miss** | needed chunk never ranked | FP1 |
+| **lost-in-assembly** | retrieved, then cut by budget or floor | FP2 |
+| **extraction-miss** | fact in context, answer missed it | FP3 / FP4 |
+| **abstain (safe)** | declined an unanswerable question | working as designed |
+| **abstain (missed)** | declined an answerable one | floor/threshold too high |
+
+Then the decision stops being aesthetic. Coverage (how often it answers) and
+harm (how often it answers *wrongly*) move in opposite directions as you raise
+floors and thresholds — choosing the operating point is the same
+threshold-on-a-curve judgment as the Evaluation guide's Chapter 2, applied to
+a pipeline. A support product usually pays more for one confident wrong answer
+than for three honest abstentions; an internal research tool may price it the
+other way. The golden set doesn't make that call for you — it makes the call
+*visible*.
+
+## See it: the table that settles the argument
+
+Config A ("ship-it") versus config B ("hardened"), six golden rows, every cell
+a real pipeline run. Predict before revealing: which config wins, and is there
+a question where *both* lose? Expand the rows — especially the money-timing
+question, where the same failure shows up as a different category in each
+config.
+
+<PipelineCompareExplorer client:visible data={compareData} />
+
+<Practice id="abstain-rate-fight" difficulty={3}>
+Your golden set says config B beats A on every harm metric — but B abstains on
+18% of questions, and the PM wants that number near zero. Resolve the conflict
+without vibes: what do you decompose, what do you measure, and what options do
+you bring to the meeting?
+
+<details>
+<summary>One defensible answer</summary>
+
+- **Decompose the abstains** using the outcome categories: how many are
+  *safe* (out-of-scope — working as designed; arguing them to zero means
+  answering unanswerable questions), versus *missed* (answerable but floored —
+  a calibration problem), versus *paraphrase-unreachable* (a retrieval-quality
+  problem no floor setting can fix).
+- **Measure the floor as a curve, not a constant**: sweep it across the golden
+  set and plot junk-rate vs abstain-rate at each value — the Evaluation
+  guide's threshold-trade-off logic, applied to the pipeline. Bring the curve,
+  not a single number.
+- **Options for the meeting**: (1) recalibrate the floor to the knee of the
+  curve — buys back the *missed* abstains for a measured junk cost; (2) fix
+  the unreachable class properly with better retrieval (hybrid/reranking —
+  next chapter) — shrinks abstains without raising junk; (3) change the
+  abstain UX (offer a search link or escalation instead of a dead end) — makes
+  the remaining safe abstains cheaper. What you don't offer: silently lowering
+  the floor until the number looks good.
+</details>
+</Practice>
+
+## How this is graded
+
+- **Technical Correctness** — you score the *included context* (what the model
+  saw), not raw retrieval, and you know why the toy's faithfulness is
+  trivially 1.0 while a real generator's isn't.
+- **Trade-off Awareness** — coverage vs harm as an explicit operating point;
+  the floor as a curve you choose a point on, priced per product.
+- **Evaluation Rigor** — this chapter's weighted dimension: a versioned golden
+  set with abstain rows, two-half measurement, outcome categories, and
+  re-runs on every config change. "I read ten answers" never appears.
+- **Communication** — "B converts one junk answer into a safe abstain and
+  loses nothing; both configs still fail the morphology trap — that's a
+  ranking problem, here's the table" beats "B felt better."
+
+### Industry variation
+
+- **Customer support / consumer** — junk is the expensive cell: one invented
+  policy answer costs more trust than ten abstains; teams bias the operating
+  point hard toward safety and instrument the abstain UX.
+- **Legal / medical / compliance** — the golden set is itself an audited
+  artifact: who labeled it, when, against which corpus version; provenance of
+  the labels matters as much as the scores.
+- **Startups** — the six-row table in this chapter is an afternoon, runs in
+  CI in a minute, and already beats most teams' RAG QA. Build it before the
+  demo, not after the incident.
+
+## Stretch: every failure points the same direction
+
+Look back at the table: the morphology trap defeated both configs, the
+paraphrase forced a choice between junk and abstaining, and the money-timing
+question failed because a chattier chunk outranked the right one. Three
+different categories — and one common cause: the *ranking* your pipeline
+feeds everything downstream is lexically brittle. No budget, floor, or prompt
+fixes ranking. What stage would you add or upgrade so that "money back"
+finds the refund policy, "clearance item" beats the chunk that merely says
+"item" twice, and the right chunk reaches rank #1 more often? That's
+Chapter 6 — hybrid retrieval, rerankers, and query rewriting: the upgrades
+that attack ranking quality itself.

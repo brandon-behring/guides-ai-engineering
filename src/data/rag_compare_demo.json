@@ -1,0 +1,241 @@
+{
+  "name": "Two configs, one golden set",
+  "note": "Every cell is a real RagPipeline.run(); outcome categories are authored ground truth; context recall via mini_eval.recall_at_k.",
+  "verdict": "B is safer than A \u2014 the floor converts one junk answer into an honest abstain \u2014 but the golden set's real finding is that NEITHER config is shippable: the failures concentrate in ranking quality (morphology traps, run-up chunks outranking answers), which no budget or floor can fix. That is Chapter 6's job. Without this table, you'd have shipped A believing it worked.",
+  "chunks": [
+    {
+      "id": 0,
+      "text": "Thanks for shopping with ACME. This page explains our return and refund policies for standard orders, gift cards, and final-sale items. If anything here is unclear, our support team can walk you through the details."
+    },
+    {
+      "id": 1,
+      "text": "Most items qualify for a full refund. To start, open your order history, choose the order that contains the item, and select the item you want to send back. If your order shipped in several packages, return each item separately."
+    },
+    {
+      "id": 2,
+      "text": "You may request a refund within 30 days of purchase, as long as the item is unopened and in its original packaging."
+    },
+    {
+      "id": 3,
+      "text": "Once your return arrives at our warehouse, we inspect it within two business days. Approved refunds are paid to the original payment method. Bank processing times vary, so allow up to five business days for the money to appear."
+    },
+    {
+      "id": 4,
+      "text": "Gift cards and final-sale items are non-refundable. Items marked as clearance may be exchanged for store credit instead. Shipping fees are refunded only when the return is our error."
+    }
+  ],
+  "configs": [
+    {
+      "key": "A",
+      "label": "A \u2014 ship-it",
+      "detail": "k=4 \u00b7 budget 60 \u00b7 no floor"
+    },
+    {
+      "key": "B",
+      "label": "B \u2014 hardened",
+      "detail": "k=4 \u00b7 budget 200 \u00b7 floor 0.12"
+    }
+  ],
+  "questions": [
+    {
+      "q": "How long after purchase can I request a refund?",
+      "relevant": [
+        2
+      ],
+      "fact": "30 days",
+      "note": "",
+      "runs": {
+        "A": {
+          "outcome": "correct",
+          "why": "",
+          "answer": "You may request a refund within 30 days of purchase, as long as the item is unopened and in its original packaging.",
+          "supported": true,
+          "included": [
+            2,
+            0
+          ],
+          "context_recall": 1.0
+        },
+        "B": {
+          "outcome": "correct",
+          "why": "",
+          "answer": "You may request a refund within 30 days of purchase, as long as the item is unopened and in its original packaging.",
+          "supported": true,
+          "included": [
+            2
+          ],
+          "context_recall": 1.0
+        }
+      }
+    },
+    {
+      "q": "Are gift cards refundable?",
+      "relevant": [
+        4
+      ],
+      "fact": "non-refundable",
+      "note": "",
+      "runs": {
+        "A": {
+          "outcome": "correct",
+          "why": "",
+          "answer": "Gift cards and final-sale items are non-refundable.",
+          "supported": true,
+          "included": [
+            4
+          ],
+          "context_recall": 1.0
+        },
+        "B": {
+          "outcome": "correct",
+          "why": "",
+          "answer": "Gift cards and final-sale items are non-refundable.",
+          "supported": true,
+          "included": [
+            4,
+            0
+          ],
+          "context_recall": 1.0
+        }
+      }
+    },
+    {
+      "q": "How long until the money appears after a refund is approved?",
+      "relevant": [
+        3
+      ],
+      "fact": "five business days",
+      "note": "",
+      "runs": {
+        "A": {
+          "outcome": "lost-in-assembly",
+          "why": "FP2 context window \u2014 retrieved, then cut by the budget or the floor",
+          "answer": "You may request a refund within 30 days of purchase, as long as the item is unopened and in its original packaging.",
+          "supported": true,
+          "included": [
+            2,
+            0
+          ],
+          "context_recall": 0.0
+        },
+        "B": {
+          "outcome": "extraction-miss",
+          "why": "FP3 extraction \u2014 fact in context, wrong sentence quoted",
+          "answer": "You may request a refund within 30 days of purchase, as long as the item is unopened and in its original packaging.",
+          "supported": true,
+          "included": [
+            2,
+            3,
+            1
+          ],
+          "context_recall": 1.0
+        }
+      }
+    },
+    {
+      "q": "Can I get my money back?",
+      "relevant": [
+        2
+      ],
+      "fact": "30 days",
+      "note": "answerable by the corpus, but shares no token with it \u2014 Ch 2's paraphrase miss",
+      "runs": {
+        "A": {
+          "outcome": "junk",
+          "why": "FP1 retrieval \u2014 answered when it should abstain",
+          "answer": "If anything here is unclear, our support team can walk you through the details.",
+          "supported": true,
+          "included": [
+            0
+          ],
+          "context_recall": 0.0
+        },
+        "B": {
+          "outcome": "abstain-safe",
+          "why": "the missing-context rule did its job",
+          "answer": "I don't know \u2014 the retrieved context doesn't answer this.",
+          "supported": false,
+          "included": [],
+          "context_recall": 0.0
+        }
+      }
+    },
+    {
+      "q": "Do you offer gift wrapping?",
+      "relevant": [],
+      "fact": null,
+      "note": "out of scope \u2014 the only right answer is an abstain",
+      "runs": {
+        "A": {
+          "outcome": "junk",
+          "why": "FP1 retrieval \u2014 answered when it should abstain",
+          "answer": "This page explains our return and refund policies for standard orders, gift cards, and final-sale items.",
+          "supported": true,
+          "included": [
+            0,
+            2
+          ],
+          "context_recall": null
+        },
+        "B": {
+          "outcome": "junk",
+          "why": "FP1 retrieval \u2014 answered when it should abstain",
+          "answer": "If anything here is unclear, our support team can walk you through the details.",
+          "supported": true,
+          "included": [
+            0,
+            4
+          ],
+          "context_recall": null
+        }
+      }
+    },
+    {
+      "q": "Can I exchange a clearance item?",
+      "relevant": [
+        4
+      ],
+      "fact": "store credit",
+      "note": "morphology trap: \"item\" \u2260 \"items\", \"exchange\" \u2260 \"exchanged\"",
+      "runs": {
+        "A": {
+          "outcome": "lost-in-assembly",
+          "why": "FP2 context window \u2014 retrieved, then cut by the budget or the floor",
+          "answer": "Most items qualify for a full refund.",
+          "supported": true,
+          "included": [
+            1
+          ],
+          "context_recall": 0.0
+        },
+        "B": {
+          "outcome": "lost-in-assembly",
+          "why": "FP2 context window \u2014 retrieved, then cut by the budget or the floor",
+          "answer": "Most items qualify for a full refund.",
+          "supported": true,
+          "included": [
+            1,
+            2
+          ],
+          "context_recall": 0.0
+        }
+      }
+    }
+  ],
+  "aggregates": {
+    "A": {
+      "correct": 2,
+      "harmful": 4,
+      "safe_abstain": 0,
+      "missed_abstain": 0,
+      "avg_context_recall": 0.4
+    },
+    "B": {
+      "correct": 2,
+      "harmful": 3,
+      "safe_abstain": 1,
+      "missed_abstain": 0,
+      "avg_context_recall": 0.6
+    }
+  }
+}

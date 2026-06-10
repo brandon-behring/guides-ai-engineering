@@ -552,6 +552,117 @@ def rag_pipeline_demo() -> dict:
     }
 
 
+def rag_compare_demo() -> dict:
+    """Two pipeline configs judged on one golden set, for the guide-2 Ch 5
+    island. Six questions over the policy corpus — three answerable, one
+    lexically-unreachable paraphrase, one out-of-scope, one morphology trap —
+    each run through config A ("ship-it": budget 60, no floor) and config B
+    ("hardened": budget 200, floor 0.12). Outcomes are categorized against
+    authored ground truth and mapped to Ch 4's failure points; retrieval-half
+    context recall comes from mini_eval.recall_at_k. Every answer is a real
+    RagPipeline.run()."""
+    chunks = chunk_paragraphs(POLICY_DOC, 40)
+
+    golden = [
+        {"q": "How long after purchase can I request a refund?",
+         "relevant": [2], "fact": "30 days", "reachable": True},
+        {"q": "Are gift cards refundable?",
+         "relevant": [4], "fact": "non-refundable", "reachable": True},
+        {"q": "How long until the money appears after a refund is approved?",
+         "relevant": [3], "fact": "five business days", "reachable": True},
+        {"q": "Can I get my money back?",
+         "relevant": [2], "fact": "30 days", "reachable": False,
+         "note": "answerable by the corpus, but shares no token with it — Ch 2's paraphrase miss"},
+        {"q": "Do you offer gift wrapping?",
+         "relevant": [], "fact": None, "reachable": False,
+         "note": "out of scope — the only right answer is an abstain"},
+        {"q": "Can I exchange a clearance item?",
+         "relevant": [4], "fact": "store credit", "reachable": True,
+         "note": "morphology trap: \"item\" ≠ \"items\", \"exchange\" ≠ \"exchanged\""},
+    ]
+    configs = [
+        {"key": "A", "label": "A — ship-it", "detail": "k=4 · budget 60 · no floor",
+         "params": dict(k=4, budget_words=60, min_score=0.0)},
+        {"key": "B", "label": "B — hardened", "detail": "k=4 · budget 200 · floor 0.12",
+         "params": dict(k=4, budget_words=200, min_score=0.12)},
+    ]
+
+    def categorize(item: dict, trace, raw_ids: set) -> tuple[str, str]:
+        """Map one (question, trace) to an outcome category + failure point.
+        ``raw_ids`` are the pre-floor hit ids, so a chunk eaten by the floor
+        is reported as lost-in-assembly, not as a ranking miss."""
+        relevant = set(item["relevant"])
+        included = {h.index for h in trace.included}
+        ans = trace.answer
+        if ans.supported:
+            if item["fact"] and item["fact"] in ans.text:
+                return "correct", ""
+            if not relevant or not item["reachable"]:
+                return "junk", "FP1 retrieval — answered when it should abstain"
+            if relevant <= included:
+                return "extraction-miss", "FP3 extraction — fact in context, wrong sentence quoted"
+            if relevant & raw_ids:
+                return "lost-in-assembly", "FP2 context window — retrieved, then cut by the budget or the floor"
+            return "retrieval-miss", "FP1 retrieval — the needed chunk never ranked"
+        # abstained
+        if not relevant or not item["reachable"]:
+            return "abstain-safe", "the missing-context rule did its job"
+        return "abstain-missed", "the fact was reachable; the floor/threshold ate it"
+
+    questions = []
+    raw_index = TfidfIndex(chunks)
+    for item in golden:
+        raw_ids = {h.index for h in raw_index.search(item["q"], k=4)}
+        row = {"q": item["q"], "relevant": item["relevant"],
+               "fact": item["fact"], "note": item.get("note", ""), "runs": {}}
+        for cfg in configs:
+            trace = RagPipeline(chunks, **cfg["params"]).run(item["q"])
+            outcome, why = categorize(item, trace, raw_ids)
+            relevant = set(item["relevant"])
+            included_ids = [h.index for h in trace.included]
+            ctx_recall = (recall_at_k(included_ids, relevant, max(len(included_ids), 1))
+                          if relevant else None)
+            row["runs"][cfg["key"]] = {
+                "outcome": outcome,
+                "why": why,
+                "answer": trace.answer.text,
+                "supported": trace.answer.supported,
+                "included": included_ids,
+                "context_recall": (round(ctx_recall, 2) if ctx_recall is not None else None),
+            }
+        questions.append(row)
+
+    aggregates = {}
+    for cfg in configs:
+        outs = [q["runs"][cfg["key"]]["outcome"] for q in questions]
+        recalls = [q["runs"][cfg["key"]]["context_recall"] for q in questions
+                   if q["runs"][cfg["key"]]["context_recall"] is not None]
+        aggregates[cfg["key"]] = {
+            "correct": outs.count("correct"),
+            "harmful": sum(outs.count(o) for o in
+                           ("junk", "extraction-miss", "lost-in-assembly", "retrieval-miss")),
+            "safe_abstain": outs.count("abstain-safe"),
+            "missed_abstain": outs.count("abstain-missed"),
+            "avg_context_recall": round(sum(recalls) / len(recalls), 2),
+        }
+
+    return {
+        "name": "Two configs, one golden set",
+        "note": ("Every cell is a real RagPipeline.run(); outcome categories are "
+                 "authored ground truth; context recall via mini_eval.recall_at_k."),
+        "verdict": ("B is safer than A — the floor converts one junk answer into an "
+                    "honest abstain — but the golden set's real finding is that "
+                    "NEITHER config is shippable: the failures concentrate in ranking "
+                    "quality (morphology traps, run-up chunks outranking answers), "
+                    "which no budget or floor can fix. That is Chapter 6's job. "
+                    "Without this table, you'd have shipped A believing it worked."),
+        "chunks": [{"id": i, "text": c} for i, c in enumerate(chunks)],
+        "configs": [{k: c[k] for k in ("key", "label", "detail")} for c in configs],
+        "questions": questions,
+        "aggregates": aggregates,
+    }
+
+
 def agent_demo() -> dict:
     """pass@k curves for a flaky vs a reliable agent, for the Ch 10 island. Each
     suite is 40 tasks sampled K times; pass@k rises with attempts, but pass@1 (the
@@ -614,6 +725,7 @@ def main() -> None:
         ("retrieval_demo", retrieval_demo()),
         ("chunking_demo", chunking_demo()),
         ("rag_pipeline_demo", rag_pipeline_demo()),
+        ("rag_compare_demo", rag_compare_demo()),
         ("agent_demo", agent_demo()),
         ("monitoring_demo", monitoring_demo()),
     ]:

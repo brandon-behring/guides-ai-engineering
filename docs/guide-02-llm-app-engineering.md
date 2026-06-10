@@ -27,7 +27,12 @@ demand spine: `~/guides/docs/research/role_demand_and_interview_signals/`.
   RagPipeline+RagTrace, similarity floor; tests now 19/19) + `RagPipelineExplorer` island
   (computed `rag_pipeline_demo.json`: happy path / retrieval-failure-vs-floor /
   context-window-omission-vs-budget, all real traces).
-- **Next:** Ch 5 (Evaluating RAG) — bridge to `mini_eval.retrieval`, no new companion code.
+- **Ch 5 authored** — the builder's-loop bridge to guide 1 (golden-set construction incl.
+  abstain rows; two-half eval scoring the *included* context via `mini_eval.recall_at_k`;
+  config decisions via outcome categories) + `PipelineCompareExplorer` island (computed
+  `rag_compare_demo.json`: A-vs-B on a 6-row golden set; both configs fail the morphology
+  trap — the Ch 6 hook). No new companion code (by design — reuse is the lesson).
+- **Next:** Ch 6 (Advanced RAG) — adds `mini_rag.rerank`.
 
 ## Spine & outline (RAG-centric, ~13 ch)
 
