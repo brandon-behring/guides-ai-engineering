@@ -1,0 +1,261 @@
+---
+title: "RAG in production: latency, cost, and what to watch"
+slug: rag-in-production
+description: "The two budgets every production RAG system answers to — milliseconds and dollars — and the instrumentation that keeps it honest. Latency anatomy (TTFT vs decode, and why output length is the forgotten multiplier), token economics (caching, cascades, the self-host break-even), and observability that watches the knowledge boundary, not just the GPUs."
+freshness: literature-survey
+last_verified: 2026-06-10
+tags: [llm-app-engineering, rag, production, latency, cost, observability]
+sources: []
+draft: false
+mode: tutorial
+target: transfer
+ordering: problem-first
+commitment: long-lived
+paradigms: [default]
+research_debt_addressed: |
+  Production LLM content splits into serving-infrastructure deep dives (vLLM flags,
+  quantization formats) and vague "monitor your model" advice, leaving a gap where
+  the working engineer lives: the back-of-envelope latency and cost arithmetic that
+  decides architectures, and the observability that catches quality failures APM
+  can't see. "No production experience" and "ignoring ops/cost" are top documented
+  interview failure modes; this chapter is the antidote, with the arithmetic built
+  and tested in the companion.
+task_classes: [production-design, cost-latency-analysis]
+provenance:
+  ai_tools: ["Claude Fable 5 (Anthropic)"]
+  audit_history:
+    - date: 2026-06-10
+      type: authored
+      file: src/content/llm-app-engineering/07-rag-in-production.mdx
+  citation_backstop: manual
+los:
+  - id: LAE-7.1
+    bloom: calculate
+    statement: "Decompose a RAG request's latency — retrieval stages, prefill, decode × output length — estimate it from first principles, and never quote a latency without stating the output-length assumption."
+    anchor: latency-anatomy
+    threshold: true
+  - id: LAE-7.2
+    bloom: design
+    statement: "Design the cost side: token economics per query, caching and model cascades as the primary levers, and the self-host-vs-API break-even driven by volume, latency, and data residency."
+    anchor: token-economics
+    threshold: true
+  - id: LAE-7.3
+    bloom: design
+    statement: "Instrument what APM can't see: per-stage traces, cost-per-request (not just total), retrieval-confidence logging at the knowledge boundary, and sampled live-traffic evaluation."
+    anchor: production-observability
+    threshold: true
+---
+
+import YouWillLearn from '@brandon_m_behring/book-scaffold-astro/components/YouWillLearn.astro';
+import Pitfall from '@brandon_m_behring/book-scaffold-astro/components/Pitfall.astro';
+import Practice from '@brandon_m_behring/book-scaffold-astro/components/Practice.astro';
+import BudgetExplorer from '../../components/BudgetExplorer.tsx';
+import budgetData from '../../data/budget_demo.json';
+
+# RAG in production: latency, cost, and what to watch
+
+<YouWillLearn prerequisites="Chapters 4–6 — the pipeline, its eval, and the upgrades that added stages to it. Comfortable with arithmetic.">
+- **Latency anatomy**: TTFT versus decode, why output length is the multiplier everyone forgets, and the estimates you can do before building.
+- **Token economics**: what a query costs, the levers in order of leverage — caching, cascades, routing — and the self-host break-even.
+- **Observability beyond APM**: per-stage traces, cost-per-request, and watching the *knowledge boundary* — the failure your dashboards can't see.
+</YouWillLearn>
+
+## The invoice and the dashboard arrive together
+
+Chapter 6's upgrades shipped. Quality holds — the golden set says so. Then
+finance forwards the API invoice with a "?" and the on-call channel lights up:
+p95 latency went from 1.8s to 5.6s, cost per query tripled, and during Monday's
+traffic spike the bot timed out for eleven minutes. In the retro, three
+questions go around the room and nobody has numbers: *Where do the milliseconds
+go? Where do the dollars go? And why did our dashboards — GPU at 60%, error
+rate 0.1%, all green — say nothing?*
+
+Predict before reading: of one request's total latency, roughly what fraction
+do you think is *generating the answer* versus everything else — retrieval,
+reranking, prompt assembly combined?
+
+<Pitfall title="Green dashboards, failing system">
+Infrastructure metrics — CPU, GPU utilization, error rates, even request
+latency — tell you the machines are healthy, not that the *answers* are good
+or affordable. An LLM system can hold 99.9% uptime while quietly tripling its
+token bill (a prompt bug concatenating context twice) or while answering a
+growing share of questions wrongly (a new topic your corpus doesn't cover).
+The failures that hurt are invisible to APM; you have to instrument for them
+on purpose.
+</Pitfall>
+
+## Where the milliseconds go {/* anchor: latency-anatomy */}
+
+A RAG request's latency is a sum you can write down: retrieval stages (embed,
+search, rerank — tens of milliseconds each), then the model's two phases.
+**Prefill** processes the whole input at once — compute-bound, roughly *1ms
+per billion parameters per 1K input tokens*. **Decode** generates one token at
+a time — memory-bandwidth-bound, roughly *0.5ms per token per billion
+parameters*, self-hosted. Those constants are estimates to be replaced by
+measurement, but the *structure* is the lesson, and the structure says:
+
+$$
+\text{latency} \approx \underbrace{\text{stages}}_{\sim 100\text{ms}}
++ \underbrace{\text{prefill}(\text{input})}_{\text{one-time}}
++ \underbrace{\text{ms/token} \times \text{output}}_{\text{the multiplier}}
+$$
+
+Decode dominates. Generating 500 tokens costs 25× the generation time of 20 —
+which is why the single most common estimation error is quoting "model
+latency" without stating the output length. `mini_rag.budget` encodes the
+arithmetic (`prefill_ms`, `decode_ms`, `rag_request_budget`), and the worked
+example from the companion's tests: an 8B model with 1,500 input tokens
+prefills in ~12ms and decodes 200 output tokens in ~800ms. The answer *is*
+the latency.
+
+Two practical consequences. **Streaming** changes what users feel: time to
+first token (TTFT = stages + prefill) is the perceived wait, so a 5-second
+total can feel like 600ms — which is why chat products stream and batch
+pipelines don't care. And **every Chapter 6 upgrade was a latency line item**:
+expansion multiplied retrieval calls, the reranker added its pass; the
+`RequestBudget` ledger is how you keep each stage accountable instead of
+discovering the sum in an incident.
+
+## Where the dollars go {/* anchor: token-economics */}
+
+The bill is the same arithmetic in different units:
+$(\text{in} \times r_{\text{in}} + \text{out} \times r_{\text{out}})/10^6$.
+The RAG-specific realization: **input tokens are your pipeline's knobs** —
+$k \times \text{chunk size} + \text{prompt} + \text{question}$. Chapter 4's
+context budget is literally a line item on the invoice; doubling k doubles
+most of your input bill for a recall gain you should be measuring anyway.
+
+The levers, in the order a sane team pulls them:
+
+1. **Caching.** A response cache turns repeat questions into free answers —
+   a 30% hit rate is a 30% discount on the whole bill (`effective_cost_usd`).
+   Embedding caches and provider prompt-caching (shared system-prompt
+   prefixes) stack on top. Cheapest lever, pull it first. Caveat: hits help
+   the *bill* and the average, not the p95 — misses still pay full latency.
+2. **Model cascades** — the biggest single lever. Route the easy 70% to a
+   small model, escalate the rest: `cascade_cost_usd(0.7, cheap, expensive)`
+   typically cuts costs 3–5× with small quality loss. The catch is the
+   routing signal: a cascade is only as good as the small model's *calibration*
+   (a confidently-wrong cheap model never escalates — the Evaluation guide's
+   calibration chapter is suddenly a cost-engineering tool).
+3. **Right-size the defaults.** Max output tokens, k, prompt length — each
+   trimmed against the golden set, not against vibes.
+4. **Self-host vs API** — last, because it's a step change in operational
+   burden. The break-even is arithmetic
+   (`break_even_queries_per_day(gpu_monthly, api_cost_per_query)`): a
+   ~$864/month GPU against a $0.002/query API breaks even around 14,400
+   queries/day. Below that, the API is cheaper than your idle GPU; far above
+   it, self-hosting (with vLLM-class serving and quantization) wins big. And
+   two non-cost trumps override the math entirely: hard latency floors
+   (network round-trips) and **data residency** — if the data can't leave,
+   the decision was never about money.
+
+## Watching the knowledge boundary {/* anchor: production-observability */}
+
+The Evaluation guide's production chapter covers the eval machinery — online
+metrics, drift, guardrails. Here is the *builder's* instrumentation list, the
+things to emit from code you own:
+
+- **Traces, per stage.** Chapter 4's `RagTrace` is the local form; production
+  is the same thing as OpenTelemetry spans — embed, search, rerank, generate,
+  each with attributes (chunk count, scores, token counts). Metrics tell you
+  *something* is slow; the trace tells you *which stage*.
+- **Cost-per-request, not just total cost.** Total spend spikes for two very
+  different reasons: more traffic (fine) or a per-request regression (a prompt
+  bug stuffing 10KB of extra context — a bug you fix today). Only separating
+  the two makes the alert actionable.
+- **Retrieval confidence at the boundary.** Log the top-1 similarity score on
+  every request. A falling median is your earliest warning that *users have
+  started asking about things your corpus doesn't cover* — the "silent
+  decline" failure where offline evals stay green (the golden set only tests
+  what you knew to include) while production answers degrade. Pair it with a
+  light topic clusterer and alert when a new cluster passes ~10% of traffic:
+  that's a knowledge-gap signal, and the fix is ingestion, not modeling.
+- **Sampled live-traffic eval.** Judge ~5% of production requests
+  continuously; segment scores by topic, alert on burn rate against an SLO
+  rather than raw thresholds (a metric that wobbles 88–92% pages nobody
+  usefully). The runbook when it fires, in order: recent prompt change? →
+  retrieval scores down? → query distribution shifted? → did the provider
+  silently update the model?
+
+## See it: four levers, two budgets
+
+One support bot, 10,000 queries/day, a 2-second SLA. Commit to a prediction —
+which single lever change cuts the monthly bill most from the default — then
+pull them. Watch three things: the decode bar as you change answer length;
+what the cascade does to cost versus what it *fails* to do to p95 (the
+escalated path still pays full latency); and the corner of the grid where the
+bill reads $45/month — then ask what that config trades away.
+
+<BudgetExplorer client:visible data={budgetData} />
+
+<Practice id="cost-cut-architecture" difficulty={3}>
+Your transaction-review bot runs everything on a frontier model: 10K
+queries/day, ~1,760 tokens/query, $2,400/month, p95 2.1s (just over the 2s
+SLA). Mandate: cut cost 60% (to ≤$960/month) without breaking the SLA. You
+have a mini-tier API model, the frontier API model, and one 24GB GPU
+($864/month if run 24/7). Design it, with arithmetic.
+
+<details>
+<summary>One defensible answer</summary>
+
+- **Attribute the spend first**: $2,400 / 300K queries/month = $0.008/query —
+  consistent with ~1,300 input + ~450 output tokens at frontier rates. Output
+  tokens are over half the bill: cap answer length where the product allows.
+- **Tier the traffic** (the cascade is the lever): classify queries cheaply;
+  route the ~80% that are lookups/FAQ to the mini-tier model
+  (~$0.0005/query), keep the frontier model for the ~20% that are genuinely
+  hard (~$0.008). Blended: 0.8 × 0.0005 + 0.2 × 0.008 ≈ $0.002/query ≈
+  **$600/month** — under target with room for the router's own cost.
+- **Add a response cache** for repeated compliance questions (support traffic
+  repeats heavily; even 30% hits → ~$420/month) — and it helps the SLA's
+  *average*, though not p95.
+- **Decline the GPU**: at tier-1's residual volume the break-even
+  ($864 / $0.0005 ≈ 58K queries/day) is nowhere close; the GPU only re-enters
+  on data-residency or hard-latency grounds, which weren't in the mandate.
+- **Verify the SLA side**: the mini-tier model decodes faster, so 80% of
+  traffic gets *quicker*; re-measure p95 on the escalated 20% and cap their
+  output length — the calibration of the router gets validated on the golden
+  set before any of this ships.
+</details>
+</Practice>
+
+## How this is graded
+
+- **Technical Correctness** — you decompose latency into stages + prefill +
+  decode × output, and you can do the cost and break-even arithmetic unaided.
+- **Trade-off Awareness** — this chapter's weighted dimension: every lever
+  with its catch (cache helps the bill not the p95; cascades need calibration;
+  self-hosting trades dollars for ops; residency overrides all of it).
+- **Evaluation Rigor** — cost cuts are validated against the golden set like
+  any other config change, and quality monitoring samples *live* traffic
+  because offline sets can't see new topics.
+- **Communication** — "decode dominates: 200-token answers at 40 tok/s is 5s
+  before retrieval even starts — we either stream, shorten, or downsize the
+  model for easy queries; here's the blended cost" beats "we should optimize
+  inference."
+
+### Industry variation
+
+- **Startups** — API-first, measure, and a one-page budget sheet: the
+  arithmetic in this chapter *is* the infra plan until volume says otherwise;
+  the GPU purchase is a milestone, not a default.
+- **Regulated industries** (fintech, healthcare, gov) — data residency
+  decides hosting before cost gets a vote; cost attribution per department
+  and auditable cost-per-request become reporting requirements, not nice-to-haves.
+- **High-scale consumer** — cascades, aggressive caching, quantization, and
+  continuous batching are all on; serving is a dedicated team and the
+  marginal token is negotiated with providers — the same arithmetic, with
+  more zeros and a procurement department.
+
+## Stretch: the bot that needs to *do* something
+
+Production is boring now — budgeted, instrumented, cheap. Then the roadmap
+lands: users don't just want the refund *policy*, they want the bot to check
+*their* order status and start the refund. Answering from documents can't do
+that — no retrieved chunk contains the live status of order #18342, and no
+generated paragraph moves money. What new capability does the system need,
+what could possibly go wrong when a language model is given it, and what
+would "k=4" even mean when the context isn't documents but *actions*? That's
+Chapter 8: tool use and agents — where the model stops describing the world
+and starts changing it.

@@ -38,7 +38,11 @@ demand spine: `~/guides/docs/research/role_demand_and_interview_signals/`.
   golden set: context recall 0.6 → 1.0; residual failure = extraction, the toy
   generator's ceiling). `TfidfIndex`/`extractive_answer` gained an optional `tokenizer`
   seam (backward-compatible).
-- **Next:** Ch 7 (RAG in production) — latency/cost model in the companion.
+- **Ch 7 authored** — `mini_rag.budget` (prefill/decode rules of thumb, api_cost,
+  cascade blending, cache discount, self-host break-even; tests 29/29) + `BudgetExplorer`
+  island (computed `budget_demo.json`: 4-lever grid, SLA badge, TTFT-vs-decode bar).
+  Complements guide-1 Ch 11 (eval-side monitoring) with the builder's instrumentation.
+- **Next:** Ch 8 (Agents & tool use) — seeds `mini_agent.loop`.
 
 ## Spine & outline (RAG-centric, ~13 ch)
 

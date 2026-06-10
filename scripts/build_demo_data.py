@@ -29,6 +29,7 @@ from mini_rag import (  # noqa: E402
     RagPipeline, split_sentences,
     fold_tokenize, expand_query, coverage_score, hybrid_search,
     assemble_context, ABSTAIN,
+    api_cost_usd, cascade_cost_usd, effective_cost_usd,
 )
 
 # The ACME refund policy — shared by the Ch 3 chunking demo and the Ch 4
@@ -767,6 +768,86 @@ def rag_upgrade_demo() -> dict:
     }
 
 
+def budget_demo() -> dict:
+    """The two budgets of a production RAG bot, for the guide-2 Ch 7 island:
+    a lever grid (answer length x context chunks x model tier x cache rate)
+    where every cell's latency and cost are computed via mini_rag.budget.
+    Latency model: retrieval stages are constants; per-model TTFT and
+    tokens/sec are representative API-class numbers (stated, not measured —
+    the lesson is the structure, and 'measure your provider' is the takeaway)."""
+    QPD = 10_000                      # queries/day
+    SLA_MS = 2000.0                   # p95 target on total latency
+    STAGES_MS = {"embed": 20.0, "search": 15.0, "rerank": 80.0}
+    CHUNK_TOKENS, PROMPT_TOKENS, QUESTION_TOKENS = 300, 150, 50
+    MODELS = {
+        "small": {"label": "small (mini-tier)", "ttft_ms": 250.0, "tok_per_s": 150.0,
+                  "rate_in": 0.15, "rate_out": 0.60},
+        "large": {"label": "large (frontier)", "ttft_ms": 550.0, "tok_per_s": 40.0,
+                  "rate_in": 2.50, "rate_out": 10.00},
+    }
+    CASCADE_EASY = 0.7                # fraction routed to the small model
+
+    outputs = [50, 200, 500]
+    ks = [2, 4, 8]
+    model_keys = ["small", "large", "cascade"]
+    caches = [0.0, 0.3, 0.6]
+
+    def cell(output: int, k: int, model: str, cache: float) -> dict:
+        input_tokens = k * CHUNK_TOKENS + PROMPT_TOKENS + QUESTION_TOKENS
+        stages = sum(STAGES_MS.values())
+
+        def lat(mkey: str) -> tuple[float, float]:
+            m = MODELS[mkey]
+            ttft = stages + m["ttft_ms"]
+            decode = output / m["tok_per_s"] * 1000.0
+            return ttft, decode
+
+        def cost(mkey: str) -> float:
+            m = MODELS[mkey]
+            return api_cost_usd(input_tokens, output, m["rate_in"], m["rate_out"])
+
+        if model == "cascade":
+            # p95 is the escalated (slow) path; cost is the blended average
+            ttft, decode = lat("large")
+            cost_q = cascade_cost_usd(CASCADE_EASY, cost("small"), cost("large"))
+        else:
+            ttft, decode = lat(model)
+            cost_q = cost(model)
+
+        eff_cost = effective_cost_usd(cost_q, cache)
+        total = ttft + decode
+        return {
+            "output": output, "k": k, "model": model, "cache": cache,
+            "input_tokens": input_tokens,
+            "ttft_ms": round(ttft), "decode_ms": round(decode),
+            "total_ms": round(total), "sla_ok": total <= SLA_MS,
+            "cost_q": round(cost_q, 5), "eff_cost_q": round(eff_cost, 5),
+            "cost_month": round(eff_cost * QPD * 30, 0),
+        }
+
+    combos = [cell(o, k, m, c) for o in outputs for k in ks
+              for m in model_keys for c in caches]
+
+    return {
+        "name": "Two budgets: milliseconds and dollars",
+        "note": ("Latency and cost computed by mini_rag.budget; per-model TTFT and "
+                 "tokens/sec are representative API-class constants (the structure is "
+                 "the lesson — measure your own provider). Cache hits affect the bill, "
+                 "not the p95 (misses still pay full latency). Cascade p95 = the "
+                 "escalated path; cascade cost = the 70/30 blend."),
+        "qpd": QPD, "sla_ms": SLA_MS,
+        "levers": {
+            "output": outputs, "k": ks,
+            "model": [{"key": "small", "label": "small (mini-tier)"},
+                      {"key": "large", "label": "large (frontier)"},
+                      {"key": "cascade", "label": "cascade 70/30"}],
+            "cache": caches,
+        },
+        "defaults": {"output": 200, "k": 4, "model": "large", "cache": 0.0},
+        "combos": combos,
+    }
+
+
 def agent_demo() -> dict:
     """pass@k curves for a flaky vs a reliable agent, for the Ch 10 island. Each
     suite is 40 tasks sampled K times; pass@k rises with attempts, but pass@1 (the
@@ -831,6 +912,7 @@ def main() -> None:
         ("rag_pipeline_demo", rag_pipeline_demo()),
         ("rag_compare_demo", rag_compare_demo()),
         ("rag_upgrade_demo", rag_upgrade_demo()),
+        ("budget_demo", budget_demo()),
         ("agent_demo", agent_demo()),
         ("monitoring_demo", monitoring_demo()),
     ]:

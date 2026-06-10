@@ -12,6 +12,8 @@ from mini_rag import (  # noqa: E402
     boundary_coherence,
     ABSTAIN, assemble_context, build_prompt, extractive_answer, RagPipeline,
     fold, fold_tokenize, expand_query, rrf_fuse, coverage_rerank, hybrid_search,
+    prefill_ms, decode_ms, llm_latency_ms, api_cost_usd, rag_request_budget,
+    cascade_cost_usd, effective_cost_usd, break_even_queries_per_day,
 )
 
 
@@ -253,6 +255,46 @@ def test_hybrid_search_fixes_golden_set_failures():
     # coverage floor turns off-topic junk into emptiness
     assert hybrid_search(index, "Do you offer gift wrapping?", synonyms=syn,
                          k=2, min_coverage=0.5) == []
+
+
+def test_latency_estimates_match_rules_of_thumb():
+    # 8B model, 1.5K input: prefill ~12ms; 200 output tokens: decode ~800ms
+    assert abs(prefill_ms(8.0, 1500) - 12.0) < 1e-9
+    assert abs(decode_ms(8.0, 200) - 800.0) < 1e-9
+    assert abs(llm_latency_ms(8.0, 1500, 200) - 812.0) < 1e-9
+    # decode scales linearly with output length — 25x tokens = 25x time
+    assert decode_ms(8.0, 500) == 25 * decode_ms(8.0, 20)
+
+
+def test_api_cost_and_cascade_and_cache():
+    # 800 in / 200 out at $2.50/$10 per 1M -> $0.004
+    assert abs(api_cost_usd(800, 200, 2.50, 10.00) - 0.004) < 1e-12
+    # cascade: 70% to a $0.001 model, 30% to a $0.008 model
+    blended = cascade_cost_usd(0.7, 0.001, 0.008)
+    assert abs(blended - 0.0031) < 1e-12
+    # 30% cache hits discount the bill by 30%
+    assert abs(effective_cost_usd(0.004, 0.30) - 0.0028) < 1e-12
+    for bad in (-0.1, 1.1):
+        try:
+            cascade_cost_usd(bad, 1, 2)
+            raise AssertionError("expected ValueError")
+        except ValueError:
+            pass
+
+
+def test_request_budget_assembles_tokens_and_stages():
+    b = rag_request_budget(params_b=8.0, k_chunks=4, chunk_tokens=300,
+                           prompt_tokens=150, question_tokens=50,
+                           output_tokens=200, rerank_ms=80.0)
+    assert b.input_tokens == 4 * 300 + 150 + 50
+    assert b.ttft_ms == b.embed_ms + b.search_ms + b.rerank_ms + b.prefill_ms
+    assert abs(b.total_ms - (b.ttft_ms + b.decode_ms)) < 1e-9
+    assert b.decode_ms > b.prefill_ms          # decode dominates at 200 tokens
+
+
+def test_break_even_volume():
+    # $864/month GPU vs $0.002/query API -> 14,400 queries/day
+    assert abs(break_even_queries_per_day(864.0, 0.002) - 14400.0) < 1e-6
 
 
 def _run_all():
