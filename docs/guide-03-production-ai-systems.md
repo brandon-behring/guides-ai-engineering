@@ -35,7 +35,35 @@ lifecycle. Guide-1 Ch 11 (production eval & monitoring) is the measurement seed 
 
 "Transform, not port" the seeds; agnosticize company-tagged framing (the seeds carry
 Google/Meta level tags and dated pricing — keep the *frameworks*, re-verify every number at
-authoring time per the freshness notes in the seed inventory).
+authoring time per the **Seed freshness notes** below).
+
+> **Seed freshness notes (vol08) — verified 2026-06-10.** The seed repo's velocity scanner flags
+> 25 HIGH "March 2026" `datedcontent` stamps in vol08, but those are mostly evergreen chapter
+> intros, *not* 25 distinct stale numbers (see hub roadmap v2 §7). The figures that actually need
+> re-checking at authoring time — and their current state as of 2026-06-10 — are concentrated in
+> vol08's appendices + cost/safety chapters:
+>
+> - **Frontier model lineup + pricing** (`appendix_c` model comparison, `appendix_b` API ref, `ch13`
+>   cost — all snapshot "Dec 2025"). The seed lists GPT-4o, Claude Sonnet 4 / Haiku 4, Gemini 2.0
+>   Pro/Flash — **all superseded**. Current ($/MTok in/out):
+>     - Anthropic — Opus 4.8 `claude-opus-4-8` $5/$25 (1M ctx) · Sonnet 4.6 `claude-sonnet-4-6` $3/$15
+>       (1M) · Haiku 4.5 `claude-haiku-4-5` $1/$5 (200K) · Fable 5 `claude-fable-5` $10/$50 (1M).
+>     - OpenAI — GPT-5.5 $5/$30 · GPT-5.4 $2.50/$15 · GPT-5.4 mini $0.75/$4.50 · o3 ~$2 in.
+>     - Google — Gemini 3.1 Pro $2/$12 (2M ctx) · Gemini 3.5 Flash $1.50/$9 (1M); **Gemini 2.0 Flash/Pro
+>       retired 1 Jun 2026.**
+>   Re-pull at authoring — provider pricing drifts.
+> - **Benchmark + embedding tables** (`appendix_c` MMLU/GSM8K/HumanEval + MTEB): the listed models no
+>   longer exist — **rebuild the tables around the current frontier**, don't patch the numbers.
+> - **API model IDs** (`appendix_b`): `claude-sonnet-4-20250514` → `claude-sonnet-4-6`; `gemini-2.0-pro`
+>   → a current Gemini 3.x id.
+> - **MCP / agent-framework landscape** (`ch08`): seed says "MCP supported by Claude, Cursor, Windsurf,
+>   Cline as of early 2026" — understated. MCP was **donated to the Linux Foundation Dec 2025**
+>   (OpenAI / Google / Microsoft co-sponsors); 10k+ public servers; first-party support now spans
+>   OpenAI/ChatGPT, Google/Gemini, Microsoft, GitHub, VS Code, Cursor.
+> - **OWASP LLM Top 10** (`ch11` safety → guide-3 Ch 8 guardrails): seed cites "v1.1, 2024" — current is
+>   the **2025 edition** (adds System Prompt Leakage = LLM07:2025, Vector & Embedding Weaknesses =
+>   LLM08:2025; Prompt Injection still LLM01).
+> - **GPU economics** (`ch13`: A100 ~$2/hr, H100 ~$4/hr): re-verify at authoring; rates have trended down.
 
 | Ch | Title | Primary seed (`~/interview_prep_series`) | Companion |
 |----|-------|------------------------------------------|-----------|
