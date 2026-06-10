@@ -1,8 +1,9 @@
-# Resume notes — guides-ai-engineering (as of 2026-06-09)
+# Resume notes — guides-ai-engineering (as of 2026-06-10)
 
-Part of the AI-native series roadmap (`~/guides/docs/plans/active/2026-06-04_session_handoff.md`
-is the canonical direction; `~/guides/docs/plans/active/2026-06-08_roadmap_audit.md` is the state
-audit). This is the **multi-guide** `guides-ai-engineering` repo — guides as Astro content
+Part of the AI-native series: **`~/guides/docs/plans/active/2026-06-10_series_roadmap_v2.md` is the
+canonical roadmap** (design doc: `~/guides/docs/design/2026-06-10_design_v0.4.md`); the earlier
+06-04 handoff + 06-08 audit are superseded (now in `~/guides/docs/plans/done/`). This is the
+**multi-guide** `guides-ai-engineering` repo — guides as Astro content
 collections under `src/content/<guide>/`, one shared `companion/` lib, per-guide capstones.
 
 ## Guides

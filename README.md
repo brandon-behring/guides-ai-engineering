@@ -1,9 +1,10 @@
 # guides-ai-engineering
 
 The **AI-native dimensions of AI engineering** — company-agnostic, interview-prep-led
-guides for engineers moving into AI-native roles. Deploys to
-`guides.brandon-behring.dev/ai-engineering/`; part of the
-[guides](https://github.com/brandon-behring/guides) hub.
+guides for engineers moving into AI-native roles. Will live at
+`guides.brandon-behring.dev/ai-engineering/` (the site launches when guide #2 is
+complete); until then, the chapters are readable as MDX under `src/content/`. Part
+of the [guides](https://github.com/brandon-behring/guides) hub.
 
 Multi-guide repo: each guide is an Astro **content collection**. Built with
 [`@brandon_m_behring/book-scaffold-astro`](https://github.com/brandon-behring/book-scaffold-astro)
@@ -28,18 +29,19 @@ Multi-guide repo: each guide is an Astro **content collection**. Built with
 
 | Guide | Status |
 | --- | --- |
-| **Evaluation & benchmarking** (`src/content/evaluation/`) | in progress — Ch 0, 2, 7 + `mini_eval` core |
+| **Evaluation & benchmarking** (`src/content/evaluation/`) | **complete** — 13 chapters, independently reviewed; `mini_eval` companion |
+| **LLM application engineering** (`src/content/llm-app-engineering/`) | in progress — Ch 0–1 of ~13; `mini_rag` companion seeded |
 
-(llm-app-engineering, production, craft, working-with-AI to follow.)
+(Production AI systems is next; more to follow.)
 
 ## Layout
 
 ```
-src/content/evaluation/   chapters (MDX)
-src/components/            Preact island demos (ThresholdExplorer, JudgeBiasExplorer)
-src/data/                  precomputed demo JSON (generated, see scripts/)
-companion/                 the build-your-own companion lib (mini_eval) + tests
-scripts/build_demo_data.py generates the demo JSON from mini_eval
+src/content/<guide>/       chapters (MDX), one folder per guide
+src/components/            Preact island demos (ThresholdExplorer, JudgeBiasExplorer, …)
+src/data/                  demo JSON — computed (see scripts/) or hand-authored (quizzes)
+companion/                 build-your-own companion libs (mini_eval, mini_rag) + tests
+scripts/build_demo_data.py generates the computed demo JSON from the companion libs
 ```
 
 ## Develop
@@ -49,10 +51,13 @@ npm install
 npm run dev                      # local dev server
 npm run build                    # production build
 python3 companion/tests/test_mini_eval.py   # companion correctness tests
-python3 scripts/build_demo_data.py          # regenerate demo data
+python3 companion/tests/test_mini_rag.py    # companion correctness tests
+python3 scripts/build_demo_data.py          # regenerate computed demo data
 ```
 
 ## License
 
-Content CC BY 4.0; code (companion, scripts, components) MIT. AI-collaboration
-disclosure: see `/ai-engineering/authors`.
+Content (chapter prose/MDX, figures): **CC BY 4.0** — see [`LICENSE`](LICENSE).
+Code (`companion/`, `scripts/`, `src/` components + config): **MIT** — see
+[`LICENSE-MIT`](LICENSE-MIT). AI-collaboration disclosure: see
+`/ai-engineering/authors`.
