@@ -848,6 +848,85 @@ def budget_demo() -> dict:
     }
 
 
+def agent_loop_demo() -> dict:
+    """Four real runs of mini_agent.run_agent for the guide-2 Ch 8 island:
+    the competent path (facts -> policy -> gated write), the gate holding on
+    a gift card, a hallucinated tool surfaced-and-recovered, and the loop
+    guard ending a stuck agent. Scripted policies, deterministic; every
+    thought/action/observation below is actual loop output."""
+    import mini_agent.tools as agent_tools
+    from mini_agent import (run_agent, make_support_tools,
+                            support_policy, confused_policy, stuck_policy)
+
+    tools = make_support_tools()
+    writes = {t.name: t.writes for t in tools}
+
+    scenarios_spec = [
+        {"key": "happy", "label": "Eligible refund",
+         "goal": "Customer: please refund order 18342",
+         "policy": support_policy,
+         "predict": ("Three tools are available, one of which moves money. "
+                     "In what order will a competent agent use them — and how "
+                     "many steps until it's done?"),
+         "lesson": ("Facts first (order_status), policy second (policy_lookup), and "
+                    "only then the write — with the eligibility reasoning recorded in "
+                    "the thoughts. The trace is the audit log.")},
+        {"key": "gate", "label": "The gate holds",
+         "goal": "Customer: please refund order 20117 (a gift card)",
+         "policy": support_policy,
+         "predict": ("The order is a gift card, and the policy says those are "
+                     "non-refundable. Will start_refund get called anyway?"),
+         "lesson": ("The write tool never fired: the policy checked category before "
+                    "eligibility and refused with the reason. A wrong READ is free to "
+                    "retry; a wrong WRITE is an incident — gate the writes.")},
+        {"key": "hallucinated", "label": "Hallucinated tool",
+         "goal": "Customer: what's the refund policy for order 18342?",
+         "policy": confused_policy,
+         "predict": ("This agent's first move is to call check_warranty — a tool "
+                     "that doesn't exist. Crash, or recover?"),
+         "lesson": ("The unknown tool became an observation, not an exception — and "
+                    "the error message listed what IS available, so the very next step "
+                    "recovered. Tool errors the model can read are a design choice.")},
+        {"key": "stuck", "label": "Stuck loop",
+         "goal": "Customer: please refund order 18342",
+         "policy": stuck_policy,
+         "predict": ("This agent re-checks the order status forever. What stops "
+                     "it — and after how many steps?"),
+         "lesson": ("The loop guard aborted after the same (tool, args) repeated: "
+                    "no progress, only spend. Without it, max_steps is the only "
+                    "backstop — and every wasted step is a paid LLM call in production.")},
+    ]
+
+    out = []
+    for spec in scenarios_spec:
+        agent_tools._REFUNDS_STARTED.clear()
+        trace = run_agent(spec["goal"], tools, spec["policy"], max_steps=8)
+        out.append({
+            "key": spec["key"], "label": spec["label"], "goal": spec["goal"],
+            "predict": spec["predict"], "lesson": spec["lesson"],
+            "status": trace.status, "answer": trace.answer,
+            "steps": [{
+                "n": i + 1,
+                "thought": s.thought,
+                "tool": s.action.tool if s.action else None,
+                "args": (", ".join(f"{k}={v!r}" for k, v in s.action.args.items())
+                         if s.action else ""),
+                "writes": bool(s.action and writes.get(s.action.tool, False)),
+                "observation": s.observation,
+            } for i, s in enumerate(trace.steps)],
+        })
+
+    return {
+        "name": "One loop, four traces",
+        "note": ("Every trace is real run_agent output over scripted policies — "
+                 "deterministic stand-ins for the LLM in the reasoning seat. The "
+                 "loop, tools, guards, and gates are exactly what production keeps."),
+        "tools": [{"name": t.name, "description": t.description, "writes": t.writes}
+                  for t in tools],
+        "scenarios": out,
+    }
+
+
 def agent_demo() -> dict:
     """pass@k curves for a flaky vs a reliable agent, for the Ch 10 island. Each
     suite is 40 tasks sampled K times; pass@k rises with attempts, but pass@1 (the
@@ -913,6 +992,7 @@ def main() -> None:
         ("rag_compare_demo", rag_compare_demo()),
         ("rag_upgrade_demo", rag_upgrade_demo()),
         ("budget_demo", budget_demo()),
+        ("agent_loop_demo", agent_loop_demo()),
         ("agent_demo", agent_demo()),
         ("monitoring_demo", monitoring_demo()),
     ]:

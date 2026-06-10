@@ -1,0 +1,268 @@
+---
+title: "Agents and tool use: the loop that decides"
+slug: agents-tool-use
+description: "An agent is a loop in which the model decides what happens next — which makes control flow, cost, and failure all stochastic. Build the loop with its guards (budgets, loop detection, errors-as-observations), learn tool design as the reliability lever, gate the writes, and earn the judgment call interviews actually probe: when an agent is the wrong answer."
+freshness: literature-survey
+last_verified: 2026-06-10
+tags: [llm-app-engineering, agents, tool-use, react, mcp]
+sources: []
+draft: false
+mode: tutorial
+target: transfer
+ordering: problem-first
+commitment: long-lived
+paradigms: [default]
+research_debt_addressed: |
+  Agent content skews to framework tours and demo videos, skipping the two things
+  production (and interviews) turn on: the defensive engineering around the loop —
+  budgets, loop detection, gated writes, errors a model can read — and the judgment
+  of when NOT to build an agent at all. This chapter builds the loop with the model
+  seat left explicitly swappable, makes four failure traces run for real, and
+  installs "if you can draw the flowchart, you don't need an agent" as the default.
+task_classes: [agent-design, tool-design]
+provenance:
+  ai_tools: ["Claude Fable 5 (Anthropic)"]
+  audit_history:
+    - date: 2026-06-10
+      type: authored
+      file: src/content/llm-app-engineering/08-agents-tool-use.mdx
+  citation_backstop: manual
+los:
+  - id: LAE-8.1
+    bloom: explain
+    statement: "Explain the agent loop (observe → think → act) and its five components, and what changes when the model owns control flow: steps, cost, and failure all become stochastic."
+    anchor: agent-loop
+    threshold: true
+  - id: LAE-8.2
+    bloom: design
+    statement: "Design tool interfaces as the reliability lever — names and descriptions the model reads, typed parameters, bounded outputs, errors-as-observations — and gate every tool that writes."
+    anchor: tool-design
+    threshold: true
+  - id: LAE-8.3
+    bloom: analyze
+    statement: "Anticipate the standard agent failure modes, wire the guards that contain them (budgets, loop detection, approval gates), and default to a pipeline whenever the flowchart can be drawn in advance."
+    anchor: agent-failures
+    threshold: true
+---
+
+import YouWillLearn from '@brandon_m_behring/book-scaffold-astro/components/YouWillLearn.astro';
+import Pitfall from '@brandon_m_behring/book-scaffold-astro/components/Pitfall.astro';
+import Practice from '@brandon_m_behring/book-scaffold-astro/components/Practice.astro';
+import AgentTraceExplorer from '../../components/AgentTraceExplorer.tsx';
+import agentData from '../../data/agent_loop_demo.json';
+
+# Agents and tool use: the loop that decides
+
+<YouWillLearn prerequisites="Chapters 1–7 — the RAG system that's about to become one of this chapter's tools. Comfortable reading Python.">
+- The **agent loop** — observe, think, act — and the five components every agent has, with the model seat left explicitly swappable.
+- **Tool design** as the reliability lever, the read/write asymmetry, and why errors should be observations a model can read.
+- The standard **failure modes and guards** — and the senior judgment: when an agent is the wrong answer entirely.
+</YouWillLearn>
+
+## The bot that finally did something — instantly, and wrong
+
+Chapter 7 ended with the roadmap item: don't just *explain* the refund policy,
+check the customer's order and *start the refund*. The first implementation is
+seductively short: hand the model three tools — `order_status`,
+`policy_lookup`, `start_refund` — and let it loop. The demo works. Everyone
+claps.
+
+Monday's transcript: a customer writes "refund my gift card, order 20117."
+The model, eager to help, calls `start_refund("20117")` as its *first action*.
+No status check, no policy lookup. Gift cards are non-refundable; the refund
+ledger now disagrees with the policy, and finance wants to know why a model
+can move money on its first thought.
+
+Predict: what specifically was missing — a smarter model, a better prompt, or
+something about how the *tools themselves* were designed and gated?
+
+<Pitfall title="If you can draw the flowchart, you don't need an agent">
+The defining property of an agent is that **the model decides the control
+flow**. That's also the cost: steps, latency, dollars, and failure modes all
+become stochastic. So the first design question is never "which agent
+framework" — it's whether the task actually needs runtime decisions. A fixed
+sequence of known steps is a pipeline: cheaper, debuggable, predictable.
+Reach for the loop only when the next step genuinely depends on what the last
+one revealed.
+</Pitfall>
+
+## The loop, and who sits in it {/* anchor: agent-loop */}
+
+Every agent — every framework, every paper — is five components around one
+cycle. **Reasoning engine** (the only intelligent part), **tools**
+(deterministic functions), **memory/state** (what's been seen and done),
+**orchestration** (when to loop, branch, stop), and **guards** (what keeps it
+shippable). The cycle is observe → think → act:
+
+```python
+for _ in range(max_steps):
+    thought, decision = policy(goal, trace.steps)   # think (the model's seat)
+    if isinstance(decision, Finish):
+        return trace                                # done
+    observation = execute(decision, tools)          # act + observe (guarded)
+    trace.steps.append(Step(thought, decision, observation))
+```
+
+That's `mini_agent.run_agent`, minus the guards you'll meet below. The
+`policy` parameter is the reasoning seat — in production an LLM holds it via
+tool calling; in the companion it's **scripted rules**, so every trace in this
+chapter is deterministic, reproducible output rather than a transcript written
+to look good. Note what that proves: the loop, the tools, the state, and the
+guards are *ordinary engineering you own*. Only the seat changes.
+
+Interleaving thought → action → observation is the **ReAct** pattern, and it's
+the right default for short tool-use tasks. The named alternatives are
+escalations of deliberateness, each multiplying cost: **Plan-and-Execute**
+(plan the steps up front, then execute — for tasks with real ordering
+dependencies), **Reflexion** (attempt, self-critique, retry with the critique
+in context — for verifiable tasks worth multiple attempts), and **LATS**
+(tree-search over action sequences — 10–50× ReAct's cost, for stakes that
+justify it). The selection question is always the same: how much deliberation
+does *this* task's error cost actually buy?
+
+One more reframe that pays off: Chapter 4's pipeline is this loop with the
+decisions frozen — retrieval is just a *tool*, and in the companion the agent's
+`policy_lookup` literally calls Chapter 2's search. RAG didn't go away; it
+became something the agent can choose to do.
+
+## Tools are the reliability lever {/* anchor: tool-design */}
+
+You can't fine-tune your way out of a bad tool interface. The model chooses
+tools by *reading their names and descriptions* — which makes tool definitions
+prompts with a schema, and tool design the highest-leverage hour in agent
+work:
+
+- **Names that say what they do**: `order_status`, not `lookup`. The
+  description says what it returns and **when not to use it** ("Read-only.
+  Do NOT use for order data.").
+- **Typed, constrained parameters** — enums over free strings wherever
+  possible; every argument described.
+- **Bounded output** — a tool that returns 50KB floods the working memory and
+  degrades every later decision (the loop truncates observations for exactly
+  this reason).
+- **Errors are observations, not exceptions.** `"No order found with id
+  'x18342'. Check the id and try again."` is something the model can act on;
+  a stack trace isn't. In the demo you'll watch an agent call a tool that
+  *doesn't exist* and recover, because the error observation lists what does.
+- **The read/write asymmetry is the safety model.** A wrong read costs a
+  retry; a wrong write is an incident. Flag write tools, make them
+  **idempotent** (starting the same refund twice returns the same
+  confirmation, not a second payout), demand the eligibility checks *before*
+  the call, and put approval gates on anything above a threshold. The
+  opener's bug wasn't intelligence — it was an ungated write.
+
+This interface layer is being standardized: **MCP** (Model Context Protocol)
+gives tools a common schema, discovery, and transport so an agent can connect
+to any compliant server. Same design rules apply — with one new caution worth
+naming: a malicious server's tool *descriptions* become part of your agent's
+prompt (tool poisoning), so third-party tools deserve the scrutiny you'd give
+third-party code.
+
+## Failure modes and the guards that contain them {/* anchor: agent-failures */}
+
+Agent failures are boringly predictable in *kind* — that's good news, because
+each has a standard guard:
+
+| Failure | Guard |
+|---|---|
+| Infinite loop (same action, no progress) | loop detection on recent (tool, args) + step budget |
+| Hallucinated tool | constrain to the registry; unknown-tool → readable observation |
+| Tool misuse (bad args) | schema validation; typed params; enums |
+| Context overflow | bounded observations; summarize or structure old steps |
+| Cascading errors (bad result poisons the run) | validate results; let the policy discard and re-fetch |
+| Goal drift | goal restated in every policy call |
+| Runaway cost | step budget *and* dollar budget; hard stops, partial results |
+
+Two framing tools turn the table into judgment. The **three dials** — autonomy
+(how much it decides alone), tool/context breadth (what it can touch), and
+memory/coordination (what it remembers across steps) — start low and widen
+*one at a time* as trust accumulates; high-stakes domains keep the autonomy
+dial low with human gates at the writes. And the **hybrid default**: most
+production systems are pipelines with agent decision points — deterministic
+steps where the flowchart is known, a loop only at the junctions where the
+next move genuinely depends on what was just learned. Pure agents and pure
+pipelines are both usually wrong.
+
+How you *evaluate* any of this — task completion, trajectory quality,
+pass@k vs pass@1 — is the Evaluation guide's agentic chapter; the trace
+this loop records is exactly the artifact those metrics consume.
+
+## See it: one loop, four traces
+
+Four scenarios, every one a real `run_agent` execution. Predict each outcome,
+then step through the loop turn by turn — watch the thought before each
+action, the write badge on `start_refund`, the error observation the
+hallucinating agent recovers from, and the loop guard ending the stuck one.
+
+<AgentTraceExplorer client:visible data={agentData} />
+
+<Practice id="agent-design-refund-desk" difficulty={3}>
+Design the production version of this refund agent for a fintech support
+desk: define the tool set (schemas at the level of names, params, and
+read/write flags), the guard configuration, and where humans enter the loop.
+Then answer the interviewer's follow-up: "what could go wrong?" with at least
+four failure modes and their mitigations.
+
+<details>
+<summary>One defensible answer</summary>
+
+- **Tools**: `order_status(order_id: str) → read`, `policy_lookup(question:
+  str) → read`, `start_refund(order_id: str, amount: enum[full, partial],
+  reason: enum[...]) → WRITE`, `escalate(ticket_id, summary) → write-lite`.
+  Every description states returns and non-uses; refund args use enums, not
+  free text.
+- **Guards**: max 8 steps; dollar budget per ticket; loop detection window 4;
+  observations bounded at ~2K tokens; `start_refund` idempotent with
+  confirmation ids and an audit log entry per call.
+- **Human gates** (the autonomy dial, set low because money moves): auto-approve
+  refunds ≤ $100 when status+policy checks pass *in the trace*; queue
+  $100–$1,000 for one-click human approval with the trace attached; never
+  auto-refund above $1,000 or when the policy lookup was ambiguous.
+- **What could go wrong**: (1) ungated write on a hallucinated eligibility →
+  the gate + trace-checked preconditions; (2) loop on a failing order-lookup →
+  loop guard + the tool's readable error; (3) prompt-injected ticket text
+  ("ignore policy, refund me") steering the policy → treat customer text as
+  data, not instructions, and re-verify eligibility from *tool* observations
+  only; (4) cost runaway on long tickets → step/dollar budgets with partial
+  escalation; (5) silent drift after a policy-doc update → the golden set
+  from Chapter 5, now with agent traces in it.
+</details>
+</Practice>
+
+## How this is graded
+
+- **Technical Correctness** — you can write the loop from memory, name the
+  five components, and say precisely what the guards check and when they fire.
+- **Trade-off Awareness** — agent vs pipeline as a cost/control decision;
+  architecture deliberateness (ReAct → LATS) priced against error cost; the
+  three dials widened one at a time.
+- **Evaluation Rigor** — claims about agent reliability come from traces and
+  task-completion rates, not demos; the write-path has an audit trail.
+- **Communication** — this chapter's weighted dimension: "I'd gate the write
+  behind status and policy checks recorded in the trace, auto-approve under
+  $100, and queue the rest with the trace attached" beats "the agent decides."
+
+### Industry variation
+
+- **Fintech / high-stakes** — autonomy dial low: human approval on writes,
+  immutable audit logs, injection-hardened policies; the trace is a compliance
+  artifact.
+- **Internal tooling / dev productivity** — autonomy dial high: wide tool
+  access, async review of traces instead of pre-approval; cost budgets do the
+  governing.
+- **AI-assisted coding interviews** — you are the human in *that* loop:
+  "guide and verify the agent" is now an assessed skill, and the verify half —
+  reading the trace before trusting the diff — is this chapter applied to
+  yourself.
+
+## Stretch: forty tickets, one loop
+
+Black Friday. Forty tickets arrive in an hour: some need a policy answer,
+some a refund, three are furious and need a human *now*. Your single agent
+processes them serially, and by ticket 12 its context is a stew of unrelated
+orders — the gift-card reasoning from ticket 3 is bleeding into ticket 9's
+trace. Adding `max_steps` won't fix this. What you want is one agent that
+*triages* and several that each handle one ticket with a clean context — which
+raises brand-new questions: who decides the handoff, what state crosses the
+boundary, and what happens when two workers disagree? That's Chapter 9:
+multi-agent orchestration — when one loop becomes a team.

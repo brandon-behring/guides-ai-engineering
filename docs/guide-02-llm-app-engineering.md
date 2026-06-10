@@ -42,7 +42,13 @@ demand spine: `~/guides/docs/research/role_demand_and_interview_signals/`.
   cascade blending, cache discount, self-host break-even; tests 29/29) + `BudgetExplorer`
   island (computed `budget_demo.json`: 4-lever grid, SLA badge, TTFT-vs-decode bar).
   Complements guide-1 Ch 11 (eval-side monitoring) with the builder's instrumentation.
-- **Next:** Ch 8 (Agents & tool use) — seeds `mini_agent.loop`.
+- **Ch 8 authored** — NEW companion package `mini_agent` (loop.py: Tool/Action/Finish/
+  Step/AgentTrace + run_agent with guards — loop detection, unknown-tool-as-observation,
+  bounded obs, step budget; tools.py: toy support desk w/ gated WRITE + scripted policies
+  incl. broken ones; 7/7 tests) + `AgentTraceExplorer` island (computed
+  `agent_loop_demo.json`: 4 real traces — happy/gate-holds/hallucinated-tool/stuck-loop).
+  `policy_lookup` reuses mini_rag (RAG-as-a-tool).
+- **Next:** Ch 9 (Multi-agent orchestration) — extends `mini_agent`.
 
 ## Spine & outline (RAG-centric, ~13 ch)
 

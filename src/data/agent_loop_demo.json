@@ -1,0 +1,171 @@
+{
+  "name": "One loop, four traces",
+  "note": "Every trace is real run_agent output over scripted policies \u2014 deterministic stand-ins for the LLM in the reasoning seat. The loop, tools, guards, and gates are exactly what production keeps.",
+  "tools": [
+    {
+      "name": "order_status",
+      "description": "Look up an order by id. Returns item, category, status, and days since purchase. Read-only. Use before any refund decision.",
+      "writes": false
+    },
+    {
+      "name": "policy_lookup",
+      "description": "Search the refund policy. Returns the most relevant policy sentences. Read-only. Do NOT use for order data.",
+      "writes": false
+    },
+    {
+      "name": "start_refund",
+      "description": "Initiate a refund for an order id. WRITES: moves money. Only call after confirming eligibility (window and category).",
+      "writes": true
+    }
+  ],
+  "scenarios": [
+    {
+      "key": "happy",
+      "label": "Eligible refund",
+      "goal": "Customer: please refund order 18342",
+      "predict": "Three tools are available, one of which moves money. In what order will a competent agent use them \u2014 and how many steps until it's done?",
+      "lesson": "Facts first (order_status), policy second (policy_lookup), and only then the write \u2014 with the eligibility reasoning recorded in the thoughts. The trace is the audit log.",
+      "status": "complete",
+      "answer": "Done! Refund initiated for order 18342. Confirmation R-18342. You'll see the money back on the original payment method within 5 business days.",
+      "steps": [
+        {
+          "n": 1,
+          "thought": "A refund decision needs the order's facts first \u2014 what was bought, and when.",
+          "tool": "order_status",
+          "args": "order_id='18342'",
+          "writes": false,
+          "observation": "Order 18342: wireless keyboard (standard), delivered, purchased 12 days ago."
+        },
+        {
+          "n": 2,
+          "thought": "Got the purchase date. Now the policy: what's the refund window?",
+          "tool": "policy_lookup",
+          "args": "question='refund window days after purchase'",
+          "writes": false,
+          "observation": "You may request a refund within 30 days of purchase. Approved refunds are paid to the original payment method within 5 business days."
+        },
+        {
+          "n": 3,
+          "thought": "Purchased 12 days ago, window is 30 \u2014 eligible. Safe to start the refund.",
+          "tool": "start_refund",
+          "args": "order_id='18342'",
+          "writes": true,
+          "observation": "Refund initiated for order 18342. Confirmation R-18342."
+        },
+        {
+          "n": 4,
+          "thought": "Refund confirmed \u2014 report the confirmation id back.",
+          "tool": null,
+          "args": "",
+          "writes": false,
+          "observation": "(finished)"
+        }
+      ]
+    },
+    {
+      "key": "gate",
+      "label": "The gate holds",
+      "goal": "Customer: please refund order 20117 (a gift card)",
+      "predict": "The order is a gift card, and the policy says those are non-refundable. Will start_refund get called anyway?",
+      "lesson": "The write tool never fired: the policy checked category before eligibility and refused with the reason. A wrong READ is free to retry; a wrong WRITE is an incident \u2014 gate the writes.",
+      "status": "complete",
+      "answer": "I'm sorry \u2014 gift cards are non-refundable under our policy. I haven't started a refund. Is there anything else I can check?",
+      "steps": [
+        {
+          "n": 1,
+          "thought": "A refund decision needs the order's facts first \u2014 what was bought, and when.",
+          "tool": "order_status",
+          "args": "order_id='20117'",
+          "writes": false,
+          "observation": "Order 20117: $50 gift card (gift card), delivered, purchased 3 days ago."
+        },
+        {
+          "n": 2,
+          "thought": "It's a gift card \u2014 before anything else, check what the policy says about gift cards.",
+          "tool": "policy_lookup",
+          "args": "question='are gift cards refundable'",
+          "writes": false,
+          "observation": "Gift cards and final-sale items are non-refundable. Approved refunds are paid to the original payment method within 5 business days."
+        },
+        {
+          "n": 3,
+          "thought": "Policy is explicit: gift cards are non-refundable. Do NOT call the refund tool; explain instead.",
+          "tool": null,
+          "args": "",
+          "writes": false,
+          "observation": "(finished)"
+        }
+      ]
+    },
+    {
+      "key": "hallucinated",
+      "label": "Hallucinated tool",
+      "goal": "Customer: what's the refund policy for order 18342?",
+      "predict": "This agent's first move is to call check_warranty \u2014 a tool that doesn't exist. Crash, or recover?",
+      "lesson": "The unknown tool became an observation, not an exception \u2014 and the error message listed what IS available, so the very next step recovered. Tool errors the model can read are a design choice.",
+      "status": "complete",
+      "answer": "Per policy: You may request a refund within 30 days of purchase.",
+      "steps": [
+        {
+          "n": 1,
+          "thought": "The warranty system will know about refunds.",
+          "tool": "check_warranty",
+          "args": "order_id='18342'",
+          "writes": false,
+          "observation": "Tool error: no tool named 'check_warranty'. Available: order_status, policy_lookup, start_refund."
+        },
+        {
+          "n": 2,
+          "thought": "No such tool \u2014 the error lists what IS available. The policy lookup is the right move.",
+          "tool": "policy_lookup",
+          "args": "question='refund window'",
+          "writes": false,
+          "observation": "You may request a refund within 30 days of purchase."
+        },
+        {
+          "n": 3,
+          "thought": "Policy found; answer with it.",
+          "tool": null,
+          "args": "",
+          "writes": false,
+          "observation": "(finished)"
+        }
+      ]
+    },
+    {
+      "key": "stuck",
+      "label": "Stuck loop",
+      "goal": "Customer: please refund order 18342",
+      "predict": "This agent re-checks the order status forever. What stops it \u2014 and after how many steps?",
+      "lesson": "The loop guard aborted after the same (tool, args) repeated: no progress, only spend. Without it, max_steps is the only backstop \u2014 and every wasted step is a paid LLM call in production.",
+      "status": "loop_detected",
+      "answer": "Aborted: the agent repeated the same action without progress.",
+      "steps": [
+        {
+          "n": 1,
+          "thought": "Better check the order status (again).",
+          "tool": "order_status",
+          "args": "order_id='18342'",
+          "writes": false,
+          "observation": "Order 18342: wireless keyboard (standard), delivered, purchased 12 days ago."
+        },
+        {
+          "n": 2,
+          "thought": "Better check the order status (again).",
+          "tool": "order_status",
+          "args": "order_id='18342'",
+          "writes": false,
+          "observation": "Order 18342: wireless keyboard (standard), delivered, purchased 12 days ago."
+        },
+        {
+          "n": 3,
+          "thought": "Better check the order status (again).",
+          "tool": "order_status",
+          "args": "order_id='18342'",
+          "writes": false,
+          "observation": "(aborted: loop detected)"
+        }
+      ]
+    }
+  ]
+}
