@@ -1,0 +1,71 @@
+{
+  "name": "Diagnose the gap in the design answer",
+  "note": "Five excerpts from system-design answers. Each has one critical gap. Name it — and the framework step (or rubric dimension) it violates — before revealing.",
+  "items": [
+    {
+      "id": "boxes-first",
+      "prompt": "Interviewer: \"Design a support AI for a mid-size bank.\" Candidate, first sentence: \"I'd use a frontier model with a vector database — let me draw the RAG pipeline.\" What's the gap?",
+      "candidates": [
+        "Step 1 was skipped: no clarification of requirements (scale, latency SLO, what 'support' covers, the regulatory constraint) — the architecture might be right, but the candidate can't know that yet",
+        "The architecture is wrong — banks can't use vector databases",
+        "Nothing — decisiveness is a senior signal",
+        "The candidate should have written code first"
+      ],
+      "correct": "Step 1 was skipped: no clarification of requirements (scale, latency SLO, what 'support' covers, the regulatory constraint) — the architecture might be right, but the candidate can't know that yet",
+      "explanation": "Jumping without clarifying is a top documented rejection reason, and in a bank scenario it's fatal: the unasked questions (Can the bot access account data? What's the hallucination tolerance? Escalation path?) change the entire design. You earn the right to draw boxes by framing the problem first — five minutes that determine whether the next forty are relevant.",
+      "principle": "Earn the right to draw boxes: clarify inputs, outputs, scale, SLOs, and the feared failure first."
+    },
+    {
+      "id": "no-eval",
+      "prompt": "A candidate delivers a polished architecture — router, RAG, tools, fallbacks — and finishes with time to spare. The interviewer asks: \"How would you know it's working?\" The candidate improvises. Which step was missing?",
+      "candidates": [
+        "Step 5 — eval and production: a golden set as a CI gate, sampled live-traffic judging, business-metric mapping, and SLO-based monitoring should have been volunteered, not extracted",
+        "Step 2 — the architecture needed more boxes",
+        "Nothing — eval is the interviewer's job to ask about",
+        "Step 3 — the candidate should have gone deeper on the embedding model"
+      ],
+      "correct": "Step 5 — eval and production: a golden set as a CI gate, sampled live-traffic judging, business-metric mapping, and SLO-based monitoring should have been volunteered, not extracted",
+      "explanation": "Eval strategy is what separates AI system design from generic system design — and bringing it up unprompted is among the strongest senior signals available. The template is five sentences: offline golden set as a deploy gate, online shadow eval on sampled traffic, AI-metrics mapped to business KPIs, SLOs with alerting, and A/B for changes. Volunteer it before being asked.",
+      "principle": "\"How would you know it's working?\" decides seniority — answer it before it's asked."
+    },
+    {
+      "id": "false-tradeoff",
+      "prompt": "Candidate: \"There's a trade-off between using structured output and free text for the JSON the downstream service parses — I'll weigh both.\" What's wrong?",
+      "candidates": [
+        "It's a manufactured trade-off: for schema-constrained output consumed by code, structured output dominates — performing 'balance' where a dominant option exists signals inexperience, not seniority",
+        "Nothing — every decision should be presented as a trade-off",
+        "Free text is actually better for JSON",
+        "The candidate should let the interviewer decide"
+      ],
+      "correct": "It's a manufactured trade-off: for schema-constrained output consumed by code, structured output dominates — performing 'balance' where a dominant option exists signals inexperience, not seniority",
+      "explanation": "Trade-off articulation is the highest-signal moment in a design interview — but only for genuine tensions (strictness vs escalation rate, latency vs validation depth, cost vs quality). When one option dominates, say so and move on. The senior sentence pattern is: 'I chose X over Y because the requirement is Z — and if Z changed, I'd reconsider.'",
+      "principle": "Articulate real tensions; name dominant solutions as dominant. Fake balance reads as inexperience."
+    },
+    {
+      "id": "happy-path",
+      "prompt": "A design for the bank bot covers routing, retrieval, generation, and eval — and never once mentions what happens when a component fails or the bot doesn't know. Which dimension is bleeding points?",
+      "candidates": [
+        "Trade-off Awareness / failure thinking — Step 4 exists because 'what happens when the model is wrong?' has a designed answer in strong systems: validation gates, calibrated abstention, and a human fallback that transfers context",
+        "Technical Correctness — the components named were wrong",
+        "Communication — the candidate spoke too slowly",
+        "None — failure handling is an implementation detail"
+      ],
+      "correct": "Trade-off Awareness / failure thinking — Step 4 exists because 'what happens when the model is wrong?' has a designed answer in strong systems: validation gates, calibrated abstention, and a human fallback that transfers context",
+      "explanation": "Describing the happy path is the IC4 ceiling. The bank scenario is chosen by interviewers precisely because its feared failure (a hallucinated balance or fee) has regulatory teeth — the expected answer designs the failure path as a first-class component: output validation, an 'I don't know' that's preferred to a guess, and escalation that hands the human the full context.",
+      "principle": "Design the failure path as a component, not a caveat: validation, abstention, escalation-with-context."
+    },
+    {
+      "id": "depth-cue",
+      "prompt": "Mid-interview, the interviewer says: \"Tell me more about how you'd validate the bot's answers.\" The candidate replies with the next framework step: \"Sure — but first, the high-level architecture has three more components...\" What went wrong?",
+      "candidates": [
+        "The candidate missed the depth cue: when the interviewer points at a component, the framework yields — you dive deep there (validation stages, thresholds, fallback behavior), not march on",
+        "Nothing — frameworks must be completed in order",
+        "The interviewer broke protocol by interrupting",
+        "The candidate should have asked for more time"
+      ],
+      "correct": "The candidate missed the depth cue: when the interviewer points at a component, the framework yields — you dive deep there (validation stages, thresholds, fallback behavior), not march on",
+      "explanation": "The framework is scaffolding, not a script. Interviewers steer toward what they want to grade — a pointed question is an invitation to demonstrate depth (here: schema checks on citations, an entailment model against retrieved context, confidence gating with escalation). Following the cue shows the structure was serving you, not the reverse.",
+      "principle": "The framework bends to the interviewer's cues — depth on request beats coverage on rails."
+    }
+  ]
+}

@@ -1,0 +1,260 @@
+---
+title: "Capstone: design an LLM application, under interview conditions"
+slug: system-design-capstone
+description: "Forty-five minutes, one sentence: 'Design a customer-support AI for a mid-size bank.' The capstone assembles the whole guide into the 5-step framework that drives an AI system-design interview — problem framing, architecture, deep dive, trade-offs, eval — with a worked bank-bot mock, a diagnose-the-gap drill, and the four-dimension rubric as your scorecard."
+freshness: literature-survey
+last_verified: 2026-06-10
+tags: [llm-app-engineering, system-design, capstone, rubric]
+sources: []
+draft: false
+mode: tutorial
+target: transfer
+ordering: problem-first
+commitment: long-lived
+paradigms: [default]
+research_debt_addressed: |
+  System-design questions are where every other chapter's skill is graded at once,
+  and where candidates fail structurally: jumping to architecture, narrating happy
+  paths, never volunteering an eval strategy. This capstone mirrors the Evaluation
+  guide's capstone pattern — a sequencing framework that is the guide in order, a
+  worked mock on the canonical bank scenario, a gap-diagnosis drill, and the rubric
+  made explicit — so the assembly is practiced, not assumed.
+task_classes: [system-design, rubric-self-assessment]
+provenance:
+  ai_tools: ["Claude Fable 5 (Anthropic)"]
+  audit_history:
+    - date: 2026-06-10
+      type: authored
+      file: src/content/llm-app-engineering/11-system-design-capstone.mdx
+  citation_backstop: manual
+los:
+  - id: LAE-11.1
+    bloom: design
+    statement: "Drive a 45-minute AI system-design interview with the 5-step framework — problem framing, high-level architecture, component deep dive, trade-offs and failure modes, eval and production — on a realistic time budget."
+    anchor: five-steps
+    threshold: true
+  - id: LAE-11.2
+    bloom: analyze
+    statement: "Diagnose the critical gap in a partial design answer and map it to the framework step and rubric dimension it violates."
+    anchor: diagnose-gap
+    threshold: true
+  - id: LAE-11.3
+    bloom: explain
+    statement: "Articulate trade-offs the senior way — 'X over Y because Z; if Z changed, I'd reconsider' — and self-assess a design answer against the four-dimension rubric."
+    anchor: tradeoff-talk
+    threshold: true
+---
+
+import YouWillLearn from '@brandon_m_behring/book-scaffold-astro/components/YouWillLearn.astro';
+import Pitfall from '@brandon_m_behring/book-scaffold-astro/components/Pitfall.astro';
+import WorkedExample from '@brandon_m_behring/book-scaffold-astro/components/WorkedExample.astro';
+import NoteBox from '@brandon_m_behring/book-scaffold-astro/components/NoteBox.astro';
+import Practice from '@brandon_m_behring/book-scaffold-astro/components/Practice.astro';
+import ScenarioQuiz from '../../components/ScenarioQuiz.tsx';
+import capstoneData from '../../data/capstone_design_demo.json';
+
+# Capstone: design an LLM application, under interview conditions
+
+<YouWillLearn prerequisites="Chapters 1–10 — this chapter assembles them.">
+- The **5-step framework** that drives the 45 minutes — and the time budget that keeps it honest.
+- A **worked mock** on the canonical scenario: the bank bot with zero hallucination tolerance.
+- **Trade-off articulation** as the senior signal, and the **four-dimension rubric** as your explicit scorecard.
+</YouWillLearn>
+
+## Forty-five minutes, one sentence
+
+The interviewer smiles and says it: *"Design a customer-support AI for a
+mid-size bank."* Whiteboard marker in your hand. Everything from this guide is
+relevant — prompts, retrieval, chunking, eval, budgets, agents, the
+fine-tuning question — and that's precisely the trap: you know forty-five
+minutes of material per *chapter*, and you have forty-five minutes total.
+
+Predict: what do you spend the first five minutes on — and what should the
+interviewer hear *before* any architecture word like "RAG" or "agent" leaves
+your mouth?
+
+<Pitfall title="You have to earn the right to draw boxes">
+The most common system-design failure is structural, not technical: jumping to
+architecture. "I'd use a frontier model with a vector DB" as an opener signals
+the exact jumping-without-clarifying failure that rejects more candidates than
+any knowledge gap. The bank sentence is deliberately underspecified — what
+does "support" cover? can the bot see account data? what's the hallucination
+tolerance? what scale, what latency? — and asking is not stalling. Asking *is*
+the demonstration.
+</Pitfall>
+
+## The five steps are this guide, in order {/* anchor: five-steps */}
+
+The framework that drives the conversation — and the chapters that armed each
+step:
+
+1. **Problem framing** (~5 min) — inputs, outputs, scale, latency SLO, the
+   *feared failure*, success metrics. Chapter 1's prompt-as-spec instinct,
+   applied to the whole system: pin the degrees of freedom before designing.
+2. **High-level architecture** (~10 min) — the boxes and the data flow:
+   router → retrieval (Ch 2–3) → generation with grounding (Ch 4) → tools
+   where actions are needed (Ch 8) → validation → response. Name what's AI
+   and what's ordinary infrastructure.
+3. **Component deep dive** (~15 min) — pick the 1–2 components where the
+   risk lives and go deep: the retrieval stack and its upgrades (Ch 6), the
+   context budget (Ch 4, 7), the agent loop's guards (Ch 8), the validation
+   layer. Estimates beat adjectives: tokens, milliseconds, dollars (Ch 7).
+4. **Trade-offs & failure modes** (~8 min) — the genuine tensions, plus
+   "what happens when the model is wrong?" answered with designed components:
+   abstention, validation gates, human fallback with context transfer
+   (Ch 4, 5, 8, 9).
+5. **Eval & production** (~7 min) — the differentiator, volunteered before
+   it's asked: golden set as a deploy gate (Ch 5), sampled live-traffic
+   judging, business-metric mapping, SLOs and drift watch (Ch 7), A/B for
+   changes. Adaptation questions land here too: tuned voice, retrieved facts
+   (Ch 10).
+
+<NoteBox title="Say the structure out loud">
+Narrating the framework is itself scored: "Before I design anything, let me
+pin down requirements — then I'll sketch the architecture, go deep on the
+riskiest component, walk the trade-offs, and close with how we'd know it
+works." The interviewer now has a map of your next forty minutes, and you've
+demonstrated structure under ambiguity before naming a single technology.
+One flexibility rule: when the interviewer points at a component, the
+framework yields — depth on request beats coverage on rails.
+</NoteBox>
+
+## A worked mock {/* the synthesis */}
+
+<WorkedExample id="capstone-bank-bot" title="The bank bot with zero hallucination tolerance">
+**Framing:** customers ask about balances, transactions, fees, and product
+eligibility; 50K conversations/day. The feared failure is regulatory: a
+fabricated balance or fee is a compliance violation, not a UX bug. Key
+clarifications earned: account data comes from *APIs* (live, per-customer),
+policy/fee answers come from *documents* (RAG) — and "I don't know → human"
+is explicitly preferred over any guess.
+
+**Architecture:** intent router → two grounding paths (account-API tools for
+personal data; retrieval over the policy KB for general questions) → LLM
+*synthesizes but never invents* → **output validator** → response, with a
+human-escalation lane that transfers full context. The validator is a
+first-class box, not a caveat — that's the zero-tolerance requirement made
+structural.
+
+**Deep dive (the validator):** three stages. Schema: every response carries a
+`sources` field citing document ids or API calls — empty sources, automatic
+reject (Ch 4's citations, now load-bearing). Entailment: a small NLI model
+checks the response against the retrieved context, thresholded (a
+faithfulness check at runtime — guide 1's metric turned into a gate).
+Confidence: structured self-report, low confidence → escalate. Failure
+behavior is scripted and warm: "Let me connect you with a specialist," with
+the conversation and retrieved context handed over (Ch 9's front desk).
+
+**Trade-offs:** strictness vs escalation rate — strict validation means more
+human handoffs and zero fabrications; for a regulated domain the asymmetry is
+overwhelming (one hallucinated fee can cost more than a year of escalations),
+so: design for zero hallucinations *first*, then optimize the escalation rate
+down. Validation latency (+~200ms) vs compliance risk — same asymmetry, same
+call. Model tier per intent — Chapter 7's cascade, with the escalated path
+priced.
+
+**Eval:** offline — a compliance-built golden set (~500 questions): grounding
+accuracy, hallucination rate (target 0%), *appropriate-escalation* rate
+(target band, not zero — too low means the bot is guessing). Online — shadow
+comparison against human agents on sampled conversations, weekly compliance
+review of flags, SLOs with burn-rate alerts. Every prompt or retrieval change
+re-runs the golden set in CI.
+</WorkedExample>
+
+## The senior sentence {/* anchor: tradeoff-talk */}
+
+The highest-signal moment in the whole interview is one sentence shape:
+
+> "I chose **X** over **Y** because the requirement is **Z** — and if Z
+> changed, I'd reconsider."
+
+"Strict validation over relaxed, because the feared failure is regulatory —
+if this were an internal tool, I'd flip it." "pgvector over a dedicated store,
+because we're at 200K chunks on existing Postgres — past ~5M, I'd revisit."
+That shape demonstrates all four rubric dimensions at once: a correct
+mechanism, a genuine tension, a requirement-anchored decision, and clean
+communication. Two cautions from Chapter 10's discipline: only articulate
+*real* tensions (performing balance where one option dominates reads as
+inexperience), and keep the rubric in view as you speak — **Technical
+Correctness** (the mechanisms you name work the way you say), **Trade-off
+Awareness** (every choice priced), **Evaluation Rigor** (Step 5 volunteered,
+gates named), **Communication** (the interviewer can follow the map). Score
+your own mock against those four before anyone else does.
+
+## See it: diagnose the gap {/* anchor: diagnose-gap */}
+
+Five design-answer excerpts, each with one critical gap. Name the gap and the
+step or dimension it violates before revealing — this is the grading view of
+the same framework, and the fastest way to install it.
+
+<ScenarioQuiz client:visible data={capstoneData} />
+
+<Practice id="capstone-full-mock" difficulty={3}>
+Run the full mock, alone, for real: set a 45-minute timer and design **"an
+AI assistant for a hospital's patient-portal messages"** out loud or on paper —
+five steps, time-budgeted. Then self-score one paragraph per rubric dimension,
+citing what you actually said. (The scenario is chosen to transfer: the
+regulated-domain logic of the bank mock applies, but the feared failures,
+data sensitivity, and escalation paths are different enough that copying the
+worked example won't survive contact.)
+
+<details>
+<summary>What a strong run includes</summary>
+
+- **Framing** that surfaces the domain's teeth: PHI handling and data
+  residency (Ch 7's trump card), clinical-advice boundaries (the bot
+  explains logistics and *never* advises on care), the feared failure
+  (missed urgent symptom in a triage-adjacent message), and an explicit
+  human-in-the-loop requirement.
+- **Architecture** with two lanes: logistics questions (appointments,
+  billing → tools + RAG over policy docs) and anything clinical → routed to
+  nursing staff *with urgency classification*, never answered.
+- **Deep dive** on the router's failure asymmetry: a false "logistics" label
+  on an urgent clinical message is the catastrophic cell — so the router is
+  calibrated (guide 1, Ch 4), thresholded conservatively, and audited.
+- **Trade-offs** with the senior sentence: over-escalation vs missed-urgent
+  (asymmetric, escalate), self-hosted vs API under PHI (residency decides,
+  Ch 7), abstention rate vs deflection target.
+- **Eval** volunteered: golden set built with clinical staff including
+  urgent-message recall as the headline metric with a CI gate; shadow mode
+  before any autonomy; per-category live sampling; incident runbook.
+- **Self-score** that cites evidence ("I named the router's failure asymmetry
+  unprompted — Trade-off ✓; I never estimated message volume — Correctness
+  gap") rather than vibes.
+</details>
+</Practice>
+
+## How this is graded
+
+- **Technical Correctness** — the components you name behave the way you say:
+  retrieval, grounding, validation, budgets, and the arithmetic when asked.
+- **Trade-off Awareness** — genuine tensions, priced, anchored to
+  requirements, with the reversal condition stated.
+- **Evaluation Rigor** — Step 5 volunteered; golden set as a gate; the
+  difference between offline pass and production safety kept explicit.
+- **Communication** — this chapter's weighted dimension: the framework
+  narrated, the time budget kept, depth cues followed, and every decision
+  traceable to a requirement the interviewer heard you establish.
+
+### Industry variation
+
+- **Regulated domains** (banking, healthcare, gov) — the feared failure has
+  legal teeth, so validation and escalation are first-class boxes and "design
+  for zero, then optimize the cost" is the expected posture.
+- **Consumer scale** — the deep dive shifts to Chapter 7's economics:
+  cascades, caches, and SLOs carry the interview; the eval story leans on
+  sampled online judging at volume.
+- **Frontier-adjacent / platform teams** — expect the 100× follow-up ("what
+  breaks at 100× scale?") and the build-vs-buy fork; the senior answer
+  re-runs the same framework with the new constraint rather than improvising.
+
+## Stretch: the skill above the skills
+
+You can design the system. But the interview itself is a *system* too — a
+loop with phases, failure modes, and an evaluator whose rubric you now know.
+And one phase has changed shape recently: the coding rounds where an AI
+assistant sits next to you, and what's graded is how you *direct and verify*
+it — clarify, decompose, prompt, review, test, explain. What does deliberate
+practice for that loop look like, and how do you transfer everything this
+guide built to questions you've never seen? That's Chapter 12 — interview
+craft and transfer — the last chapter, about the meta-skill.
