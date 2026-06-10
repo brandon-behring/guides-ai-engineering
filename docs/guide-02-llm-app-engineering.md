@@ -8,7 +8,15 @@ interview-prep-led, taught for transfer. Audience: engineers moving into AI-nati
 Direction: `~/guides/docs/plans/active/2026-06-04_session_handoff.md` (canonical) ·
 demand spine: `~/guides/docs/research/role_demand_and_interview_signals/`.
 
-## Status (2026-06-10)
+## Status: COMPLETE (2026-06-10)
+
+**All 13 chapters (0–12) authored, independently reviewed (3 reviewer agents:
+math+facts / demo-honesty+islands / pedagogy+continuity), all findings fixed —
+`docs/REVIEW_FINDINGS_2026-06-10.md`. Build + validate green; companion tests
+24/24 + 29/29 + 12/12; LOS↔anchor bijection in all 13. The roadmap-v2 §5 launch
+gate is MET — the site-launch workstream is unblocked.**
+
+### Build log (chapter-by-chapter)
 
 - **Ch 0–2 authored** in the §5 shape. Ch 0–1 reuse the `ScenarioQuiz` island (hand-authored
   quiz JSON: `llm_claims_demo.json`, `prompt_robustness_demo.json`); **Ch 2 ships the new

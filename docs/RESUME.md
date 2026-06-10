@@ -11,21 +11,25 @@ collections under `src/content/<guide>/`, one shared `companion/` lib, per-guide
   `f52ea51`, pushed to `github.com/brandon-behring/guides-ai-engineering`. Independent 5-dimension
   review done 2026-06-09; all findings fixed (`docs/REVIEW_FINDINGS_2026-06-08.md`); LOS anchors
   bijective in all 13.
-- **#2 LLM App Engineering — IN PROGRESS.** RAG-centric, ~13 ch. Outline + status + slug list:
-  `docs/guide-02-llm-app-engineering.md`. **Ch 0–1 authored**; `mini_rag` companion seeded. Next:
-  Ch 2 (Retrieval 101) — first to import `mini_rag`.
+- **#2 LLM App Engineering — COMPLETE, reviewed (2026-06-10).** All 13 chapters (0–12) in the
+  §5 shape; independent 3-agent review, all findings fixed (`docs/REVIEW_FINDINGS_2026-06-10.md`);
+  LOS anchors bijective in all 13. Build log: `docs/guide-02-llm-app-engineering.md`.
+  **The roadmap-v2 §5 launch gate is MET → next series move = the site-launch workstream**
+  (`~/guides/docs/plans/active/2026-06-10_series_roadmap_v2.md` §5; user-side Cloudflare steps).
 
 ## Companion (`companion/`, stdlib-only, "for learning, not production")
 - `mini_eval` — 6 modules (metrics·confidence·calibration·retrieval·agent·judge), **24/24 tests**.
-- `mini_rag` — seeded: `search` (TF-IDF + cosine + top_k), **7/7 tests**. Grows across guide #2 ch2–7.
-  `pyproject.toml` ships both packages.
+- `mini_rag` — 5 modules (search·chunk·pipeline·rerank·budget), **29/29 tests**.
+- `mini_agent` — 3 modules (loop·tools·orchestrate + crew), **12/12 tests**.
+  `pyproject.toml` ships all three packages.
 
 ## Build / test
 ```bash
 npm install && npm run build                 # astro build + book-scaffold validate
 python3 companion/tests/test_mini_eval.py    # 24 tests
-python3 companion/tests/test_mini_rag.py     # 7 tests
-python3 scripts/build_demo_data.py           # regenerate the COMPUTED demo JSON (7 files, seeded)
+python3 companion/tests/test_mini_rag.py     # 29 tests
+python3 companion/tests/test_mini_agent.py   # 12 tests
+python3 scripts/build_demo_data.py           # regenerate the COMPUTED demo JSON (15 files, seeded)
 ```
 ScenarioQuiz / quiz-style demo JSON (`benchmark_demo.json`, `llm_claims_demo.json`,
 `prompt_robustness_demo.json`, …) are **hand-authored**, not emitted by `build_demo_data.py`.
