@@ -24,7 +24,9 @@ from mini_eval import (  # noqa: E402
     mean_pass_at_k,
     Response, PairwiseJudge, position_flip_rate,
 )
-from mini_rag import TfidfIndex  # noqa: E402
+from mini_rag import (  # noqa: E402
+    TfidfIndex, chunk_fixed, chunk_sentences, chunk_paragraphs, boundary_coherence,
+)
 
 OUT = os.path.join(os.path.dirname(__file__), "..", "src", "data")
 
@@ -367,6 +369,80 @@ def retrieval_demo() -> dict:
     }
 
 
+def chunking_demo() -> dict:
+    """Chunking strategies on one refund-policy document, for the guide-2 Ch 3
+    island. For each (strategy, size): the chunks themselves, boundary
+    coherence, and a retrieval check — does the TOP-ranked chunk for the
+    question still contain the 30-day limit? The document is tuned so fixed-
+    size chunking cuts the key sentence at "...request a refund | within 30
+    days" at sizes 40 and 80; overlap rescues 40 but not 80 (the refund-heavy
+    run-up chunk outranks the answer). Sentence/paragraph packing never cuts
+    mid-fact. All computed by mini_rag; nothing hand-simulated."""
+    doc = "\n\n".join([
+        ("Thanks for shopping with ACME. This page explains our return and refund "
+         "policies for standard orders, gift cards, and final-sale items. If anything "
+         "here is unclear, our support team can walk you through the details."),
+        ("Most items qualify for a full refund. To start, open your order history, "
+         "choose the order that contains the item, and select the item you want to "
+         "send back. If your order shipped in several packages, return each item "
+         "separately. You may request a refund within 30 days of purchase, as long "
+         "as the item is unopened and in its original packaging."),
+        ("Once your return arrives at our warehouse, we inspect it within two "
+         "business days. Approved refunds are paid to the original payment method. "
+         "Bank processing times vary, so allow up to five business days for the "
+         "money to appear."),
+        ("Gift cards and final-sale items are non-refundable. Items marked as "
+         "clearance may be exchanged for store credit instead. Shipping fees are "
+         "refunded only when the return is our error."),
+    ])
+    query = "How long after purchase can I request a refund?"
+    limit_phrase = "30 days"
+    sizes = [40, 60, 80]
+    strategies = [
+        ("fixed", "Fixed-size", lambda t, s: chunk_fixed(t, s)),
+        ("fixed_overlap", "Fixed + 10-word overlap", lambda t, s: chunk_fixed(t, s, 10)),
+        ("sentence", "Sentence packing", lambda t, s: chunk_sentences(t, s)),
+        ("paragraph", "Paragraph packing", lambda t, s: chunk_paragraphs(t, s)),
+    ]
+
+    combos = []
+    for key, label, fn in strategies:
+        for size in sizes:
+            chunks = fn(doc, size)
+            hits = TfidfIndex(chunks).search(query, k=1)
+            top_index = hits[0].index if hits else -1
+            top = chunks[top_index] if top_index >= 0 else ""
+            fact_intact = limit_phrase in top
+            sizes_w = [len(c.split()) for c in chunks]
+            combos.append({
+                "strategy": key,
+                "size": size,
+                "n_chunks": len(chunks),
+                "avg_words": round(sum(sizes_w) / len(sizes_w), 1),
+                "coherence": round(boundary_coherence(chunks), 2),
+                "top_index": top_index,
+                "fact_intact": fact_intact,
+                "chunks": [{
+                    "text": c,
+                    "has_request": "request a refund" in c,
+                    "has_limit": limit_phrase in c,
+                    "is_top": i == top_index,
+                } for i, c in enumerate(chunks)],
+            })
+
+    return {
+        "name": "Chunking decides what a vector can say",
+        "note": ("One document, one question, twelve chunking configs — every split "
+                 "and every ranking computed by mini_rag.chunk + mini_rag.search."),
+        "query": query,
+        "fact": "You may request a refund within 30 days of purchase",
+        "limit_phrase": limit_phrase,
+        "strategies": [{"key": k, "label": l} for k, l, _ in strategies],
+        "sizes": sizes,
+        "combos": combos,
+    }
+
+
 def agent_demo() -> dict:
     """pass@k curves for a flaky vs a reliable agent, for the Ch 10 island. Each
     suite is 40 tasks sampled K times; pass@k rises with attempts, but pass@1 (the
@@ -427,6 +503,7 @@ def main() -> None:
         ("calibration_demo", calibration_demo()),
         ("rag_demo", rag_demo()),
         ("retrieval_demo", retrieval_demo()),
+        ("chunking_demo", chunking_demo()),
         ("agent_demo", agent_demo()),
         ("monitoring_demo", monitoring_demo()),
     ]:

@@ -1,0 +1,458 @@
+{
+  "name": "Chunking decides what a vector can say",
+  "note": "One document, one question, twelve chunking configs \u2014 every split and every ranking computed by mini_rag.chunk + mini_rag.search.",
+  "query": "How long after purchase can I request a refund?",
+  "fact": "You may request a refund within 30 days of purchase",
+  "limit_phrase": "30 days",
+  "strategies": [
+    {
+      "key": "fixed",
+      "label": "Fixed-size"
+    },
+    {
+      "key": "fixed_overlap",
+      "label": "Fixed + 10-word overlap"
+    },
+    {
+      "key": "sentence",
+      "label": "Sentence packing"
+    },
+    {
+      "key": "paragraph",
+      "label": "Paragraph packing"
+    }
+  ],
+  "sizes": [
+    40,
+    60,
+    80
+  ],
+  "combos": [
+    {
+      "strategy": "fixed",
+      "size": 40,
+      "n_chunks": 5,
+      "avg_words": 33.0,
+      "coherence": 0.4,
+      "top_index": 1,
+      "fact_intact": false,
+      "chunks": [
+        {
+          "text": "Thanks for shopping with ACME. This page explains our return and refund policies for standard orders, gift cards, and final-sale items. If anything here is unclear, our support team can walk you through the details. Most items qualify for a",
+          "has_request": false,
+          "has_limit": false,
+          "is_top": false
+        },
+        {
+          "text": "full refund. To start, open your order history, choose the order that contains the item, and select the item you want to send back. If your order shipped in several packages, return each item separately. You may request a refund",
+          "has_request": true,
+          "has_limit": false,
+          "is_top": true
+        },
+        {
+          "text": "within 30 days of purchase, as long as the item is unopened and in its original packaging. Once your return arrives at our warehouse, we inspect it within two business days. Approved refunds are paid to the original payment method.",
+          "has_request": false,
+          "has_limit": true,
+          "is_top": false
+        },
+        {
+          "text": "Bank processing times vary, so allow up to five business days for the money to appear. Gift cards and final-sale items are non-refundable. Items marked as clearance may be exchanged for store credit instead. Shipping fees are refunded only when",
+          "has_request": false,
+          "has_limit": false,
+          "is_top": false
+        },
+        {
+          "text": "the return is our error.",
+          "has_request": false,
+          "has_limit": false,
+          "is_top": false
+        }
+      ]
+    },
+    {
+      "strategy": "fixed",
+      "size": 60,
+      "n_chunks": 3,
+      "avg_words": 55.0,
+      "coherence": 0.67,
+      "top_index": 1,
+      "fact_intact": true,
+      "chunks": [
+        {
+          "text": "Thanks for shopping with ACME. This page explains our return and refund policies for standard orders, gift cards, and final-sale items. If anything here is unclear, our support team can walk you through the details. Most items qualify for a full refund. To start, open your order history, choose the order that contains the item, and select the item you",
+          "has_request": false,
+          "has_limit": false,
+          "is_top": false
+        },
+        {
+          "text": "want to send back. If your order shipped in several packages, return each item separately. You may request a refund within 30 days of purchase, as long as the item is unopened and in its original packaging. Once your return arrives at our warehouse, we inspect it within two business days. Approved refunds are paid to the original payment method.",
+          "has_request": true,
+          "has_limit": true,
+          "is_top": true
+        },
+        {
+          "text": "Bank processing times vary, so allow up to five business days for the money to appear. Gift cards and final-sale items are non-refundable. Items marked as clearance may be exchanged for store credit instead. Shipping fees are refunded only when the return is our error.",
+          "has_request": false,
+          "has_limit": false,
+          "is_top": false
+        }
+      ]
+    },
+    {
+      "strategy": "fixed",
+      "size": 80,
+      "n_chunks": 3,
+      "avg_words": 55.0,
+      "coherence": 0.33,
+      "top_index": 0,
+      "fact_intact": false,
+      "chunks": [
+        {
+          "text": "Thanks for shopping with ACME. This page explains our return and refund policies for standard orders, gift cards, and final-sale items. If anything here is unclear, our support team can walk you through the details. Most items qualify for a full refund. To start, open your order history, choose the order that contains the item, and select the item you want to send back. If your order shipped in several packages, return each item separately. You may request a refund",
+          "has_request": true,
+          "has_limit": false,
+          "is_top": true
+        },
+        {
+          "text": "within 30 days of purchase, as long as the item is unopened and in its original packaging. Once your return arrives at our warehouse, we inspect it within two business days. Approved refunds are paid to the original payment method. Bank processing times vary, so allow up to five business days for the money to appear. Gift cards and final-sale items are non-refundable. Items marked as clearance may be exchanged for store credit instead. Shipping fees are refunded only when",
+          "has_request": false,
+          "has_limit": true,
+          "is_top": false
+        },
+        {
+          "text": "the return is our error.",
+          "has_request": false,
+          "has_limit": false,
+          "is_top": false
+        }
+      ]
+    },
+    {
+      "strategy": "fixed_overlap",
+      "size": 40,
+      "n_chunks": 6,
+      "avg_words": 35.8,
+      "coherence": 0.17,
+      "top_index": 2,
+      "fact_intact": true,
+      "chunks": [
+        {
+          "text": "Thanks for shopping with ACME. This page explains our return and refund policies for standard orders, gift cards, and final-sale items. If anything here is unclear, our support team can walk you through the details. Most items qualify for a",
+          "has_request": false,
+          "has_limit": false,
+          "is_top": false
+        },
+        {
+          "text": "walk you through the details. Most items qualify for a full refund. To start, open your order history, choose the order that contains the item, and select the item you want to send back. If your order shipped in several",
+          "has_request": false,
+          "has_limit": false,
+          "is_top": false
+        },
+        {
+          "text": "want to send back. If your order shipped in several packages, return each item separately. You may request a refund within 30 days of purchase, as long as the item is unopened and in its original packaging. Once your return",
+          "has_request": true,
+          "has_limit": true,
+          "is_top": true
+        },
+        {
+          "text": "is unopened and in its original packaging. Once your return arrives at our warehouse, we inspect it within two business days. Approved refunds are paid to the original payment method. Bank processing times vary, so allow up to five business",
+          "has_request": false,
+          "has_limit": false,
+          "is_top": false
+        },
+        {
+          "text": "Bank processing times vary, so allow up to five business days for the money to appear. Gift cards and final-sale items are non-refundable. Items marked as clearance may be exchanged for store credit instead. Shipping fees are refunded only when",
+          "has_request": false,
+          "has_limit": false,
+          "is_top": false
+        },
+        {
+          "text": "for store credit instead. Shipping fees are refunded only when the return is our error.",
+          "has_request": false,
+          "has_limit": false,
+          "is_top": false
+        }
+      ]
+    },
+    {
+      "strategy": "fixed_overlap",
+      "size": 60,
+      "n_chunks": 4,
+      "avg_words": 48.8,
+      "coherence": 0.25,
+      "top_index": 1,
+      "fact_intact": true,
+      "chunks": [
+        {
+          "text": "Thanks for shopping with ACME. This page explains our return and refund policies for standard orders, gift cards, and final-sale items. If anything here is unclear, our support team can walk you through the details. Most items qualify for a full refund. To start, open your order history, choose the order that contains the item, and select the item you",
+          "has_request": false,
+          "has_limit": false,
+          "is_top": false
+        },
+        {
+          "text": "order that contains the item, and select the item you want to send back. If your order shipped in several packages, return each item separately. You may request a refund within 30 days of purchase, as long as the item is unopened and in its original packaging. Once your return arrives at our warehouse, we inspect it within two business",
+          "has_request": true,
+          "has_limit": true,
+          "is_top": true
+        },
+        {
+          "text": "arrives at our warehouse, we inspect it within two business days. Approved refunds are paid to the original payment method. Bank processing times vary, so allow up to five business days for the money to appear. Gift cards and final-sale items are non-refundable. Items marked as clearance may be exchanged for store credit instead. Shipping fees are refunded only when",
+          "has_request": false,
+          "has_limit": false,
+          "is_top": false
+        },
+        {
+          "text": "for store credit instead. Shipping fees are refunded only when the return is our error.",
+          "has_request": false,
+          "has_limit": false,
+          "is_top": false
+        }
+      ]
+    },
+    {
+      "strategy": "fixed_overlap",
+      "size": 80,
+      "n_chunks": 3,
+      "avg_words": 61.7,
+      "coherence": 0.33,
+      "top_index": 0,
+      "fact_intact": false,
+      "chunks": [
+        {
+          "text": "Thanks for shopping with ACME. This page explains our return and refund policies for standard orders, gift cards, and final-sale items. If anything here is unclear, our support team can walk you through the details. Most items qualify for a full refund. To start, open your order history, choose the order that contains the item, and select the item you want to send back. If your order shipped in several packages, return each item separately. You may request a refund",
+          "has_request": true,
+          "has_limit": false,
+          "is_top": true
+        },
+        {
+          "text": "packages, return each item separately. You may request a refund within 30 days of purchase, as long as the item is unopened and in its original packaging. Once your return arrives at our warehouse, we inspect it within two business days. Approved refunds are paid to the original payment method. Bank processing times vary, so allow up to five business days for the money to appear. Gift cards and final-sale items are non-refundable. Items marked as clearance may be exchanged",
+          "has_request": true,
+          "has_limit": true,
+          "is_top": false
+        },
+        {
+          "text": "items are non-refundable. Items marked as clearance may be exchanged for store credit instead. Shipping fees are refunded only when the return is our error.",
+          "has_request": false,
+          "has_limit": false,
+          "is_top": false
+        }
+      ]
+    },
+    {
+      "strategy": "sentence",
+      "size": 40,
+      "n_chunks": 5,
+      "avg_words": 33.0,
+      "coherence": 1.0,
+      "top_index": 2,
+      "fact_intact": true,
+      "chunks": [
+        {
+          "text": "Thanks for shopping with ACME. This page explains our return and refund policies for standard orders, gift cards, and final-sale items. If anything here is unclear, our support team can walk you through the details.",
+          "has_request": false,
+          "has_limit": false,
+          "is_top": false
+        },
+        {
+          "text": "Most items qualify for a full refund. To start, open your order history, choose the order that contains the item, and select the item you want to send back. If your order shipped in several packages, return each item separately.",
+          "has_request": false,
+          "has_limit": false,
+          "is_top": false
+        },
+        {
+          "text": "You may request a refund within 30 days of purchase, as long as the item is unopened and in its original packaging. Once your return arrives at our warehouse, we inspect it within two business days.",
+          "has_request": true,
+          "has_limit": true,
+          "is_top": true
+        },
+        {
+          "text": "Approved refunds are paid to the original payment method. Bank processing times vary, so allow up to five business days for the money to appear. Gift cards and final-sale items are non-refundable.",
+          "has_request": false,
+          "has_limit": false,
+          "is_top": false
+        },
+        {
+          "text": "Items marked as clearance may be exchanged for store credit instead. Shipping fees are refunded only when the return is our error.",
+          "has_request": false,
+          "has_limit": false,
+          "is_top": false
+        }
+      ]
+    },
+    {
+      "strategy": "sentence",
+      "size": 60,
+      "n_chunks": 4,
+      "avg_words": 41.2,
+      "coherence": 1.0,
+      "top_index": 1,
+      "fact_intact": true,
+      "chunks": [
+        {
+          "text": "Thanks for shopping with ACME. This page explains our return and refund policies for standard orders, gift cards, and final-sale items. If anything here is unclear, our support team can walk you through the details. Most items qualify for a full refund.",
+          "has_request": false,
+          "has_limit": false,
+          "is_top": false
+        },
+        {
+          "text": "To start, open your order history, choose the order that contains the item, and select the item you want to send back. If your order shipped in several packages, return each item separately. You may request a refund within 30 days of purchase, as long as the item is unopened and in its original packaging.",
+          "has_request": true,
+          "has_limit": true,
+          "is_top": true
+        },
+        {
+          "text": "Once your return arrives at our warehouse, we inspect it within two business days. Approved refunds are paid to the original payment method. Bank processing times vary, so allow up to five business days for the money to appear. Gift cards and final-sale items are non-refundable. Items marked as clearance may be exchanged for store credit instead.",
+          "has_request": false,
+          "has_limit": false,
+          "is_top": false
+        },
+        {
+          "text": "Shipping fees are refunded only when the return is our error.",
+          "has_request": false,
+          "has_limit": false,
+          "is_top": false
+        }
+      ]
+    },
+    {
+      "strategy": "sentence",
+      "size": 80,
+      "n_chunks": 3,
+      "avg_words": 55.0,
+      "coherence": 1.0,
+      "top_index": 1,
+      "fact_intact": true,
+      "chunks": [
+        {
+          "text": "Thanks for shopping with ACME. This page explains our return and refund policies for standard orders, gift cards, and final-sale items. If anything here is unclear, our support team can walk you through the details. Most items qualify for a full refund. To start, open your order history, choose the order that contains the item, and select the item you want to send back. If your order shipped in several packages, return each item separately.",
+          "has_request": false,
+          "has_limit": false,
+          "is_top": false
+        },
+        {
+          "text": "You may request a refund within 30 days of purchase, as long as the item is unopened and in its original packaging. Once your return arrives at our warehouse, we inspect it within two business days. Approved refunds are paid to the original payment method. Bank processing times vary, so allow up to five business days for the money to appear. Gift cards and final-sale items are non-refundable. Items marked as clearance may be exchanged for store credit instead.",
+          "has_request": true,
+          "has_limit": true,
+          "is_top": true
+        },
+        {
+          "text": "Shipping fees are refunded only when the return is our error.",
+          "has_request": false,
+          "has_limit": false,
+          "is_top": false
+        }
+      ]
+    },
+    {
+      "strategy": "paragraph",
+      "size": 40,
+      "n_chunks": 5,
+      "avg_words": 33.0,
+      "coherence": 1.0,
+      "top_index": 2,
+      "fact_intact": true,
+      "chunks": [
+        {
+          "text": "Thanks for shopping with ACME. This page explains our return and refund policies for standard orders, gift cards, and final-sale items. If anything here is unclear, our support team can walk you through the details.",
+          "has_request": false,
+          "has_limit": false,
+          "is_top": false
+        },
+        {
+          "text": "Most items qualify for a full refund. To start, open your order history, choose the order that contains the item, and select the item you want to send back. If your order shipped in several packages, return each item separately.",
+          "has_request": false,
+          "has_limit": false,
+          "is_top": false
+        },
+        {
+          "text": "You may request a refund within 30 days of purchase, as long as the item is unopened and in its original packaging.",
+          "has_request": true,
+          "has_limit": true,
+          "is_top": true
+        },
+        {
+          "text": "Once your return arrives at our warehouse, we inspect it within two business days. Approved refunds are paid to the original payment method. Bank processing times vary, so allow up to five business days for the money to appear.",
+          "has_request": false,
+          "has_limit": false,
+          "is_top": false
+        },
+        {
+          "text": "Gift cards and final-sale items are non-refundable. Items marked as clearance may be exchanged for store credit instead. Shipping fees are refunded only when the return is our error.",
+          "has_request": false,
+          "has_limit": false,
+          "is_top": false
+        }
+      ]
+    },
+    {
+      "strategy": "paragraph",
+      "size": 60,
+      "n_chunks": 5,
+      "avg_words": 33.0,
+      "coherence": 1.0,
+      "top_index": 2,
+      "fact_intact": true,
+      "chunks": [
+        {
+          "text": "Thanks for shopping with ACME. This page explains our return and refund policies for standard orders, gift cards, and final-sale items. If anything here is unclear, our support team can walk you through the details.",
+          "has_request": false,
+          "has_limit": false,
+          "is_top": false
+        },
+        {
+          "text": "Most items qualify for a full refund. To start, open your order history, choose the order that contains the item, and select the item you want to send back. If your order shipped in several packages, return each item separately.",
+          "has_request": false,
+          "has_limit": false,
+          "is_top": false
+        },
+        {
+          "text": "You may request a refund within 30 days of purchase, as long as the item is unopened and in its original packaging.",
+          "has_request": true,
+          "has_limit": true,
+          "is_top": true
+        },
+        {
+          "text": "Once your return arrives at our warehouse, we inspect it within two business days. Approved refunds are paid to the original payment method. Bank processing times vary, so allow up to five business days for the money to appear.",
+          "has_request": false,
+          "has_limit": false,
+          "is_top": false
+        },
+        {
+          "text": "Gift cards and final-sale items are non-refundable. Items marked as clearance may be exchanged for store credit instead. Shipping fees are refunded only when the return is our error.",
+          "has_request": false,
+          "has_limit": false,
+          "is_top": false
+        }
+      ]
+    },
+    {
+      "strategy": "paragraph",
+      "size": 80,
+      "n_chunks": 3,
+      "avg_words": 55.0,
+      "coherence": 1.0,
+      "top_index": 1,
+      "fact_intact": true,
+      "chunks": [
+        {
+          "text": "Thanks for shopping with ACME. This page explains our return and refund policies for standard orders, gift cards, and final-sale items. If anything here is unclear, our support team can walk you through the details.",
+          "has_request": false,
+          "has_limit": false,
+          "is_top": false
+        },
+        {
+          "text": "Most items qualify for a full refund. To start, open your order history, choose the order that contains the item, and select the item you want to send back. If your order shipped in several packages, return each item separately. You may request a refund within 30 days of purchase, as long as the item is unopened and in its original packaging.",
+          "has_request": true,
+          "has_limit": true,
+          "is_top": true
+        },
+        {
+          "text": "Once your return arrives at our warehouse, we inspect it within two business days. Approved refunds are paid to the original payment method. Bank processing times vary, so allow up to five business days for the money to appear.\n\nGift cards and final-sale items are non-refundable. Items marked as clearance may be exchanged for store credit instead. Shipping fees are refunded only when the return is our error.",
+          "has_request": false,
+          "has_limit": false,
+          "is_top": false
+        }
+      ]
+    }
+  ]
+}

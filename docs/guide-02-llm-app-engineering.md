@@ -20,7 +20,10 @@ demand spine: `~/guides/docs/research/role_demand_and_interview_signals/`.
   guide folder, so chapters serve at `/ai-engineering/chapters/<guide>/<slug>/`. Slugs only
   need to be unique *within* a guide. (The `/chapters/` index still mixes both guides;
   per-guide grouping waits on scaffold #15.)
-- **Next:** Ch 3 (Chunking & document representation) — adds `mini_rag.chunk`.
+- **Ch 3 authored** — `mini_rag.chunk` (fixed/sentence/paragraph + `boundary_coherence`,
+  14/14 tests) + `ChunkingExplorer` island (computed `chunking_demo.json`: strategy × size
+  grid with a real split-fact failure + retrieval check).
+- **Next:** Ch 4 (RAG end-to-end) — adds `mini_rag.pipeline`.
 
 ## Spine & outline (RAG-centric, ~13 ch)
 

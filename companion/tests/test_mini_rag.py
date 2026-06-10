@@ -8,6 +8,8 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "src"))
 
 from mini_rag import (  # noqa: E402
     tokenize, idf, cosine_similarity, TfidfIndex, top_k, Hit,
+    split_sentences, chunk_fixed, chunk_sentences, chunk_paragraphs,
+    boundary_coherence,
 )
 
 
@@ -66,6 +68,63 @@ def test_search_is_deterministic_and_ordered():
     scores = [h.score for h in hits]
     assert scores == sorted(scores, reverse=True)        # descending order
     assert all(h.doc != "unrelated text" for h in hits)  # zero-score doc filtered out
+
+
+def test_chunk_fixed_sizes_and_overlap():
+    text = " ".join(f"w{i}" for i in range(10))  # w0 .. w9
+    chunks = chunk_fixed(text, size=4, overlap=1)
+    assert chunks[0] == "w0 w1 w2 w3"
+    assert chunks[1].startswith("w3")            # overlap repeats the boundary word
+    assert all(len(c.split()) <= 4 for c in chunks)
+    joined = " ".join(chunks).split()
+    assert set(joined) == {f"w{i}" for i in range(10)}  # nothing lost
+
+
+def test_chunk_fixed_no_pure_overlap_tail():
+    text = " ".join(f"w{i}" for i in range(8))
+    chunks = chunk_fixed(text, size=5, overlap=2)
+    # last chunk must contain the final word, and no chunk is a subset of the previous
+    assert chunks[-1].split()[-1] == "w7"
+    for a, b in zip(chunks, chunks[1:]):
+        assert not set(b.split()) <= set(a.split())
+
+
+def test_chunk_fixed_validates_args():
+    for bad in [(0, 0), (4, 4), (4, -1)]:
+        try:
+            chunk_fixed("a b c", size=bad[0], overlap=bad[1])
+            raise AssertionError("expected ValueError")
+        except ValueError:
+            pass
+
+
+def test_chunk_sentences_never_splits_mid_sentence():
+    text = "Refunds take five days. Gift cards are final. Items must be unopened. Contact support for help."
+    chunks = chunk_sentences(text, size=9)
+    assert boundary_coherence(chunks) == 1.0     # every chunk ends at a sentence end
+    sentences = split_sentences(text)
+    for s in sentences:                           # every sentence survives intact
+        assert any(s in c for c in chunks)
+
+
+def test_chunk_sentences_oversized_sentence_is_own_chunk():
+    long_sentence = "This single sentence is far longer than the chunk size limit we set here."
+    chunks = chunk_sentences(long_sentence + " Short one.", size=5)
+    assert chunks[0] == long_sentence             # not split, despite exceeding size
+    assert chunks[1] == "Short one."
+
+
+def test_chunk_paragraphs_keeps_paragraphs_intact():
+    text = "First topic sentence one. First topic sentence two.\n\nSecond topic here."
+    chunks = chunk_paragraphs(text, size=12)
+    assert any("First topic sentence one. First topic sentence two." in c for c in chunks)
+    assert boundary_coherence(chunks) == 1.0
+
+
+def test_boundary_coherence_scores():
+    assert boundary_coherence([]) == 0.0
+    assert boundary_coherence(["Ends well.", "cut mid"]) == 0.5
+    assert boundary_coherence(["Done!", "Sure?"]) == 1.0
 
 
 def _run_all():

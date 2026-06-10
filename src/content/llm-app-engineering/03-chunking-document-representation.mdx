@@ -1,0 +1,263 @@
+---
+title: "Chunking and document representation"
+slug: chunking-document-representation
+description: "Retrieval ranks chunks, not documents — so the chunker decides what a vector can even represent. Build three honest strategies (fixed, sentence, paragraph) plus overlap, see a real fact get cut in half and lost, learn why extraction quality is the ceiling and tables are first-class, and measure chunking like an engineer instead of eyeballing it."
+freshness: literature-survey
+last_verified: 2026-06-10
+tags: [llm-app-engineering, chunking, document-processing, rag]
+sources: []
+draft: false
+mode: tutorial
+target: transfer
+ordering: problem-first
+commitment: long-lived
+paradigms: [default]
+research_debt_addressed: |
+  Chunking is treated as boring preprocessing — "split at 512, ship it" — when it is
+  the highest-leverage decision in a RAG pipeline and the one made before any vector
+  exists. Tutorials rarely show a fact actually being destroyed by a chunk boundary,
+  so engineers tune embeddings and prompts while the real failure sits upstream. This
+  chapter makes the failure visible on a real split, builds the strategies by hand,
+  and replaces "the chunks look fine" with measurement.
+task_classes: [chunking-design, rag]
+provenance:
+  ai_tools: ["Claude Fable 5 (Anthropic)"]
+  audit_history:
+    - date: 2026-06-10
+      type: authored
+      file: src/content/llm-app-engineering/03-chunking-document-representation.mdx
+  citation_backstop: manual
+los:
+  - id: LAE-3.1
+    bloom: explain
+    statement: "Explain why chunking decides what a vector can represent: retrieval ranks chunks, and a fact split across two chunks is invisible to both — before any embedding is computed."
+    anchor: chunks-are-the-unit
+    threshold: true
+  - id: LAE-3.2
+    bloom: analyze
+    statement: "Compare fixed, sentence, and structure-aware chunking (plus overlap) by their failure modes, and route by content type — prose, tables, and structured sections need different cuts."
+    anchor: strategy-tradeoffs
+    threshold: true
+  - id: LAE-3.3
+    bloom: design
+    statement: "Treat chunking as a measured decision: audit extraction first (the quality ceiling), smoke-test with boundary coherence, and benchmark configs against retrieval metrics on a golden set."
+    anchor: measure-chunking
+    threshold: true
+---
+
+import YouWillLearn from '@brandon_m_behring/book-scaffold-astro/components/YouWillLearn.astro';
+import Pitfall from '@brandon_m_behring/book-scaffold-astro/components/Pitfall.astro';
+import Practice from '@brandon_m_behring/book-scaffold-astro/components/Practice.astro';
+import ChunkingExplorer from '../../components/ChunkingExplorer.tsx';
+import chunkingData from '../../data/chunking_demo.json';
+
+# Chunking and document representation
+
+<YouWillLearn prerequisites="Chapter 2 — you built vector search and know recall@k. Comfortable reading Python.">
+- Why retrieval ranks **chunks**, not documents — and how a chunk boundary can destroy a fact before any vector exists.
+- Three honest strategies you build — fixed, sentence, paragraph — **plus overlap**, each with a named failure mode; and why tables are first-class objects.
+- How to **measure** a chunking config: extraction audit first, boundary coherence as the smoke test, golden-set retrieval as the real test.
+</YouWillLearn>
+
+## Recall went up. Answers got worse.
+
+You took Chapter 2 seriously: swapped in dense embeddings, built a golden set,
+watched recall@5 jump. Then a customer asks *"How long after purchase can I
+request a refund?"* and the assistant confidently answers that refunds are
+available — no deadline, ever mentioned. The user misses the 30-day window and
+files a complaint.
+
+You pull the trace. Retrieval worked: the top chunk is from the refund policy,
+ranked #1 for the question. It reads: *"…choose the order that contains the
+item, and select the item you want to send back. You may request a refund"* —
+and stops.
+The next words of the document, *"within 30 days of purchase"*, live in the
+next chunk, which didn't make the context. The model answered faithfully from
+what it saw. What it saw was half a sentence.
+
+Predict: which component do you change — the embedding model, the prompt, or
+something that ran *before either of them*?
+
+<Pitfall title="Chunking is not preprocessing">
+The default move — "split every 512 tokens and ship it" — treats chunking as a
+boring detail. But the chunker runs *before* the embedding model and decides
+what any vector can possibly say. A 10% better chunking strategy routinely
+beats a 2× more expensive embedding model, because no model can represent
+text that isn't in its chunk. Tune the cheap upstream decision before paying
+for the expensive downstream one.
+</Pitfall>
+
+## Retrieval ranks chunks, not documents {/* anchor: chunks-are-the-unit */}
+
+Chapter 2's index had one vector per *document*. Real corpora don't allow that:
+a 10-page policy is far too long to embed as one meaningful vector and far too
+long to paste into the context window whole. So pipelines split documents into
+**chunks** — a few hundred tokens each — and the chunk becomes the unit of
+everything downstream: one vector per chunk, ranking over chunks, top-k
+*chunks* into the prompt.
+
+That makes the cut itself load-bearing. A vector is a lossy summary of its
+chunk; a fact that straddles a boundary is split across two vectors, and
+neither one carries it. In the opener, the cut landed between *"You may
+request a refund"* and *"within 30 days of purchase"* — the first chunk knows
+a refund exists, the second knows a deadline exists, and **no chunk knows the
+refund has a deadline**. The damage is done before any embedding is computed,
+which is why no amount of model upgrading repairs it.
+
+One more thing runs even earlier: **extraction**. Chunking operates on text
+pulled out of PDFs, decks, and scans — and extraction quality is the ceiling
+for everything after it. A scanned PDF with no text layer extracts as an empty
+string; a two-column paper read in naive order interleaves its columns
+mid-sentence; a font-encoding glitch emits `(cid:117)` garbage that embeds into
+noise. Audit extracted text against the original *before* debugging anything
+downstream — empty-page rate, characters per page, `(cid:` artifacts. Garbage
+in, confidently-wrong out.
+
+## Three honest strategies, plus overlap {/* anchor: strategy-tradeoffs */}
+
+`mini_rag.chunk` implements the three moves every production splitter is built
+from. Simplest first:
+
+```python
+def chunk_fixed(text: str, size: int, overlap: int = 0) -> list[str]:
+    """Every `size` words becomes a chunk; `overlap` words repeat at each
+    boundary so a fact straddling the cut survives in at least one chunk."""
+    words = text.split()
+    chunks, step = [], size - overlap
+    for start in range(0, len(words), step):
+        piece = words[start : start + size]
+        if piece:
+            chunks.append(" ".join(piece))
+        if start + size >= len(words):
+            break
+    return chunks
+```
+
+Sentence packing adds one constraint — boundaries only at sentence ends — and
+paragraph packing adds one more: respect the author's own topic boundaries
+(blank lines), falling back to sentences when a paragraph is oversized.
+Structure first, then size. Each strategy has a *named* failure mode:
+
+| Strategy | Guarantee | Failure mode |
+|---|---|---|
+| Fixed-size | uniform chunks, uniform cost | cuts mid-sentence — can split a fact |
+| Fixed + overlap | boundary facts survive in one chunk | duplicate text, more vectors; mitigation, not a guarantee |
+| Sentence packing | never cuts mid-sentence | sizes vary; topic can still split across chunks |
+| Paragraph packing | respects the author's topic boundaries | needs real paragraphs; long ones still fall back |
+
+Production splitters are these moves with better tooling: LangChain's
+recursive splitter is "try paragraph boundaries, then sentences, then words"
+with token counting; *semantic* chunking cuts where consecutive-sentence
+embedding similarity drops; *document-aware* chunking splits at headers and
+section markers. Same skeleton, richer boundary detectors.
+
+Two content types refuse prose chunking entirely. **Tables** read linearly
+become word salad — extract them as units, render rows as `Header: Value`
+text, and never split mid-table: a compliance matrix cut in half is two
+meaningless halves. **Structured sections** (forms, field–value blocks,
+runbook steps) chunk best at their natural atoms — one step, one Q&A pair,
+one API method per chunk. The general rule is **route by content type**: a
+corpus of papers, memos, and scorecards needs three chunkers, not one
+universal size.
+
+## Measure it like an engineer {/* anchor: measure-chunking */}
+
+"The chunks look fine" is the chunking version of "the results look right" —
+the exact instinct Chapter 2 trained you out of. Measure in three tiers, cheap
+to expensive:
+
+1. **Extraction audit** (before chunking exists): empty-extraction rate,
+   characters per page, `(cid:` artifacts, OCR confidence on scans. This is
+   the ceiling; fix it first.
+2. **Boundary coherence** (one line of code): the fraction of chunks ending at
+   sentence-terminal punctuation — `boundary_coherence` in the companion.
+   Fixed-size configs score 0.2–0.4; sentence/paragraph score 1.0 by
+   construction. A cheap smoke test, not a quality proof.
+3. **Golden-set retrieval** (the real test): the same labeled (query →
+   relevant content) set from Chapter 2, re-scored per chunking config — does
+   recall@k hold, and does the *answer-bearing span* survive inside the top
+   chunks? Chunk size moves this number more than embedding choice does;
+   starting points are ~512 tokens for factual Q&A, ~1024 for narrative,
+   ~256 for dense technical content — then benchmark, don't trust the folklore.
+
+The grid below is tier 3 run live: one document, one question, twelve configs.
+
+## See it: one fact, twelve ways to cut it
+
+Predict before revealing: which strategies break the 30-day fact at *some*
+size? Then explore. Watch three things — the **fixed-40** cliffhanger chunk
+ending exactly at "…request a refund"; **fixed-60** passing (luck, not
+safety — the cut happened to miss); and **fixed-80 with overlap** still
+failing, because the refund-heavy run-up chunk outranks the one carrying the
+limit. Overlap mitigates; it doesn't guarantee.
+
+<ChunkingExplorer client:visible data={chunkingData} />
+
+<Practice id="chunking-multi-domain" difficulty={3}>
+A junior engineer proposes fixed-size chunking at 1,000 tokens, no overlap,
+for a 50,000-PDF corpus: research papers, policy memos, and table-heavy
+technical reports. Critique the proposal concretely (name the failure modes,
+not vibes), design a better strategy, and say how you'd prove yours is better.
+
+<details>
+<summary>One defensible answer</summary>
+
+- **Critique**: 1,000-token blocks split mid-sentence, mid-table, and
+  mid-section; retrieval returns blocks that are mostly irrelevant filler
+  (diluted similarity); zero overlap means any boundary fact is unrepresentable;
+  and one size across three document types ignores that their natural atoms
+  differ by an order of magnitude.
+- **Better strategy — route by content type**: narrative prose → sentence/
+  recursive packing at ~512 tokens with ~64-token overlap; tables → extracted
+  whole via a table-aware parser, rendered as `Header: Value` text, one chunk
+  per table; structured sections (references, checklists) → one chunk per
+  natural atom. Audit extraction first — scanned reports go through OCR with a
+  confidence gate before any chunking.
+- **Proof**: a golden set of ~50 labeled queries spanning all three document
+  types; compare configs on recall@5 and answer-span-intact rate; boundary
+  coherence as the cheap regression check in CI. Adopt the junior's config as
+  the baseline row in the comparison table — let the numbers do the critique.
+</details>
+</Practice>
+
+## How this is graded
+
+- **Technical Correctness** — you can state *why* a split fact is
+  unrepresentable (one vector per chunk, the cut precedes the embedding) and
+  what overlap actually does, including its limits.
+- **Trade-off Awareness** — uniformity vs coherence vs structure, overlap's
+  storage cost vs boundary insurance, one-size vs content-type routing — each
+  with its price named.
+- **Evaluation Rigor** — this chapter's weighted dimension: extraction audited
+  first, coherence as smoke test, and a golden set re-scored per config —
+  "the chunks look fine" never appears in your answer.
+- **Communication** — "I'd route by content type: 512/64 recursive for prose,
+  whole-table chunks, and a golden-set comparison against the fixed-1000
+  baseline" beats "I'd use LangChain's splitter."
+
+### Industry variation
+
+- **Startups** — paragraph packing with modest overlap and a 50-query golden
+  set is an afternoon of work and covers most corpora; semantic chunking can
+  wait.
+- **Enterprise & government** — extraction dominates: scanned archives, OCR
+  confidence gates, human-review queues for low-confidence documents, and
+  data-residency rules that force self-hosted parsing; compliance tables are
+  mission-critical and never split.
+- **Document-heavy products** (legal, healthcare, research tools) — chunking
+  configs are versioned and regression-tested like code; a chunking change
+  re-runs the golden set in CI, because re-chunking means re-embedding the
+  corpus — a real cost you schedule, not an afternoon tweak.
+
+## Stretch: perfect chunks, wrong answer
+
+Six months later your chunking is measured and boring: coherence 1.0,
+answer-span-intact rate 0.97, recall@5 holding at 0.91. A user asks *"Can I
+get a refund on a gift card I bought five weeks ago?"* — and the assistant
+answers *"Yes, within 30 days"*, which is wrong twice (gift cards are
+non-refundable, and five weeks is past the window). Both relevant chunks were
+retrieved: the 30-day rule ranked #1, the gift-card exclusion ranked #4. The
+failure isn't retrieval and isn't chunking. What does the *generator* actually
+see, and which part of the system decides how retrieved chunks become an
+answer? That assembly step — context construction, grounding rules, and the
+prompt around them — is Chapter 4: the full retrieve → generate pipeline.
