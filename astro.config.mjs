@@ -27,4 +27,8 @@ const guidesFamilyStyle = defineStyle({
 export default await defineBookConfig({
   styles: [researchPortfolioStyle, guidesFamilyStyle],
   base: '/ai-engineering/',
+  // The custom two-guide landing (src/pages/index.astro) replaces the
+  // scaffold's auto-injected `/`; suppress the injection so the routes
+  // don't collide (scaffold #129 escape hatch).
+  routes: { landing: false },
 });
