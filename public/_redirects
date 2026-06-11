@@ -1,4 +1,11 @@
-# Cloudflare Pages redirects.
-# The site builds with base=/ai-engineering/ (proxied at that path from the hub
-# domain), so the bare pages.dev root would otherwise 404. Send it to the app root.
+# Workers static assets redirects (same syntax as the old Pages _redirects).
+#
+# The site builds with base=/ai-engineering/ (its mount path on the hub domain),
+# but Astro emits files at the dist root. So: send the bare root to the
+# canonical base path, normalize the slashless base path, and rewrite (200, no
+# redirect) base-prefixed URLs onto the real asset paths. Scaffold-emitted
+# links that ignore the base (upstream bug, filed consumer:guides) resolve
+# directly against the dist root, so both link shapes work standalone.
 / /ai-engineering/ 302
+/ai-engineering /ai-engineering/ 302
+/ai-engineering/* /:splat 200

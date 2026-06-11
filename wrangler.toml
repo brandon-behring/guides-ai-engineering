@@ -1,15 +1,20 @@
-# Cloudflare Pages config — guides-ai-engineering.
+# Cloudflare Workers (static assets) config — guides-ai-engineering.
 #
-# Not yet deployed. This Pages project will be created when the guide goes live
-# and proxied from the hub repo's wrangler.toml at /ai-engineering/*.
+# Deployed via Workers Builds (Git-connected). Converted from a Pages config
+# 2026-06-11: Cloudflare's dashboard no longer offers Pages project creation on
+# this account (Workers-only flow), so the launch uses Workers static assets.
+# Proxied from the hub at guides.brandon-behring.dev/ai-engineering/* in Phase L1.
 #
-# Dashboard config:
-#   Framework preset: Astro
-#   Build command:    npm run build
-#   Build output:     dist
-#   Root directory:   /
-#   Node version:     22
+#   Build command:  npm run build
+#   Deploy command: npx wrangler deploy   (Workers Builds default)
+#   Node version:   22 (auto-detected by Workers Builds; Astro 6 requires >=22.12.0)
+#
+# Standalone serving of the base=/ai-engineering/ build is handled by
+# public/_redirects (302 root redirect + 200 rewrite of /ai-engineering/* onto
+# the dist-root asset paths).
 
 name = "guides-ai-engineering"
 compatibility_date = "2026-06-03"
-pages_build_output_dir = "./dist"
+
+[assets]
+directory = "./dist"

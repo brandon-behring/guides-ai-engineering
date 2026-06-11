@@ -21,7 +21,7 @@ const guidesFamilyStyle = defineStyle({
   name: 'guides-family',
   site: 'https://guides.brandon-behring.dev',
   routes: { frontmatter: { enabled: true, prefix: '' } },
-  deploy: 'pages',
+  deploy: 'workers',
 });
 
 export default await defineBookConfig({
