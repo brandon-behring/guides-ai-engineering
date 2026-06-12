@@ -14,8 +14,11 @@ collections under `src/content/<guide>/`, one shared `companion/` lib, per-guide
 - **#2 LLM App Engineering — COMPLETE, reviewed (2026-06-10).** All 13 chapters (0–12) in the
   §5 shape; independent 3-agent review, all findings fixed (`docs/REVIEW_FINDINGS_2026-06-10.md`);
   LOS anchors bijective in all 13. Build log: `docs/guide-02-llm-app-engineering.md`.
-  **The roadmap-v2 §5 launch gate is MET → next series move = the site-launch workstream**
-  (`~/guides/docs/plans/active/2026-06-10_series_roadmap_v2.md` §5; user-side Cloudflare steps).
+  **LAUNCHED 2026-06-12** — this repo is live at `guides-ai-engineering.brandon-m-behring.workers.dev`
+  (Workers static assets; root 302 → `/ai-engineering/`), hub at `guides.brandon-behring.dev`. The
+  `/ai-engineering/*` mount on the hub domain waits on scaffold **#140 + #141** (base-unaware links;
+  ChapterNav prefix — `_redirects` carries documented stopgaps for both, remove when fixed). Launch
+  state + remaining L2 work: `~/guides/docs/plans/active/2026-06-10_series_roadmap_v2.md` §5.
 
 ## Companion (`companion/`, stdlib-only, "for learning, not production")
 - `mini_eval` — 6 modules (metrics·confidence·calibration·retrieval·agent·judge), **24/24 tests**.
