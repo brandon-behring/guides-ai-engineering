@@ -29,7 +29,7 @@ from mini_rag import (  # noqa: E402
     RagPipeline, split_sentences,
     fold_tokenize, expand_query, coverage_score, hybrid_search,
     assemble_context, ABSTAIN,
-    api_cost_usd, cascade_cost_usd, effective_cost_usd,
+    api_cost_usd, cascade_cost_usd, effective_cost_usd, break_even_queries_per_day,
 )
 from mini_prod import (  # noqa: E402
     request_service_ms, poisson_arrivals, simulate_queue, latency_summary,
@@ -1255,6 +1255,42 @@ def drift_demo() -> dict:
     }
 
 
+def break_even_demo() -> dict:
+    """Ch 10 self-host vs API, for the BreakEvenExplorer island. The crossover volume
+    where a fixed monthly GPU cost (self-host) equals the per-query API bill, via
+    mini_rag.budget.break_even_queries_per_day. Levers: GPU tier ($/mo), API rate
+    ($/query), daily volume. The arithmetic is necessary but not sufficient — the
+    chapter's whole point is that latency, data residency, and the ops burden of
+    running your own serving stack often decide before the crossover does."""
+    gpus = [1500, 3000, 6000]           # $/month, self-hosted GPU tiers
+    api_rates = [0.0006, 0.006]         # $/query: hosted open model vs frontier-class
+    volumes = [5000, 20000, 100000]     # queries/day
+
+    def cell(gpu: int, api_q: float, vol: int) -> dict:
+        crossover = break_even_queries_per_day(gpu, api_q)
+        return {
+            "gpu": gpu, "api_rate": api_q, "vol": vol,
+            "crossover_qpd": round(crossover),
+            "api_month": round(api_q * vol * 30),
+            "self_month": gpu,
+            "cheaper": "self-host" if vol > crossover else "api",
+        }
+
+    combos = [cell(g, a, v) for g in gpus for a in api_rates for v in volumes]
+    return {
+        "name": "Self-host vs API: the break-even",
+        "note": ("Crossover = monthly GPU cost ÷ 30 ÷ API cost-per-query "
+                 "(mini_rag.budget.break_even_queries_per_day): below it the API is "
+                 "cheaper, above it self-hosting is. But near the line the monthly "
+                 "difference is small next to the cost of running your own serving "
+                 "stack — and latency or data-residency requirements can decide it "
+                 "before volume does. The number is necessary, not sufficient."),
+        "levers": {"gpu": gpus, "api_rate": api_rates, "vol": volumes},
+        "defaults": {"gpu": 3000, "api_rate": 0.006, "vol": 20000},
+        "combos": combos,
+    }
+
+
 def main() -> None:
     os.makedirs(OUT, exist_ok=True)
     for name, data in [
@@ -1277,6 +1313,7 @@ def main() -> None:
         ("cascade_demo", cascade_demo()),
         ("trace_demo", trace_demo()),
         ("drift_demo", drift_demo()),
+        ("break_even_demo", break_even_demo()),
     ]:
         path = os.path.join(OUT, f"{name}.json")
         with open(path, "w") as f:

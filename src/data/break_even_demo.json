@@ -1,0 +1,189 @@
+{
+  "name": "Self-host vs API: the break-even",
+  "note": "Crossover = monthly GPU cost \u00f7 30 \u00f7 API cost-per-query (mini_rag.budget.break_even_queries_per_day): below it the API is cheaper, above it self-hosting is. But near the line the monthly difference is small next to the cost of running your own serving stack \u2014 and latency or data-residency requirements can decide it before volume does. The number is necessary, not sufficient.",
+  "levers": {
+    "gpu": [
+      1500,
+      3000,
+      6000
+    ],
+    "api_rate": [
+      0.0006,
+      0.006
+    ],
+    "vol": [
+      5000,
+      20000,
+      100000
+    ]
+  },
+  "defaults": {
+    "gpu": 3000,
+    "api_rate": 0.006,
+    "vol": 20000
+  },
+  "combos": [
+    {
+      "gpu": 1500,
+      "api_rate": 0.0006,
+      "vol": 5000,
+      "crossover_qpd": 83333,
+      "api_month": 90,
+      "self_month": 1500,
+      "cheaper": "api"
+    },
+    {
+      "gpu": 1500,
+      "api_rate": 0.0006,
+      "vol": 20000,
+      "crossover_qpd": 83333,
+      "api_month": 360,
+      "self_month": 1500,
+      "cheaper": "api"
+    },
+    {
+      "gpu": 1500,
+      "api_rate": 0.0006,
+      "vol": 100000,
+      "crossover_qpd": 83333,
+      "api_month": 1800,
+      "self_month": 1500,
+      "cheaper": "self-host"
+    },
+    {
+      "gpu": 1500,
+      "api_rate": 0.006,
+      "vol": 5000,
+      "crossover_qpd": 8333,
+      "api_month": 900,
+      "self_month": 1500,
+      "cheaper": "api"
+    },
+    {
+      "gpu": 1500,
+      "api_rate": 0.006,
+      "vol": 20000,
+      "crossover_qpd": 8333,
+      "api_month": 3600,
+      "self_month": 1500,
+      "cheaper": "self-host"
+    },
+    {
+      "gpu": 1500,
+      "api_rate": 0.006,
+      "vol": 100000,
+      "crossover_qpd": 8333,
+      "api_month": 18000,
+      "self_month": 1500,
+      "cheaper": "self-host"
+    },
+    {
+      "gpu": 3000,
+      "api_rate": 0.0006,
+      "vol": 5000,
+      "crossover_qpd": 166667,
+      "api_month": 90,
+      "self_month": 3000,
+      "cheaper": "api"
+    },
+    {
+      "gpu": 3000,
+      "api_rate": 0.0006,
+      "vol": 20000,
+      "crossover_qpd": 166667,
+      "api_month": 360,
+      "self_month": 3000,
+      "cheaper": "api"
+    },
+    {
+      "gpu": 3000,
+      "api_rate": 0.0006,
+      "vol": 100000,
+      "crossover_qpd": 166667,
+      "api_month": 1800,
+      "self_month": 3000,
+      "cheaper": "api"
+    },
+    {
+      "gpu": 3000,
+      "api_rate": 0.006,
+      "vol": 5000,
+      "crossover_qpd": 16667,
+      "api_month": 900,
+      "self_month": 3000,
+      "cheaper": "api"
+    },
+    {
+      "gpu": 3000,
+      "api_rate": 0.006,
+      "vol": 20000,
+      "crossover_qpd": 16667,
+      "api_month": 3600,
+      "self_month": 3000,
+      "cheaper": "self-host"
+    },
+    {
+      "gpu": 3000,
+      "api_rate": 0.006,
+      "vol": 100000,
+      "crossover_qpd": 16667,
+      "api_month": 18000,
+      "self_month": 3000,
+      "cheaper": "self-host"
+    },
+    {
+      "gpu": 6000,
+      "api_rate": 0.0006,
+      "vol": 5000,
+      "crossover_qpd": 333333,
+      "api_month": 90,
+      "self_month": 6000,
+      "cheaper": "api"
+    },
+    {
+      "gpu": 6000,
+      "api_rate": 0.0006,
+      "vol": 20000,
+      "crossover_qpd": 333333,
+      "api_month": 360,
+      "self_month": 6000,
+      "cheaper": "api"
+    },
+    {
+      "gpu": 6000,
+      "api_rate": 0.0006,
+      "vol": 100000,
+      "crossover_qpd": 333333,
+      "api_month": 1800,
+      "self_month": 6000,
+      "cheaper": "api"
+    },
+    {
+      "gpu": 6000,
+      "api_rate": 0.006,
+      "vol": 5000,
+      "crossover_qpd": 33333,
+      "api_month": 900,
+      "self_month": 6000,
+      "cheaper": "api"
+    },
+    {
+      "gpu": 6000,
+      "api_rate": 0.006,
+      "vol": 20000,
+      "crossover_qpd": 33333,
+      "api_month": 3600,
+      "self_month": 6000,
+      "cheaper": "api"
+    },
+    {
+      "gpu": 6000,
+      "api_rate": 0.006,
+      "vol": 100000,
+      "crossover_qpd": 33333,
+      "api_month": 18000,
+      "self_month": 6000,
+      "cheaper": "self-host"
+    }
+  ]
+}

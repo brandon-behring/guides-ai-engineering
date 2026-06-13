@@ -1,0 +1,202 @@
+---
+title: "Incidents & reliability ops — SLOs, runbooks, degradation modes"
+slug: incidents-reliability
+description: "Guardrails stop the failures you anticipated; the bad day is the one you didn't. Reliability as a budget, not an absolute — an SLO with an error budget you spend on velocity, applied to AI quality and not just uptime. Degradation modes that turn an upstream outage into a graceful fallback, and runbooks that turn a 3 a.m. alert into a tested procedure: mitigate first (flip the flag, roll back), then find the cause."
+freshness: literature-survey
+last_verified: 2026-06-13
+tags: [production, reliability, incidents, slo, runbooks]
+sources: []
+draft: false
+mode: tutorial
+target: transfer
+ordering: problem-first
+commitment: long-lived
+paradigms: [default]
+research_debt_addressed: |
+  Reliability for AI systems is either ignored or imported wholesale from SRE without the
+  AI-specific twist: SLOs apply to quality (groundedness, refusal rate), not just uptime,
+  and the highest-leverage degradation mode is the model fallback. Candidates reach for
+  "aim for zero incidents" (not an engineering target) or can't separate mitigation from
+  root-cause under pressure. This chapter builds the error-budget framing, the degradation
+  mode as a reliability control, and the mitigate-then-fix discipline a runbook encodes.
+task_classes: [reliability, incident-response]
+provenance:
+  ai_tools: ["Claude Opus 4.8 (Anthropic)"]
+  audit_history:
+    - date: 2026-06-13
+      type: authored
+      file: src/content/production-ai-systems/09-incidents-reliability.mdx
+  citation_backstop: manual
+los:
+  - id: PAS-9.1
+    bloom: explain
+    statement: "Explain an SLO and its error budget — reliability as an explicit budget of allowed failure spent on shipping velocity — and why for AI systems the SLO covers quality (groundedness, refusal rate), not just uptime."
+    anchor: slo-error-budget
+    threshold: true
+  - id: PAS-9.2
+    bloom: design
+    statement: "Design the reliability controls for a known failure class — a degradation mode (graceful fallback) and a runbook (a tested mitigate-first procedure) — and order the runbook's first steps."
+    anchor: degradation-and-runbooks
+    threshold: true
+  - id: PAS-9.3
+    bloom: analyze
+    statement: "Given an incident, choose the reliability tool that bounds the damage and distinguish mitigation (stop the bleeding) from root-cause (fix the cause), in the right order."
+    anchor: mitigate-then-fix
+    threshold: true
+---
+
+import YouWillLearn from '@brandon_m_behring/book-scaffold-astro/components/YouWillLearn.astro';
+import Pitfall from '@brandon_m_behring/book-scaffold-astro/components/Pitfall.astro';
+import Practice from '@brandon_m_behring/book-scaffold-astro/components/Practice.astro';
+import ScenarioQuiz from '../../components/ScenarioQuiz.tsx';
+import incidentData from '../../data/incident_demo.json';
+
+# Incidents & reliability ops — SLOs, runbooks, degradation modes
+
+<YouWillLearn prerequisites="Chapter 8 — guardrails stop the failures you anticipated. Chapter 1's flag and fallback. You've been on-call or can imagine it.">
+- Why reliability is a **budget**, not an absolute — the SLO and its **error budget**, applied to *quality*.
+- **Degradation modes** that turn an upstream outage into a graceful fallback.
+- **Runbooks**: mitigate first (flag, rollback), then find the cause.
+</YouWillLearn>
+
+## The bad day arrives
+
+You pinned versions, gated deploys, instrumented the loop, and built guardrails. Then, on
+an ordinary Tuesday, the model provider has a regional outage and every request starts
+timing out; or a prompt change slips the gate and refusal rate doubles; or a novel attack
+gets past the input classifier. Production's defining property is that the failure you
+didn't anticipate eventually happens, and on that day prevention is no longer the question
+— *bounding the damage* is.
+
+Reliability ops is the discipline of the bad day: deciding in advance how reliable is
+reliable enough, how the system fails when it fails, and what the human on-call actually
+does at 3 a.m. The interview tell is whether a candidate treats reliability as a number to
+manage or as a vague aspiration to "be more careful."
+
+Predict, before reading on: leadership says the reliability target is "zero incidents."
+**Why is that not an engineering target** — and what number would you propose instead?
+
+<Pitfall title="Zero incidents is not a target">
+"Aim for zero incidents" sounds responsible and is actually paralysis. A target of zero
+either stops you from shipping anything (every change risks an incident) or gets quietly
+violated and then ignored, which trains everyone to ignore the next one too. Reliability
+is a budget: you decide what rate of failure is acceptable, and you *spend* the rest on
+moving fast. A target you can't measure and will inevitably break is worse than an honest
+one you manage.
+</Pitfall>
+
+## SLOs and error budgets {/* anchor: slo-error-budget */}
+
+A **Service Level Objective** is the target: "99.9% of requests succeed," "p99 < 2s,"
+or — for an AI system — "groundedness ≥ 0.70 on sampled traffic." Its shadow is the
+**error budget**: 99.9% good means 0.1% allowed-bad, and that allowance is a resource. If
+you're under budget, you can ship faster and take more risk; if you've burned it, you
+freeze features and spend on stability. The budget converts a vague "be reliable" into an
+explicit dial between velocity and safety that the whole team can see.
+
+The AI-specific move is that the SLO covers **quality**, not just uptime. A bot can be
+100% available and 60% grounded — the classic three pillars (Chapter 5) would call it
+healthy. So the reliability targets that matter here are written against the fourth pillar:
+groundedness, refusal rate, escalation precision. "Is it up?" and "is it right?" each get
+their own SLO and their own budget.
+
+## Degradation modes and runbooks {/* anchor: degradation-and-runbooks */}
+
+Two controls turn a failure into a managed event:
+
+- **A degradation mode** is the planned answer to "what happens when the primary path
+  fails?" It's Chapter 1's fallback, promoted to a reliability control: on a provider
+  outage, drop to a cached answer, a cheaper backup model, or an honest "I can't answer
+  right now" — graceful degradation instead of a wall of 500s. (And never a tight retry
+  loop against a struggling provider — that's a thundering herd that makes the outage
+  worse.)
+- **A runbook** is the tested procedure for a known alert: what it means, how to mitigate
+  *now*, and who to escalate to. It exists so that the person on-call at 3 a.m. — who may
+  have never seen this failure — executes a checklist instead of improvising. The first
+  step is almost always the kill switch or flag from Chapter 1: mitigate, then debug.
+
+```text
+RUNBOOK — quality alert: groundedness SLO breached
+  1. MITIGATE  flip cascade flag → frontier-only (kills a miscalibrated-cheap regression)
+               if still breaching, roll back to last known-good release
+  2. ASSESS    check recent changes: deploy? corpus re-index? provider model update?
+  3. ESCALATE  page the on-call ML engineer if mitigation doesn't recover within 15 min
+  4. ROOT-CAUSE  (after mitigation) bisect the change; add a regression case to the gate
+```
+
+## Mitigate, then fix {/* anchor: mitigate-then-fix */}
+
+The single most important ordering under stress: **stop the bleeding before you find the
+cause.** Mitigation (flip a flag, roll back, fall back to the backup model) bounds the
+damage in seconds and buys you the time to do root-cause analysis calmly. The failure mode
+is inverting them — debugging the interesting question of *why* groundedness dropped while
+users keep getting bad answers, because the fix feels more satisfying than the rollback.
+
+Root-cause still matters: a mitigation you never explain is a time bomb, and the durable
+fix (a new regression case in the gate, a corpus re-index, a guardrail for the new attack)
+is what stops the repeat. But it comes *second*. The runbook encodes the order so that an
+exhausted human at 3 a.m. doesn't have to rediscover it.
+
+## See it: the bad day, three moments
+
+Three moments from an incident, each with a reliability tool that fits. **Predict** the
+tool before the reveal — SLO/budget, degradation mode, or runbook.
+
+<ScenarioQuiz client:visible data={incidentData} />
+
+The pattern: reliability isn't heroics, it's preparation. An error budget decided the
+risk tolerance in advance, a degradation mode decided how to fail in advance, and a runbook
+decided the response in advance — so the bad day is execution, not invention.
+
+<Practice id="write-the-runbook" difficulty={3}>
+Your bot's groundedness SLO (≥ 0.70 on sampled traffic) just breached. Write the first
+three runbook steps in order, and name the degradation mode you'd want already in place.
+
+<details>
+<summary>One defensible answer</summary>
+
+- **Step 1 — mitigate:** flip the cascade flag to frontier-only (in case a miscalibrated
+  cheap router caused it); if groundedness doesn't recover, roll back to the last
+  golden-set-passing release. Stop the bleeding before diagnosing.
+- **Step 2 — assess:** check for a coincident change — a deploy, a corpus re-index, or a
+  provider model update — which tells you regression vs drift (Chapter 7).
+- **Step 3 — escalate:** if mitigation doesn't recover within your window, page the on-call
+  ML engineer with the trace and the recent-change list attached.
+- **Degradation mode already in place:** on a provider/model failure, fall back to a backup
+  model (or a cached answer / graceful "try again shortly"), never a 500 or a retry storm.
+- *Then* root-cause and add a regression case so it can't recur silently.
+</details>
+</Practice>
+
+## How this is graded
+
+- **Technical Correctness** — you define an SLO and error budget correctly, know it covers
+  quality not just uptime, and name degradation modes and runbooks as the concrete controls.
+- **Trade-off Awareness** — this chapter's weighted dimension: you treat the error budget as
+  the explicit velocity-vs-reliability dial, and weigh degradation options (cost, staleness)
+  against a hard failure.
+- **Evaluation Rigor** — your SLO is a measured claim on sampled live traffic (Chapter 6),
+  and your runbook adds a regression case so the incident becomes a permanent test.
+- **Communication** — "we mitigated by flipping to frontier-only, then root-caused a corpus
+  re-index, and added a gate case" is the incident narrative that signals seniority.
+
+### Industry variation
+
+- **Startups** — one SLO, a flag-based kill switch, and a one-page runbook is a real
+  reliability program; the senior move is having a degradation mode at all.
+- **Enterprise** — formal SLOs per service and tenant, error-budget policy that gates
+  feature work, on-call rotations, and blameless postmortems.
+- **Regulated** — incidents carry disclosure and audit duties; runbooks and postmortems are
+  controlled documents, and "we mitigated then investigated" must be evidenced.
+- **AI-assisted coding interviews** — asked "what happens when it breaks," the signal is
+  mitigate-then-fix and a concrete degradation mode, not "we'd look at the logs."
+
+## Stretch: every chapter assumed an API — should it have?
+
+You've now run the entire production loop — deploy, serve, observe, evaluate, respond — and
+almost every chapter quietly assumed you were calling a hosted model API. But under all of
+it sits a standing architectural decision you never made explicit: self-host the model, or
+call an API? It changes your latency, your cost curve, your data exposure, and which of the
+last nine chapters become *your* operational problem versus the provider's. When does the
+answer flip — and is cost even the thing that decides it? (That's **Chapter 10 — self-host
+vs API vs hybrid**.)

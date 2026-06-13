@@ -1,0 +1,45 @@
+{
+  "name": "The bad day: reliability ops",
+  "note": "Three moments from an incident. For each, pick the reliability tool that fits — before the chapter names SLOs, degradation modes, and runbooks.",
+  "items": [
+    {
+      "id": "slo-error-budget",
+      "prompt": "Leadership wants 'zero incidents' as the reliability target for the bot, and the team is told to stop shipping until that's guaranteed.",
+      "candidates": [
+        "Set an SLO with an error budget instead — e.g. 99.9% of requests good — so the allowed failure is an explicit budget you spend on shipping velocity; 'zero incidents' is not a target, it's a way to stop improving",
+        "Agree — zero incidents is the only acceptable standard for production",
+        "SLOs are for infra uptime and don't apply to AI quality",
+        "Promise 100% and add more reviewers to every change"
+      ],
+      "correct": "Set an SLO with an error budget instead — e.g. 99.9% of requests good — so the allowed failure is an explicit budget you spend on shipping velocity; 'zero incidents' is not a target, it's a way to stop improving",
+      "explanation": "Reliability is a budget, not an absolute. An SLO (a target like 99.9% good) implies an error budget — the failures you're allowed — and the budget is what you spend to ship at all. 'Zero incidents' either halts delivery or quietly gets violated and ignored. And SLOs apply to *quality* for AI systems (groundedness, refusal rate), not just uptime — that's the fourth-pillar point from Chapter 5.",
+      "principle": "An SLO with an error budget makes reliability a number you manage; 'zero incidents' just stops the line."
+    },
+    {
+      "id": "degradation-mode",
+      "prompt": "The model provider has a regional outage. Right now, every request to the bot times out and returns a 500.",
+      "candidates": [
+        "Define a degradation mode: fall back to a cached answer, a cheaper backup model, or an honest 'I can't answer that right now' — so an upstream outage degrades gracefully instead of hard-failing every request",
+        "Wait for the provider to recover; outages are their responsibility",
+        "Retry the failing call in a tight loop until it succeeds",
+        "Show the raw 500 error to users so they know it's not your fault"
+      ],
+      "correct": "Define a degradation mode: fall back to a cached answer, a cheaper backup model, or an honest 'I can't answer that right now' — so an upstream outage degrades gracefully instead of hard-failing every request",
+      "explanation": "Resilience is planning the bad day in advance. A degradation mode is the fallback from Chapter 1, now a reliability control: when the primary path fails, serve something safe and useful — a cached response, a backup model, or a graceful 'try later.' Tight retries make an overloaded provider worse (a thundering herd); showing 500s is the hard failure you were trying to avoid.",
+      "principle": "Plan the degradation: an upstream outage should drop you to a safe fallback, not a wall of 500s."
+    },
+    {
+      "id": "runbook",
+      "prompt": "A quality alert fires at 3 a.m. The on-call engineer has never seen this failure and doesn't know whether to roll back, flip a flag, or page someone.",
+      "candidates": [
+        "Write a runbook: for each known alert, a tested procedure — what it means, how to mitigate now (flip the kill switch / roll back), and who to escalate to — so a 3 a.m. incident is a checklist, not improvisation",
+        "Hire more senior engineers so on-call always knows what to do",
+        "Add more alerts so the problem is more visible",
+        "Tell on-call to wait until business hours to investigate"
+      ],
+      "correct": "Write a runbook: for each known alert, a tested procedure — what it means, how to mitigate now (flip the kill switch / roll back), and who to escalate to — so a 3 a.m. incident is a checklist, not improvisation",
+      "explanation": "A runbook converts tribal knowledge into a procedure anyone on-call can execute under stress. The first step is usually the kill switch / feature flag from Chapter 1 (mitigate first, debug later), then a known-good rollback, then escalation. More alerts without runbooks is more 3 a.m. panic; better hiring doesn't scale to every failure class. The runbook is what makes the response repeatable.",
+      "principle": "A runbook turns a 3 a.m. unknown into a tested checklist: mitigate (flag/rollback) first, then escalate."
+    }
+  ]
+}

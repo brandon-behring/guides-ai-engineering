@@ -1,0 +1,218 @@
+---
+title: "Self-host vs API vs hybrid — the standing judgment call"
+slug: self-host-vs-api
+description: "Every chapter so far quietly assumed a hosted model API. The standing decision underneath: self-host the model, call an API, or run a hybrid. The break-even is real arithmetic — a fixed monthly GPU cost versus a per-query API bill, with a crossover volume — but cost is necessary, not sufficient. Latency, data residency, control, and the operational burden of owning your own serving stack (every prior chapter becomes yours) routinely decide it before volume does, and a hybrid often captures most of the savings at a fraction of the ops."
+freshness: literature-survey
+last_verified: 2026-06-13
+tags: [production, self-hosting, cost, architecture, judgment]
+sources: []
+draft: false
+mode: tutorial
+target: transfer
+ordering: problem-first
+commitment: long-lived
+paradigms: [default]
+research_debt_addressed: |
+  The self-host-vs-API question is answered in public material with a single axis (cost) or
+  a vendor's thumb on the scale, leaving candidates who quote a break-even without the
+  factors that actually decide it and without the operational reality that self-hosting
+  hands you every serving, scaling, and reliability problem in this guide. This chapter
+  builds the break-even arithmetic, then subordinates it to latency / residency / control /
+  ops, and frames the hybrid as the answer that usually wins.
+task_classes: [architecture-decision, cost-modeling]
+provenance:
+  ai_tools: ["Claude Opus 4.8 (Anthropic)"]
+  audit_history:
+    - date: 2026-06-13
+      type: authored
+      file: src/content/production-ai-systems/10-self-host-vs-api.mdx
+  citation_backstop: manual
+los:
+  - id: PAS-10.1
+    bloom: calculate
+    statement: "Compute the self-host vs API break-even volume — a fixed monthly GPU cost against a per-query API bill — and read which side a given daily volume falls on."
+    anchor: the-break-even
+    threshold: true
+  - id: PAS-10.2
+    bloom: compare
+    statement: "Compare self-host, API, and hybrid across the factors the crossover ignores — latency, data residency, control, and operational burden — and explain when a non-cost factor decides before volume does."
+    anchor: beyond-cost
+    threshold: true
+  - id: PAS-10.3
+    bloom: design
+    statement: "Design a hybrid that captures most of the savings at a fraction of the ops burden — self-host the high-volume cheap path, API for burst, frontier escalations, and the long tail."
+    anchor: the-hybrid
+    threshold: true
+---
+
+import YouWillLearn from '@brandon_m_behring/book-scaffold-astro/components/YouWillLearn.astro';
+import Pitfall from '@brandon_m_behring/book-scaffold-astro/components/Pitfall.astro';
+import Practice from '@brandon_m_behring/book-scaffold-astro/components/Practice.astro';
+import BreakEvenExplorer from '../../components/BreakEvenExplorer.tsx';
+import breakEvenData from '../../data/break_even_demo.json';
+
+# Self-host vs API vs hybrid — the standing judgment call
+
+<YouWillLearn prerequisites="Chapters 1–9 — you can serve, observe, evaluate, and operate a model. Chapter 4's cost arithmetic and break-even function.">
+- How to compute the **break-even volume** where self-hosting beats per-query API cost.
+- The factors the crossover **ignores** — latency, data residency, control, ops burden.
+- Why a **hybrid** usually captures most of the savings at a fraction of the operational cost.
+</YouWillLearn>
+
+## The standing decision
+
+Nine chapters in, finance asks the obvious question: the bot is at 20,000 queries a day and
+the API bill is real — should we self-host the model and save money? It's a fair question,
+and it's also the one architectural decision every chapter so far quietly assumed away.
+Calling an API or running your own GPUs changes your latency, your cost curve, your data
+exposure, and — critically — *which problems are yours*. Self-hosting doesn't just trade a
+per-query bill for a GPU bill; it hands you every serving, batching, scaling, and reliability
+problem in this guide.
+
+There's a clean number to compute, and you should compute it. But the most common mistake is
+stopping at the number, because cost is the factor that *least often* decides this — and an
+interviewer asking "would you self-host?" is testing whether you know that.
+
+Predict, before reading on: a self-hosted GPU costs a fixed amount per month; an API costs
+per query. **At what daily volume do they break even** — and once you've computed it, what
+would make you choose the more expensive side anyway?
+
+<Pitfall title="The break-even is necessary, not sufficient">
+The crossover volume is real arithmetic and worth knowing cold. But "we're above the
+break-even, so self-host" is a junior answer, because it treats a multi-factor decision as a
+one-variable one. Near the crossover the monthly difference is often small next to the cost
+of *running* a serving stack — and far from cost, a latency SLA or a data-residency rule can
+make the decision for you regardless of which side is cheaper. The number frames the
+decision; it rarely makes it.
+</Pitfall>
+
+## The break-even {/* anchor: the-break-even */}
+
+Self-hosting is a **fixed** cost (the GPU, monthly, whether you serve one query or a
+million); an API is a **variable** cost (per query). They cross at a volume, and
+`mini_rag.budget` computes it:
+
+```python
+def break_even_queries_per_day(gpu_monthly_usd, api_cost_per_query):
+    """The daily volume where a fixed GPU cost equals the per-query API bill. Below it the
+    API is cheaper; above it self-hosting is — all else equal, which it rarely is."""
+    return gpu_monthly_usd / 30.0 / api_cost_per_query
+```
+
+A \$3,000/month GPU against a frontier-class API at \$0.006/query breaks even at
+3000 ÷ 30 ÷ 0.006 ≈ **16,700 queries/day**. So the bot at 20,000/day is just past it —
+self-host saves about \$600/month (\$3,000 vs \$3,600). Two things this makes obvious:
+
+- **The crossover swings enormously with the API rate.** Swap the frontier API for a hosted
+  *open* model at \$0.0006/query and the break-even jumps to ~83,000/day — because the thing
+  you'd self-host is cheap to call too. You're usually not choosing self-host-vs-frontier;
+  you're choosing self-host-an-open-model vs call-that-same-open-model.
+- **Near the crossover, cost barely decides.** A \$600/month difference is noise next to the
+  salary cost of the engineer keeping your GPUs healthy. The arithmetic says "either," which
+  hands the decision to everything else.
+
+## Beyond cost {/* anchor: beyond-cost */}
+
+The factors the break-even ignores are usually the ones that decide:
+
+- **Latency.** Self-hosting can give lower, more *predictable* tail latency (no shared
+  multi-tenant queue, no network hop) — decisive for a voice or real-time product. Or it can
+  be worse, if you can't keep utilization high (Chapter 3). Either way it's a serving problem
+  you now own.
+- **Data residency & privacy.** A regulated workload that can't send data to a third party
+  forces self-hosting (or a private deployment) regardless of cost. This is frequently the
+  *actual* reason a company self-hosts, and it's not on the cost axis at all.
+- **Control & customization.** Self-hosting lets you fine-tune, pin a version forever (no
+  provider swap — Chapter 1), and tune the serving stack. An API gives you the frontier
+  model's quality and the provider's improvements for free.
+- **Operational burden.** This is the one candidates forget: self-hosting makes Chapters
+  2, 3, 5, and 9 *your* job — capacity, batching, observability, on-call. The break-even
+  rarely prices in the team it takes to run the thing.
+
+The senior framing inverts the naive one: **start from latency, residency, and control;
+use the break-even to size the cost consequence — not the other way around.**
+
+## The hybrid {/* anchor: the-hybrid */}
+
+The decision is rarely all-or-nothing, and the answer that usually wins is a **hybrid** that
+takes the best of each — and it's the cascade from Chapter 4 wearing a deployment hat:
+
+- **Self-host the high-volume, cheap, steady path** — the easy majority of queries on an
+  open model you run, where the volume justifies the fixed cost and the workload is
+  predictable.
+- **Call an API for the rest** — burst capacity above your self-hosted ceiling, frontier
+  escalations for the hard queries (the cascade's expensive path), and the long tail of rare
+  request types not worth provisioning for.
+
+This captures most of the savings (the bulk of traffic is on your cheap fixed-cost path)
+while letting the API absorb spikes and the hard tail — so you don't provision GPUs for your
+peak, and you don't pay frontier rates for your easy majority. It's more moving parts, but it
+dominates the pure plays for most products above the smallest scale.
+
+## See it: where's the crossover?
+
+The default is the bot's situation — a \$3,000 GPU vs a frontier API at 20K/day, right near
+the line. **Predict** which side wins, then move the volume and the API rate and watch the
+crossover move — and notice how often "cheaper" is close enough that the non-cost factors
+should decide.
+
+<BreakEvenExplorer client:visible data={breakEvenData} />
+
+The lesson the sliders teach: the crossover is a moving target set mostly by the API rate,
+and near it the monthly difference is small — exactly the regime where latency, residency,
+and ops, not the dollar figure, make the call.
+
+<Practice id="make-the-call" difficulty={3}>
+A fintech runs a document-Q&A bot at 50,000 queries/day. Compliance forbids sending customer
+documents to a third-party API. Walk the decision: what does the break-even say, and what
+actually decides it?
+
+<details>
+<summary>One defensible answer</summary>
+
+- **Break-even:** at 50K/day you're likely well above the crossover for a self-hostable open
+  model, so cost *also* favors self-hosting — but that's not the binding constraint.
+- **What decides it:** data residency. Compliance forbidding third-party data egress forces
+  self-hosting (or a private/VPC deployment) regardless of where the cost crossover sits — the
+  decision is made on the residency axis before volume enters.
+- **Consequence to own:** you've now taken on Chapters 2–3 (capacity, batching), 5 (your own
+  observability), and 9 (your own on-call). Budget the team, not just the GPUs.
+- **Possible hybrid:** self-host the model for anything touching customer documents; use an
+  API only for non-sensitive paths (e.g. general help content) if it simplifies anything —
+  but the sensitive core is self-hosted by mandate.
+</details>
+</Practice>
+
+## How this is graded
+
+- **Technical Correctness** — you compute the break-even correctly (fixed vs per-query, the
+  crossover volume) and know the API rate, not the GPU cost, dominates where it lands.
+- **Trade-off Awareness** — this chapter's weighted dimension: you subordinate cost to
+  latency, residency, control, and ops, and you reach for the hybrid instead of a pure play.
+- **Evaluation Rigor** — you price the *operational* cost of self-hosting (the team, the
+  on-call, every prior chapter becoming yours), not just the GPU line item.
+- **Communication** — "above the break-even on cost, but residency forces self-host, so we
+  self-host the sensitive path and API the rest" is the multi-factor answer that signals
+  seniority.
+
+### Industry variation
+
+- **Startups** — almost always API first: you can't afford the ops burden, and the frontier
+  model's quality is a feature. Self-host only when a hard constraint (cost at real scale,
+  residency) forces it.
+- **Enterprise / regulated** — residency and control push toward self-hosted or private
+  deployments early; the hybrid (private core, API edges) is common.
+- **High volume / latency-critical** — self-hosting an open model on tuned serving wins on
+  both cost and tail latency once volume is high and steady.
+- **AI-assisted coding interviews** — asked "self-host or API," the signal is computing the
+  break-even *and* naming residency/latency/ops as what actually decides — never cost alone.
+
+## Stretch: you have every piece — now assemble the system
+
+Ten chapters have built the production loop one stage at a time: deploy safely, serve fast
+and affordably, observe, evaluate, respond, and choose your infrastructure. An interview
+won't ask for the pieces one at a time — it'll put a blank whiteboard in front of you and
+say "design a production AI system," and expect you to assemble them under time pressure,
+leading with requirements and SLOs before boxes. Can you compose the whole loop into one
+coherent design, and defend the trade-offs? (That's **Chapter 11 — the system-design
+capstone**.)
