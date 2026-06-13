@@ -1,0 +1,241 @@
+---
+title: "Latency anatomy — TTFT, decode, and where time goes"
+slug: latency-anatomy
+description: "A traffic spike broke p99 while per-request latency never changed — because a slow system under load is a queue, not a slow model. Where a request's time actually goes (prefill vs decode, and why you never quote latency without the output-length assumption), why latency is a distribution measured at the tail, and why capacity = serving slots / service time is the arithmetic that explains the cliff."
+freshness: literature-survey
+last_verified: 2026-06-13
+tags: [production, latency, serving, performance]
+sources: []
+draft: false
+mode: tutorial
+target: transfer
+ordering: problem-first
+commitment: long-lived
+paradigms: [default]
+research_debt_addressed: |
+  Latency for LLM serving is widely mis-taught as a single number ("the model takes
+  800ms"), which hides the two facts interviews probe: decode time scales with output
+  length and dominates the bill of materials, and tail latency under load is a
+  queueing phenomenon independent of per-request speed. This chapter builds the
+  prefill/decode split and the capacity = slots/service arithmetic from first
+  principles, so a candidate can explain a p99 cliff instead of "adding a bigger GPU."
+task_classes: [latency-estimation, capacity-planning]
+provenance:
+  ai_tools: ["Claude Opus 4.8 (Anthropic)"]
+  audit_history:
+    - date: 2026-06-13
+      type: authored
+      file: src/content/production-ai-systems/02-latency-anatomy.mdx
+  citation_backstop: manual
+los:
+  - id: PAS-2.1
+    bloom: explain
+    statement: "Explain where a request's time goes — prefill (compute-bound, sets time-to-first-token) versus decode (memory-bandwidth-bound, scales linearly with output length) — and why a latency number is meaningless without its output-length assumption."
+    anchor: prefill-vs-decode
+    threshold: true
+  - id: PAS-2.2
+    bloom: explain
+    statement: "Explain why production latency is a distribution reported at the tail (p95/p99), not a mean, and why the SLA is written against the tail."
+    anchor: latency-is-a-distribution
+    threshold: true
+  - id: PAS-2.3
+    bloom: analyze
+    statement: "Explain why a traffic spike breaks p99 even when per-request latency is unchanged: capacity = serving slots / service time, and once offered load exceeds capacity the queue wait, not the service, dominates the tail."
+    anchor: spike-is-a-queue
+    threshold: true
+---
+
+import YouWillLearn from '@brandon_m_behring/book-scaffold-astro/components/YouWillLearn.astro';
+import Pitfall from '@brandon_m_behring/book-scaffold-astro/components/Pitfall.astro';
+import Practice from '@brandon_m_behring/book-scaffold-astro/components/Practice.astro';
+import LatencyExplorer from '../../components/LatencyExplorer.tsx';
+import latencyData from '../../data/latency_demo.json';
+
+# Latency anatomy — TTFT, decode, and where time goes
+
+<YouWillLearn prerequisites="Chapter 1 — the deploy was safe; the system fell over under load anyway. Basic arithmetic and a feel for what an LLM call does.">
+- Where a request's time goes — **prefill** (sets time-to-first-token) vs **decode** (scales with answer length).
+- Why latency is a **distribution** you report at the tail (p95/p99), never a mean.
+- Why a spike breaks p99 with no change to the model: **capacity = slots ÷ service time**, and the queue does the rest.
+</YouWillLearn>
+
+## The 9 a.m. cliff
+
+The promo lands. Traffic on the support bot jumps 6×, concentrated in business hours.
+Nothing about the model changed — same id, same prompt, same answer length. Yet every
+morning between 9 and 10, p99 latency triples and blows through the 2-second SLA, then
+recovers by lunch.
+
+The instinct is "the model got slow" or "we need a bigger GPU." Both are wrong, and an
+interviewer is listening for whether you know why. Per-request latency is *identical* to
+launch week. What changed is the number of requests arriving at once — and that turns
+latency from a property of the model into a property of a **queue**.
+
+Predict, before reading on: if a single request still takes the same 800 ms it always
+did, **where do the extra seconds at p99 come from?**
+
+<Pitfall title="The average that lies">
+A latency dashboard that shows the mean is a dashboard that hides your problem. Mean
+latency can sit at a calm 700 ms while p99 is at 8 seconds and one user in a hundred is
+timing out. Users experience the tail, SLAs are written against the tail, and the mean
+is exactly the statistic that smooths the tail away. Report percentiles or report
+nothing.
+</Pitfall>
+
+## Where the time goes {/* anchor: prefill-vs-decode */}
+
+One LLM call has two phases with different physics. You can estimate both before
+building anything — and `mini_rag.budget` already encodes the rules of thumb:
+
+```python
+def prefill_ms(params_b, input_tokens):
+    """Process the whole prompt at once — compute-bound, GPU saturated.
+    ~1 ms per billion params per 1K input tokens. This sets time-to-first-token."""
+    return params_b * (input_tokens / 1000.0)
+
+def decode_ms(params_b, output_tokens):
+    """Generate one token at a time — memory-bandwidth-bound (reading the KV cache,
+    not saturating the ALUs). ~0.5 ms per token per billion params. Scales LINEARLY
+    with output length — the term beginners forget."""
+    return 0.5 * params_b * output_tokens
+```
+
+For the bot's 8B-class model on a 1,500-token RAG prompt and a 200-token answer:
+prefill ≈ 8 × 1.5 = **12 ms**, decode ≈ 0.5 × 8 × 200 = **800 ms**. Two consequences
+fall out immediately:
+
+- **Decode dominates.** The answer length, not the prompt length, is the latency knob.
+  A 400-token answer doubles decode to 1,600 ms; the prompt barely matters. This is why
+  "be concise" is a latency decision, not a style one.
+- **TTFT is the felt latency when you stream.** Time-to-first-token is everything before
+  decode starts — retrieval + prefill — because a streaming UI shows the first words
+  while the rest generate. Quote *two* numbers: TTFT (what the user feels) and total
+  (what the SLA measures). A latency quoted without its output-length assumption is a
+  number with no meaning.
+
+These are estimates — label them as such and then *measure*, because prompt caching,
+batching, and the specific serving stack move the constants. But the *structure* —
+prefill once, decode per token — is exact, and it's what lets you answer "how slow will
+500-token answers be?" without deploying anything.
+
+## Latency is a distribution {/* anchor: latency-is-a-distribution */}
+
+You don't serve one request; you serve thousands, and they don't all take the same
+time. The honest report is a distribution, summarized at the tail:
+
+```python
+def percentile(samples, p):
+    """The p-th percentile by linear interpolation between ranks — the number an SLA
+    is written against. 'p99 < 2s' is a promise about the 99th request out of 100,
+    which the mean cannot see."""
+    xs = sorted(samples)
+    rank = (p / 100.0) * (len(xs) - 1)
+    lo = int(rank)
+    if lo + 1 >= len(xs):
+        return float(xs[-1])
+    return xs[lo] + (rank - lo) * (xs[lo + 1] - xs[lo])
+```
+
+p50 tells you the typical experience; **p99 tells you whether you have a problem**. The
+gap between them *is* the story — a tight distribution means predictable service, a fat
+tail means a queue forming or a few pathological inputs (very long answers, retries).
+"What's your p99 and how far is it from p50?" is a question with a great deal of signal.
+
+## A spike is a queue, not a slow model {/* anchor: spike-is-a-queue */}
+
+Here is the resolution to the 9 a.m. cliff. A GPU serves some number of requests
+concurrently — call them **serving slots** (a batch). The throughput one deployment can
+sustain is simple arithmetic:
+
+$$\text{capacity (req/s)} = \frac{\text{serving slots}}{\text{service time per request}}$$
+
+The bot's service time is ≈ 812 ms, so **two** slots sustain 2 ÷ 0.812 ≈ **2.5 req/s**.
+At launch traffic (well under that) every request is served immediately and p99 ≈ the
+service time. But the promo pushes offered load to ~6 req/s — more than double
+capacity. Now requests arrive faster than slots free up, a backlog forms, and each new
+request waits behind the queue. The *service* is still 812 ms; the **wait** is what
+explodes, and the wait is unbounded as long as the overload persists. That is the cliff:
+
+```python
+def simulate_queue(arrivals_ms, *, servers, service_ms):
+    """c-server FCFS queue. Each arrival takes the earliest-free slot; its latency is
+    wait + service. When arrivals outrun servers/service_ms, the wait dominates."""
+    slot_free = [0.0] * servers
+    out = []
+    for arr in sorted(arrivals_ms):
+        s = min(range(servers), key=lambda i: slot_free[i])
+        start = max(arr, slot_free[s])
+        slot_free[s] = start + service_ms
+        out.append(start + service_ms - arr)
+    return out
+```
+
+So the fix for a latency cliff is *not* a faster model — it's **more concurrency**: more
+slots (a bigger batch) or more replicas, until capacity clears the offered load. The
+catch, and the bridge to Chapter 3, is that slots aren't free: each concurrent request
+holds a KV cache in GPU memory, so batch size has a hard ceiling set by VRAM, not by
+your willingness to set it higher.
+
+## See it: latency under load
+
+The default is the broken promo config — 6 qps, 2 slots — where p99 is *tens of
+seconds*. **Predict** which single lever rescues it before you reveal the others, then
+watch the capacity gauge: the tail collapses the moment capacity clears offered load.
+
+<LatencyExplorer client:visible data={latencyData} />
+
+Notice three things the grid makes concrete: more slots fixes the spike (capacity rises
+past load); shorter answers help *too* (smaller service time raises capacity for free);
+and at promo load with long answers, even 8 slots isn't enough — there is no single
+lever, only the ratio of load to capacity.
+
+<Practice id="size-the-deployment" difficulty={2}>
+Your bot must hold p99 ≤ 2 s at a peak of 12 req/s. Each request's service time is
+600 ms. Roughly how many serving slots do you need, and name one way to need fewer
+without adding hardware.
+
+<details>
+<summary>One defensible answer</summary>
+
+- **Capacity needed** = load × service = 12 req/s × 0.6 s = **~7.2 concurrent
+  requests**, so you need at least **8 slots** to keep the queue from forming (and a
+  little headroom — running at 100% utilization means any burst tips you into backlog;
+  size for ~70% utilization, so ~10 slots).
+- **Need fewer without hardware**: cut service time. Shorter answers (decode is linear in
+  output length) or prompt caching to shrink prefill both raise capacity per slot — and
+  capping a verbose answer at 200 tokens can do more for p99 than another GPU.
+</details>
+</Practice>
+
+## How this is graded
+
+- **Technical Correctness** — this chapter's weighted dimension: you split prefill from
+  decode, know decode scales with output length, and reach for capacity = slots/service
+  to explain a tail — not "the model is slow, get a bigger GPU."
+- **Trade-off Awareness** — you weigh answer length against latency, and concurrency
+  (throughput) against the KV-memory ceiling and the cost of more replicas.
+- **Evaluation Rigor** — you quote p99 with its p50, and you treat the rules of thumb as
+  estimates to measure, naming the assumptions (output length, batch, caching).
+- **Communication** — "per-request time didn't change; offered load crossed capacity, so
+  the queue wait blew up p99 — we add slots or shed load" is the sentence that lands.
+
+### Industry variation
+
+- **Startups** — one replica and a sane max-output cap gets you a long way; the senior
+  move is knowing the capacity number so the first spike isn't a surprise.
+- **Enterprise / high traffic** — autoscaling on queue depth, separate pools for
+  interactive vs batch, and p99 SLAs per tenant; capacity planning is a standing budget.
+- **Latency-sensitive (voice, trading, marketplaces)** — TTFT is the product; streaming,
+  speculative decoding, and aggressive output caps are non-negotiable.
+- **AI-assisted coding interviews** — you may be asked to estimate latency for a config
+  live; doing the prefill/decode arithmetic out loud, with assumptions stated, is the
+  signal.
+
+## Stretch: more slots, but slots cost GPUs
+
+The cliff fix was "add concurrency" — but every slot holds a KV cache in VRAM, so you
+can't just turn the batch size up, and more replicas means more GPUs and a bigger bill.
+The promo isn't going away; you need to serve 6× the load *without* 6× the hardware. So
+the question becomes: how do you get more requests through the same GPU — smaller
+weights, smarter batching, generating more than one token per step? (That's **Chapter 3
+— throughput levers**, where you make a fixed GPU do more work per second.)

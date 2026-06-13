@@ -1,0 +1,217 @@
+---
+title: "Throughput & efficiency levers — quantization, batching, speculation"
+slug: throughput-levers
+description: "Chapter 2's fix for a latency cliff was 'more concurrency' — but every serving slot holds a KV cache in VRAM, so batch size is memory-bound, not free. The KV-cache ceiling on batching, and the three levers that get more requests through a fixed GPU — quantization (free memory), continuous batching (kill idle slots), speculative decoding (more tokens per step) — each matched to the bottleneck it actually attacks, and the cost each one carries."
+freshness: literature-survey
+last_verified: 2026-06-13
+tags: [production, throughput, serving, quantization, batching]
+sources: []
+draft: false
+mode: tutorial
+target: transfer
+ordering: problem-first
+commitment: long-lived
+paradigms: [default]
+research_debt_addressed: |
+  Serving-throughput content is either vendor benchmark marketing or a list of
+  acronyms (PagedAttention, vLLM, speculative decoding) with no model of which
+  bottleneck each addresses. Candidates then reach for "use vLLM" or "quantize it"
+  as a reflex. This chapter builds the KV-cache memory ceiling that makes batch size
+  finite, then maps the three throughput levers to the three distinct bottlenecks
+  (memory, scheduling utilization, decode steps) so the choice is a diagnosis, not a
+  reflex.
+task_classes: [serving-optimization, capacity-planning]
+provenance:
+  ai_tools: ["Claude Opus 4.8 (Anthropic)"]
+  audit_history:
+    - date: 2026-06-13
+      type: authored
+      file: src/content/production-ai-systems/03-throughput-levers.mdx
+  citation_backstop: manual
+los:
+  - id: PAS-3.1
+    bloom: explain
+    statement: "Explain the KV-cache memory ceiling on batch size — why concurrency is bounded by VRAM rather than chosen freely — and why a longer context window shrinks the maximum batch."
+    anchor: kv-memory-ceiling
+    threshold: true
+  - id: PAS-3.2
+    bloom: explain
+    statement: "Explain the three throughput levers — quantization, continuous batching, speculative decoding — and which distinct bottleneck each one attacks (memory, scheduling utilization, decode steps)."
+    anchor: three-levers
+    threshold: true
+  - id: PAS-3.3
+    bloom: analyze
+    statement: "Given a serving bottleneck, choose the lever that addresses it and name the cost that lever carries (quantization → quality risk; batching → latency/throughput tension; speculation → wasted compute on mispredicts)."
+    anchor: lever-for-the-bottleneck
+    threshold: true
+---
+
+import YouWillLearn from '@brandon_m_behring/book-scaffold-astro/components/YouWillLearn.astro';
+import Pitfall from '@brandon_m_behring/book-scaffold-astro/components/Pitfall.astro';
+import Practice from '@brandon_m_behring/book-scaffold-astro/components/Practice.astro';
+import ScenarioQuiz from '../../components/ScenarioQuiz.tsx';
+import throughputData from '../../data/throughput_levers_demo.json';
+
+# Throughput & efficiency levers — quantization, batching, speculation
+
+<YouWillLearn prerequisites="Chapter 2 — capacity = slots ÷ service time, and the fix for a spike is more concurrency. You know prefill from decode.">
+- Why batch size is **memory-bound** — the KV-cache ceiling — and how context length shrinks it.
+- The **three levers** (quantization, continuous batching, speculative decoding) and the bottleneck each attacks.
+- How to **match the lever to the bottleneck**, and what each one costs.
+</YouWillLearn>
+
+## Serving 6× on the same GPU
+
+Chapter 2 ended with a fix and a catch. The fix: serve the promo's load with more
+concurrency. The catch: you try to raise the batch from 8 to 16 and the GPU runs out of
+memory. Meanwhile its compute meters sit at 40% — you have spare math and no spare
+memory. "Add concurrency" turns out to have a wall, and the wall is VRAM.
+
+The naive read is "buy more GPUs." Sometimes that's the answer, but it's the most
+expensive one, and an interviewer wants to know whether you can get more out of the
+hardware you have first. To do that you need to know *what* is full — and for LLM
+serving, the thing that fills up is almost never what beginners guess.
+
+Predict, before reading on: batch 8 fits and batch 16 OOMs, with compute at 40%. **What
+is actually full, and what would you free to fit a bigger batch?**
+
+<Pitfall title="Just turn the batch size up">
+Throughput rises with batch size, so the reflex is to set it higher. But each concurrent
+request holds its own KV cache — the keys and values for every token it has seen — in
+GPU memory, and that grows with batch size *and* with context length. Set the batch too
+high and you don't get more throughput; you get an out-of-memory crash. Batch size is a
+memory budget, not a free dial.
+</Pitfall>
+
+## The memory ceiling on batching {/* anchor: kv-memory-ceiling */}
+
+Why decode is memory-bound (Chapter 2) and why batching has a ceiling are the same fact:
+the **KV cache**. Every token a request has processed leaves a key and value vector in
+each layer, and decoding reads all of them every step. The memory is straightforward
+arithmetic, encoded in `mini_prod.latency`:
+
+```python
+def kv_cache_gb(*, batch, seq_len, layers, hidden, bytes_per=2):
+    """Two tensors (K and V) × batch × tokens × layers × hidden × bytes.
+    This — not compute — caps how many requests you can run at once."""
+    return 2 * batch * seq_len * layers * hidden * bytes_per / 1e9
+
+def max_batch_from_memory(*, kv_budget_gb, seq_len, layers, hidden, bytes_per=2):
+    """How many requests fit in the VRAM left after the weights."""
+    per_req = kv_cache_gb(batch=1, seq_len=seq_len, layers=layers, hidden=hidden)
+    return int(kv_budget_gb / per_req)
+```
+
+Make it concrete. An 8B model in fp16 is ~16 GB of weights; on a 24 GB GPU that leaves
+~8 GB for KV cache. At a 2,048-token context (32 layers, hidden 4,096), one request's
+KV cache is ~1.07 GB, so `max_batch_from_memory` ≈ **7**. Two consequences:
+
+- **Longer context costs batch.** Double the context to 4,096 tokens and per-request KV
+  doubles, so the max batch *halves* to ~3. A "bigger context window" is also a
+  throughput cut — the kind of coupling interviews reward you for seeing.
+- **Free the memory and the batch grows.** Anything that shrinks the weights or packs
+  the KV cache tighter raises the ceiling. Which is the first lever.
+
+## Three levers, three bottlenecks {/* anchor: three-levers */}
+
+Production serving has three independent levers, and the skill is knowing that they
+attack *different* limits — they are not interchangeable "make it faster" knobs:
+
+- **Quantization** — store weights (and sometimes the KV cache) in fewer bits: fp16 →
+  int8 halves the weights, int4 quarters them. Attacks the **memory** bottleneck: an 8B
+  model in int8 is ~8 GB, leaving ~16 GB for KV — roughly *doubling* the max batch, and
+  reading fewer bytes per token speeds decode too. Cost: a quality risk that you must
+  measure on your golden set (Chapter 1's gate), since aggressive quantization can
+  degrade outputs.
+- **Continuous (in-flight) batching** — instead of waiting for an entire batch to finish
+  before starting the next, evict each sequence the moment it emits its stop token and
+  admit a waiting request in its place. Attacks the **utilization** bottleneck: a static
+  batch idles on its longest member while short requests sit done. This is vLLM's core
+  trick, with PagedAttention managing KV memory in pages to avoid fragmentation. Cost:
+  scheduler complexity (you adopt a serving stack rather than build it).
+- **Speculative decoding** — a small fast "draft" model proposes several tokens; the
+  big "target" model verifies them in a single forward pass, accepting the prefix that
+  matches what it would have generated. Attacks the **decode-steps** bottleneck: it
+  produces multiple tokens per target pass, cutting single-stream latency. Cost: compute
+  burned verifying draft tokens that get rejected — it pays off only when the draft is
+  accurate on your traffic.
+
+## Matching the lever to the bottleneck {/* anchor: lever-for-the-bottleneck */}
+
+The mistake is applying a lever to a limit it doesn't touch — quantizing when the GPU is
+idle on scheduling, or adding speculative decoding to a memory-bound batch. **Diagnose
+first**:
+
+- OOM with spare compute → **memory-bound** → quantize (free VRAM), then batch bigger.
+- GPU idle between batches, finished sequences waiting → **utilization-bound** →
+  continuous batching.
+- Single stream, batch already 1, latency dominated by per-token decode →
+  **decode-step-bound** → speculative decoding.
+
+And always name the cost, because every lever has one: quantization risks quality,
+batching trades a little per-request latency for throughput, speculation wastes compute
+on mispredicts. A lever named without its cost is a benchmark claim, not an engineering
+decision.
+
+## See it: which lever?
+
+Three bottlenecks, each with a lever that fits and levers that don't. **Predict** the
+diagnosis before the fix for each — the symptom in the prompt names the limit.
+
+<ScenarioQuiz client:visible data={throughputData} />
+
+The throughline: there is no "make it faster" button. There is a memory limit, a
+utilization limit, and a decode-step limit, and a different lever for each — the senior
+move is reading the symptom to the right one.
+
+<Practice id="diagnose-and-lever" difficulty={3}>
+Your bot serves an 8B model in fp16 on a 24 GB GPU. You're holding p99 today, but a
+product change is about to triple the average prompt length (more retrieved context).
+What breaks first, and which lever do you reach for — with its cost?
+
+<details>
+<summary>One defensible answer</summary>
+
+- **What breaks:** tripling context roughly triples per-request KV cache, so the max
+  batch drops to about a third (from ~7 toward ~2). You become memory-bound and lose
+  throughput; the queue from Chapter 2 starts forming at the same offered load.
+- **Lever:** quantize the weights to int8 (~16 GB freed → batch back up), and consider
+  quantizing or paging the KV cache itself. **Cost:** quality risk — gate the quantized
+  model on the golden set before promoting (Chapter 1), and if it regresses, the honest
+  fallback is fewer/shorter retrieved chunks (a retrieval-budget decision) rather than
+  shipping a worse model.
+</details>
+</Practice>
+
+## How this is graded
+
+- **Technical Correctness** — you know batch size is KV-memory-bound and can do the
+  ceiling arithmetic, and you place each lever against the right bottleneck.
+- **Trade-off Awareness** — this chapter's weighted dimension: every lever has a cost
+  (quality, latency, wasted compute), and you state it rather than selling the lever as
+  free.
+- **Evaluation Rigor** — you gate a quantized model on the golden set instead of trusting
+  a throughput benchmark, because quality moved and the dashboard can't see it.
+- **Communication** — "we're memory-bound, not compute-bound, so quantize to free KV
+  room before adding GPUs" is the sentence that shows you diagnosed before you reached.
+
+### Industry variation
+
+- **Startups** — adopting a serving stack (vLLM) for continuous batching is usually the
+  highest-leverage hour you'll spend; you rarely need custom kernels.
+- **Enterprise / scale** — quantization and speculative decoding are tuned per workload
+  with quality gates; throughput-per-dollar is a tracked metric with a budget owner.
+- **On-device / edge** — quantization isn't optional; int4 and smaller is how a model
+  fits at all, and the quality gate is the whole game.
+- **AI-assisted coding interviews** — asked to "speed up serving," the signal is
+  diagnosing the bottleneck out loud before naming a lever, not reciting "use vLLM."
+
+## Stretch: the cheapest request is the one you don't make
+
+You've made the GPU efficient — bigger batches, full utilization, more tokens per step —
+and cost-per-token is down. But Chapter 0's bill was 4× over budget, and throughput
+tuning only shaves a fraction of that. The biggest cost lever isn't making the expensive
+model cheaper to run; it's *not running the expensive model* on the queries that don't
+need it — and not running any model at all on a question you've already answered. How do
+you decide which queries deserve the frontier model, and prove the savings are real?
+(That's **Chapter 4 — cost engineering**, where routing and caching beat efficiency.)

@@ -1,0 +1,213 @@
+{
+  "name": "A cascade is only as good as its routing signal",
+  "note": "600 simulated labelled queries (no fabricated model output): cheap model ~97% on easy / ~25% on hard, frontier ~97% on both. Costs from mini_rag.budget.api_cost_usd at stated API-class rates; the routed system credits the cheap model on kept queries and the frontier on escalated ones. Calibrated confidence tracks correctness; miscalibrated is uniform noise. Read the gap between the two.",
+  "qpd": 10000,
+  "cost_easy": 0.00034,
+  "cost_hard": 0.00575,
+  "baseline": {
+    "all_cheap": {
+      "accuracy": 0.735,
+      "cost_q": 0.00034,
+      "cost_month": 103.0
+    },
+    "all_hard": {
+      "accuracy": 0.977,
+      "cost_q": 0.00575,
+      "cost_month": 1725.0
+    }
+  },
+  "thresholds": [
+    0.0,
+    0.1,
+    0.2,
+    0.3,
+    0.4,
+    0.5,
+    0.6,
+    0.7,
+    0.8,
+    0.9,
+    1.0
+  ],
+  "calibrated": [
+    {
+      "threshold": 0.0,
+      "easy_fraction": 1.0,
+      "accuracy": 0.735,
+      "cost_q": 0.00034,
+      "cost_month": 103.0,
+      "escalation_precision": 1.0
+    },
+    {
+      "threshold": 0.1,
+      "easy_fraction": 1.0,
+      "accuracy": 0.735,
+      "cost_q": 0.00034,
+      "cost_month": 103.0,
+      "escalation_precision": 1.0
+    },
+    {
+      "threshold": 0.2,
+      "easy_fraction": 1.0,
+      "accuracy": 0.735,
+      "cost_q": 0.00034,
+      "cost_month": 103.0,
+      "escalation_precision": 1.0
+    },
+    {
+      "threshold": 0.3,
+      "easy_fraction": 0.978,
+      "accuracy": 0.757,
+      "cost_q": 0.00046,
+      "cost_month": 139.0,
+      "escalation_precision": 1.0
+    },
+    {
+      "threshold": 0.4,
+      "easy_fraction": 0.908,
+      "accuracy": 0.823,
+      "cost_q": 0.00084,
+      "cost_month": 252.0,
+      "escalation_precision": 1.0
+    },
+    {
+      "threshold": 0.5,
+      "easy_fraction": 0.802,
+      "accuracy": 0.925,
+      "cost_q": 0.00142,
+      "cost_month": 425.0,
+      "escalation_precision": 1.0
+    },
+    {
+      "threshold": 0.6,
+      "easy_fraction": 0.745,
+      "accuracy": 0.98,
+      "cost_q": 0.00172,
+      "cost_month": 517.0,
+      "escalation_precision": 0.993
+    },
+    {
+      "threshold": 0.7,
+      "easy_fraction": 0.677,
+      "accuracy": 0.988,
+      "cost_q": 0.00209,
+      "cost_month": 628.0,
+      "escalation_precision": 0.814
+    },
+    {
+      "threshold": 0.8,
+      "easy_fraction": 0.522,
+      "accuracy": 0.985,
+      "cost_q": 0.00293,
+      "cost_month": 879.0,
+      "escalation_precision": 0.554
+    },
+    {
+      "threshold": 0.9,
+      "easy_fraction": 0.232,
+      "accuracy": 0.985,
+      "cost_q": 0.0045,
+      "cost_month": 1349.0,
+      "escalation_precision": 0.345
+    },
+    {
+      "threshold": 1.0,
+      "easy_fraction": 0.05,
+      "accuracy": 0.978,
+      "cost_q": 0.00548,
+      "cost_month": 1644.0,
+      "escalation_precision": 0.279
+    }
+  ],
+  "miscalibrated": [
+    {
+      "threshold": 0.0,
+      "easy_fraction": 1.0,
+      "accuracy": 0.735,
+      "cost_q": 0.00034,
+      "cost_month": 103.0,
+      "escalation_precision": 1.0
+    },
+    {
+      "threshold": 0.1,
+      "easy_fraction": 0.895,
+      "accuracy": 0.773,
+      "cost_q": 0.00091,
+      "cost_month": 274.0,
+      "escalation_precision": 0.381
+    },
+    {
+      "threshold": 0.2,
+      "easy_fraction": 0.812,
+      "accuracy": 0.787,
+      "cost_q": 0.00136,
+      "cost_month": 409.0,
+      "escalation_precision": 0.292
+    },
+    {
+      "threshold": 0.3,
+      "easy_fraction": 0.712,
+      "accuracy": 0.813,
+      "cost_q": 0.0019,
+      "cost_month": 571.0,
+      "escalation_precision": 0.283
+    },
+    {
+      "threshold": 0.4,
+      "easy_fraction": 0.607,
+      "accuracy": 0.835,
+      "cost_q": 0.00247,
+      "cost_month": 741.0,
+      "escalation_precision": 0.28
+    },
+    {
+      "threshold": 0.5,
+      "easy_fraction": 0.505,
+      "accuracy": 0.847,
+      "cost_q": 0.00302,
+      "cost_month": 906.0,
+      "escalation_precision": 0.253
+    },
+    {
+      "threshold": 0.6,
+      "easy_fraction": 0.387,
+      "accuracy": 0.885,
+      "cost_q": 0.00366,
+      "cost_month": 1098.0,
+      "escalation_precision": 0.266
+    },
+    {
+      "threshold": 0.7,
+      "easy_fraction": 0.285,
+      "accuracy": 0.898,
+      "cost_q": 0.00421,
+      "cost_month": 1263.0,
+      "escalation_precision": 0.252
+    },
+    {
+      "threshold": 0.8,
+      "easy_fraction": 0.187,
+      "accuracy": 0.918,
+      "cost_q": 0.00474,
+      "cost_month": 1422.0,
+      "escalation_precision": 0.25
+    },
+    {
+      "threshold": 0.9,
+      "easy_fraction": 0.105,
+      "accuracy": 0.943,
+      "cost_q": 0.00518,
+      "cost_month": 1555.0,
+      "escalation_precision": 0.255
+    },
+    {
+      "threshold": 1.0,
+      "easy_fraction": 0.0,
+      "accuracy": 0.977,
+      "cost_q": 0.00575,
+      "cost_month": 1725.0,
+      "escalation_precision": 0.265
+    }
+  ],
+  "default_threshold": 0.6
+}

@@ -1,0 +1,45 @@
+{
+  "name": "Which lever for which bottleneck?",
+  "note": "Three serving bottlenecks. Each has a lever that fits it and levers that don't. Diagnose the bottleneck first, then pick — the wrong lever spends effort where the limit isn't.",
+  "items": [
+    {
+      "id": "memory-bound-batch",
+      "prompt": "Batch size 8 runs fine; batch 16 OOMs. GPU compute utilization sits at ~40% — we have spare math, not spare memory — and we want more throughput.",
+      "candidates": [
+        "Quantize the weights (fp16 → int8): smaller weights free VRAM for a larger KV cache, so the batch — and throughput — can grow, since the limit is memory, not compute",
+        "Add speculative decoding to generate more tokens per step",
+        "Increase the context window so each request carries more information",
+        "Nothing helps without buying a second GPU"
+      ],
+      "correct": "Quantize the weights (fp16 → int8): smaller weights free VRAM for a larger KV cache, so the batch — and throughput — can grow, since the limit is memory, not compute",
+      "explanation": "The tell is 'OOM at batch 16, compute at 40%': you are memory-bound, not compute-bound. Quantization shrinks the weights, leaving more VRAM for KV cache, which is what caps batch size. Speculative decoding attacks decode *steps* (a different bottleneck); a longer context makes the memory pressure worse. A second GPU works but isn't the free lever the symptom points to.",
+      "principle": "Batch size is memory-bound; when you're OOM with spare compute, free VRAM (quantize, PagedAttention) before buying hardware."
+    },
+    {
+      "id": "scheduling-waste",
+      "prompt": "Throughput is low because the server waits for every sequence in a batch to finish before starting the next batch — short requests sit completed while one long generation holds the whole batch hostage.",
+      "candidates": [
+        "Continuous (in-flight) batching: evict finished sequences and admit new ones every step, so the GPU stays full instead of idling on the slowest sequence in a fixed batch",
+        "Quantize the weights to make each sequence faster",
+        "Raise the static batch size so more requests run at once",
+        "Switch to a smaller model so sequences finish sooner"
+      ],
+      "correct": "Continuous (in-flight) batching: evict finished sequences and admit new ones every step, so the GPU stays full instead of idling on the slowest sequence in a fixed batch",
+      "explanation": "The waste here is scheduling: a static batch is only as fast as its longest member, and finished slots sit idle. Continuous batching (vLLM's core trick, with PagedAttention managing the KV memory) refills slots as they free, which is exactly the idle the symptom describes. Quantization and a bigger static batch help other limits but don't fix the wait-for-the-slowest problem.",
+      "principle": "Continuous batching attacks utilization waste — idle slots — not memory or per-token speed."
+    },
+    {
+      "id": "decode-step-bound",
+      "prompt": "A latency-sensitive path runs at batch 1. Single-stream latency is dominated by decode: one forward pass per token, and we need the answer out faster. Throughput isn't the issue — this one stream is.",
+      "candidates": [
+        "Speculative decoding: a small draft model proposes several tokens, the target model verifies them in one pass, so accepted tokens arrive multiple-per-step — at the cost of wasted compute when the draft mispredicts",
+        "Continuous batching to keep the GPU full",
+        "Increase the batch size to amortize the forward pass",
+        "Add more replicas behind a load balancer"
+      ],
+      "correct": "Speculative decoding: a small draft model proposes several tokens, the target model verifies them in one pass, so accepted tokens arrive multiple-per-step — at the cost of wasted compute when the draft mispredicts",
+      "explanation": "At batch 1 the bottleneck is decode steps, not utilization or memory, so the throughput levers (batching, replicas) don't touch single-stream latency. Speculative decoding is the lever that produces more than one token per target forward pass; its cost is the compute burned verifying draft tokens that get rejected, so it pays off when the draft model is accurate on your distribution.",
+      "principle": "Speculative decoding shortens the decode-step critical path for a single stream; batching/replicas only help throughput across many."
+    }
+  ]
+}

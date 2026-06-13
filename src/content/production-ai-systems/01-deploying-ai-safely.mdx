@@ -1,0 +1,228 @@
+---
+title: "Deploying AI safely — shadow, canary, flags, fallback"
+slug: deploying-ai-safely
+description: "The production loop starts at deploy: getting change into production — including the changes you didn't make, like a provider swapping the hosted model under you — without letting it surprise users. The four mechanisms (shadow, canary, feature flag, fallback), why a model-id change is a release and not a config tweak, and why every promotion gates on the golden set rather than on green dashboards."
+freshness: literature-survey
+last_verified: 2026-06-13
+tags: [production, deployment, rollout, reliability]
+sources: []
+draft: false
+mode: tutorial
+target: transfer
+ordering: problem-first
+commitment: long-lived
+paradigms: [default]
+research_debt_addressed: |
+  "Deploying an LLM feature" is usually taught as MLOps boilerplate (containers,
+  endpoints) or skipped entirely, which leaves two AI-specific facts unsaid: a
+  model swap is a behavior change with a failure surface your smoke test never
+  sees, and the most common production regression is an upstream change you didn't
+  make — a provider updating the hosted model. This chapter frames deploy as the
+  loop stage that owns *all* change, yours and theirs, and drills the four rollout
+  mechanisms that bound its blast radius.
+task_classes: [deployment, rollout-design]
+provenance:
+  ai_tools: ["Claude Opus 4.8 (Anthropic)"]
+  audit_history:
+    - date: 2026-06-13
+      type: authored
+      file: src/content/production-ai-systems/01-deploying-ai-safely.mdx
+  citation_backstop: manual
+los:
+  - id: PAS-1.1
+    bloom: explain
+    statement: "Explain why every change to an AI feature — including upstream ones you didn't make, like a provider model update or a corpus refresh — is a release that must pass the same shadow-canary-gate machinery, not a configuration tweak."
+    anchor: change-is-a-release
+    threshold: true
+  - id: PAS-1.2
+    bloom: design
+    statement: "Design a safe rollout for an AI change using the four mechanisms — shadow, canary, feature flag, and fallback — and name what each one buys."
+    anchor: rollout-ladder
+    threshold: true
+  - id: PAS-1.3
+    bloom: analyze
+    statement: "Given a deploy that broke in production, identify which safety mechanism was missing and the gate that would have caught it before full traffic."
+    anchor: gate-on-quality
+    threshold: true
+---
+
+import YouWillLearn from '@brandon_m_behring/book-scaffold-astro/components/YouWillLearn.astro';
+import Pitfall from '@brandon_m_behring/book-scaffold-astro/components/Pitfall.astro';
+import Practice from '@brandon_m_behring/book-scaffold-astro/components/Practice.astro';
+import ScenarioQuiz from '../../components/ScenarioQuiz.tsx';
+import deployData from '../../data/deploy_rollout_demo.json';
+
+# Deploying AI safely — shadow, canary, flags, fallback
+
+<YouWillLearn prerequisites="Chapter 0 — the production loop, and that AI systems fail silently. You've shipped code before.">
+- Why every change to an AI feature is a **release** — including the provider's change you didn't make.
+- The **rollout ladder**: shadow, canary, feature flag, fallback — and what each one buys.
+- Why every promotion **gates on quality** (a golden-set rerun), not on green dashboards.
+</YouWillLearn>
+
+## The deploy you didn't make
+
+The support bot from Chapter 0 has been stable for three weeks. You haven't touched
+it. On Tuesday afternoon, refusal rate on two common phrasings starts climbing, and
+by evening a chunk of "where's my order?" questions get a polite non-answer.
+
+You check the deploy log. Nothing shipped. Then you check the provider's changelog:
+they rolled their hosted `*-latest` model to a new snapshot that morning. You didn't
+deploy a change — *they* did, into your production system, with no canary and no
+gate, because from their side it was a routine upgrade and from your side it was
+invisible until users felt it.
+
+Predict, before reading on: **what one configuration choice would have turned that
+silent upstream swap into a change you got to test first?**
+
+<Pitfall title="The config-change fallacy">
+Teams run their own code through review, CI, and a careful rollout — then change the
+model id, the prompt, or the cascade threshold in a config file and ship it straight
+to everyone, because it "isn't really a deploy." But the model *is* the function. A
+new model id, a reworded prompt, a swapped provider — each changes behavior on inputs
+your smoke test never covered. The blast radius is identical to a code change; treat
+it that way.
+</Pitfall>
+
+## Every change is a release {/* anchor: change-is-a-release */}
+
+Classical deploy safety watches *your* commits. AI deploy safety has to watch a wider
+set of changes, because three things can alter your system's behavior without a commit
+from you:
+
+1. **Your changes** — a new prompt, a model swap, a retrieval tweak.
+2. **The provider's changes** — a hosted model updated, deprecated, or re-tuned;
+   rate limits and defaults shifting under you.
+3. **The data's changes** — the help center gets reorganized and a third of your
+   chunk index now points at stale sections (Chapter 0's second failure).
+
+Every one of these is a *release*: a change to the function users meet. The single
+highest-leverage habit is to **pin versions** so that (2) becomes opt-in. A pinned
+model id (`claude-haiku-4-5`, not `*-latest`) turns the provider's surprise upgrade
+into a migration *you* schedule — one you can shadow, gate, and canary like your own
+code. You give up automatic access to improvements; you gain the right to test them
+before your users do. For anything user-facing, that trade is almost always correct.
+
+## The rollout ladder {/* anchor: rollout-ladder */}
+
+Four mechanisms, each buying a distinct thing. They stack — a serious change uses all
+four — but you should be able to say what each one is *for*:
+
+- **Shadow** — run the new version on a mirror of real traffic and *log* its outputs
+  without showing them to anyone. Buys: a read on real-world behavior (and a golden-set
+  score) at zero user risk. The only way to test a model change on your actual query
+  distribution before committing to it.
+- **Canary** — send a small slice (1% → 10% → 100%) to the new version, watching
+  quality and cost at each step. Buys: a bounded blast radius. A regression hits 1% of
+  users for ten minutes, not everyone for a day.
+- **Feature flag** — a runtime switch for behavior (model, prompt, threshold) that
+  flips without a redeploy. Buys: seconds-not-minutes rollback — a kill switch you
+  pull while you debug the cause offline.
+- **Fallback** — a defined safe behavior for when the primary path fails: a cheaper
+  backup model, a cached answer, or an honest "I can't answer that right now" instead
+  of a timeout or a hallucination. Buys: graceful degradation instead of a hard outage.
+
+In code, the flag and the fallback are a few lines — but they are the few lines that
+turn a 40-minute incident into a 10-second one:
+
+```python
+def answer(question: str, context: str) -> str:
+    """Model behind a flag (instant rollback), with a fallback path (graceful
+    degradation). The flag value lives in config you can flip at runtime; the
+    fallback is what users get when the primary path fails its checks."""
+    model = flags.get("bot_model", "claude-haiku-4-5")   # pinned default, flip-able
+    try:
+        reply = call_model(model, question, context)
+        if not passes_output_contract(reply):            # schema / guardrail check
+            raise ValueError("primary reply failed validation")
+        return reply
+    except (TimeoutError, ValueError):
+        return fallback_answer(question)                 # cached / cheaper / honest "I don't know"
+```
+
+## Gate on quality, not on green {/* anchor: gate-on-quality */}
+
+Chapter 0's lesson was that infra dashboards watch the request, not the answer — so a
+deploy can be "healthy" (200s, fast) and still be worse. That means the promotion
+decision cannot be "the canary's error rate is flat." It has to be a **quality gate**:
+rerun the golden set against the new version and refuse to promote on a regression.
+
+This is where deploy hands off to the Evaluation guide. The golden set — a few dozen
+labelled cases covering the long tail you fear — is the same artifact you built there;
+here it becomes the *gate* on every promotion, including the provider's upgrade you
+shadowed. Shadow produces the new version's answers; the golden set scores them;
+promotion is blocked if the score drops. No green dashboard substitutes for that
+rerun, because the dashboard cannot see the dimension that moved.
+
+The shape to carry: **shadow → score on the golden set → canary if it passes → flag so
+you can pull it → fallback for when you must.** Every stage answers a different "what
+if," and the gate in the middle is the one infra can't fake.
+
+## See it: which safety step was skipped?
+
+Three changes that reached production and broke. **Predict** the missing mechanism for
+each before you reveal it — then notice each maps to one rung of the ladder above.
+
+<ScenarioQuiz client:visible data={deployData} />
+
+The pattern: none of these were caught by a smoke test, and none would have been caught
+by a dashboard. Each needed a *specific* rung — a gate, a pin, a flag — and "we tested
+it" is not the name of any of them.
+
+<Practice id="design-a-rollout" difficulty={2}>
+Your bot runs on a frontier model. Finance wants you to move the easy majority of
+queries to a mini-tier model to cut the bill (Chapter 4's cascade). Design the rollout.
+Name the four mechanisms in order, and say exactly what would *block* the change at the
+quality gate.
+
+<details>
+<summary>One defensible answer</summary>
+
+- **Shadow** — mirror live traffic to the mini-tier model for a few days; log its
+  answers and the routing decision, show users nothing. Score those shadow answers on
+  the golden set, segmented into "would-be-routed-cheap" vs "escalated."
+- **Gate** — promote only if golden-set accuracy on the cheap-routed slice stays within
+  a stated margin of the frontier baseline. A drop there *blocks* — that's the signal
+  that the routing signal isn't calibrated (Chapter 4) and the cascade is trading
+  quality for cost, not getting it free.
+- **Canary** — 1% → 10% → 100%, watching both the golden-set proxy and the actual bill
+  at each step.
+- **Flag + fallback** — the cascade threshold is a flag (flip to "frontier-only" in
+  seconds if quality dips); the fallback for a mini-tier timeout or low-confidence
+  output is to escalate that single query to the frontier model.
+</details>
+</Practice>
+
+## How this is graded
+
+- **Technical Correctness** — this chapter's weighted dimension: you name the *right*
+  mechanism for the failure (a pin for an upstream swap, a flag for fast rollback, a
+  gate for a quality regression) instead of saying "add monitoring" or "test more."
+- **Trade-off Awareness** — you weigh pinning (control vs missing improvements) and
+  canary speed (safety vs velocity), and you know shadow costs real inference dollars.
+- **Evaluation Rigor** — you make promotion gate on a golden-set rerun, not on infra
+  health, because you remember the failure is silent.
+- **Communication** — "a model swap is a release; we shadow it, gate on the golden set,
+  canary behind a flag" is the sentence that says you've run one of these.
+
+### Industry variation
+
+- **Startups** — the whole rollout might be a flag and a 30-case gate, flipped by hand.
+  That's enough; the unskippable rung is the gate, not the tooling.
+- **Enterprise** — change control and audit trails make "who promoted what, against
+  which gate score" a recorded artifact; shadow environments are standard.
+- **Regulated (fintech, health)** — a model change can require re-validation and
+  sign-off; pinning isn't optional, and "the provider upgraded it" is not an accepted
+  explanation for a behavior change.
+- **AI-assisted coding interviews** — you may be asked to sketch the rollout for a model
+  swap live; naming shadow/gate/canary/flag in order is the signal.
+
+## Stretch: the change was safe, but the system fell over anyway
+
+You pinned the model, gated the swap, canaried behind a flag — the deploy was textbook.
+Then the marketing promo from Chapter 0 lands, traffic jumps 6×, and p99 latency blows
+through the SLA. Nothing about your *change* was unsafe; the system simply couldn't
+serve the load. That isn't a deploy problem at all — it's the next stage of the loop.
+Where did the time actually go, and why does a traffic spike break latency when the
+per-request work never changed? (That's **Chapter 2 — latency anatomy**, where a slow
+system turns out to be a queue, not a slow model.)

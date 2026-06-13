@@ -31,6 +31,10 @@ from mini_rag import (  # noqa: E402
     assemble_context, ABSTAIN,
     api_cost_usd, cascade_cost_usd, effective_cost_usd,
 )
+from mini_prod import (  # noqa: E402
+    request_service_ms, poisson_arrivals, simulate_queue, latency_summary,
+    cascade_sweep, baseline,
+)
 
 # The ACME refund policy — shared by the Ch 3 chunking demo and the Ch 4
 # pipeline demo (continuity: same document, deeper failure modes).
@@ -1064,6 +1068,124 @@ def monitoring_demo() -> dict:
     }
 
 
+def latency_demo() -> dict:
+    """Ch 2 latency anatomy, for the LatencyExplorer island. One served model
+    under a seeded Poisson load; every cell runs mini_prod.simulate_queue and
+    reports the latency *distribution* (p50/p95/p99) and whether p99 holds the
+    SLA. Levers: offered load (qps), serving slots (batch width), answer length
+    (sets per-request service time via mini_rag.budget). The lesson: a load spike
+    breaks the tail, and the fix is concurrency — bounded by KV-cache memory, not
+    chosen freely. Service time is a stated first-principles estimate; the shape
+    (capacity = slots / service_ms) is the transferable part."""
+    PARAMS_B = 8.0            # an 8B-class served model
+    INPUT_TOKENS = 1500      # RAG-ish prompt: retrieved chunks + question
+    SECONDS = 60             # simulated window (the queue is seeded + deterministic)
+    SLA_MS = 2000.0          # p99 target
+    SEED = 11
+
+    loads = [1, 3, 6]                 # qps — 6 is the promo spike on a ~10K/day bot
+    servers = [1, 2, 4, 8]            # concurrent batch slots
+    outputs = [120, 200, 400]         # answer length (tokens)
+
+    def cell(qps: int, slots: int, output: int) -> dict:
+        service = request_service_ms(params_b=PARAMS_B, input_tokens=INPUT_TOKENS,
+                                     output_tokens=output)
+        arrivals = poisson_arrivals(rate_qps=qps, seconds=SECONDS, seed=SEED)
+        s = latency_summary(simulate_queue(arrivals, servers=slots, service_ms=service))
+        capacity = slots * 1000.0 / service          # qps this config can sustain
+        return {
+            "qps": qps, "servers": slots, "output": output,
+            "service_ms": round(service),
+            "capacity_qps": round(capacity, 1),
+            "overloaded": qps > capacity,
+            "p50": round(s["p50"]), "p95": round(s["p95"]), "p99": round(s["p99"]),
+            "max": round(s["max"]), "sla_ok": s["p99"] <= SLA_MS,
+        }
+
+    combos = [cell(q, s, o) for q in loads for s in servers for o in outputs]
+    return {
+        "name": "Latency is a distribution under load",
+        "note": ("Per-request service time is prefill+decode from mini_rag.budget "
+                 "(8B-class, stated estimate); the queue is mini_prod.simulate_queue "
+                 "over a 60s seeded Poisson stream. Capacity = slots / service_ms — "
+                 "when offered load exceeds it the *wait* dominates the tail and p99 "
+                 "grows without bound. More slots is the lever; KV-cache memory is the "
+                 "ceiling on slots."),
+        "sla_ms": SLA_MS, "seconds": SECONDS, "params_b": PARAMS_B,
+        "input_tokens": INPUT_TOKENS,
+        "levers": {"qps": loads, "servers": servers, "output": outputs},
+        "defaults": {"qps": 6, "servers": 2, "output": 200},   # the broken promo config
+        "combos": combos,
+    }
+
+
+def cascade_demo() -> dict:
+    """Ch 4 cost engineering, for the CascadeExplorer island. A labelled synthetic
+    of 600 queries (clearly simulated — no fabricated model text): the cheap model
+    is reliable on easy queries and shaky on hard ones; the frontier model is
+    reliable on both. Two routing signals — a *calibrated* confidence (tracks
+    correctness) and a *miscalibrated* one (uniform, uncorrelated) — are swept
+    across thresholds with mini_prod.cascade_sweep. The lesson: a cascade saves
+    money only when the routing signal is calibrated; miscalibrated, every dollar
+    saved costs accuracy on exactly the hard queries."""
+    rng = random.Random(23)
+    n = 600
+    INPUT, OUTPUT = 1500, 200
+    cost_easy = api_cost_usd(INPUT, OUTPUT, 0.15, 0.60)      # mini-tier $/MTok
+    cost_hard = api_cost_usd(INPUT, OUTPUT, 2.50, 10.00)     # frontier $/MTok
+    QPD = 10_000
+
+    cheap_correct, hard_correct, conf_cal, conf_mis = [], [], [], []
+    for _ in range(n):
+        easy = rng.random() < 0.65
+        c_ok = 1 if ((easy and rng.random() < 0.97)
+                     or (not easy and rng.random() < 0.25)) else 0
+        h_ok = 1 if rng.random() < 0.97 else 0
+        cheap_correct.append(c_ok)
+        hard_correct.append(h_ok)
+        # calibrated: confidence high exactly when the cheap model is right
+        mu = 0.85 if c_ok else 0.45
+        conf_cal.append(round(_clamp01(rng.gauss(mu, 0.10)), 3))
+        # miscalibrated: uniform, uncorrelated with correctness
+        conf_mis.append(round(rng.random(), 3))
+
+    thresholds = [round(0.1 * i, 1) for i in range(11)]      # 0.0 .. 1.0
+    common = dict(cheap_correct=cheap_correct, hard_correct=hard_correct,
+                  cost_easy=cost_easy, cost_hard=cost_hard, thresholds=thresholds)
+
+    def pack(rows: list[dict]) -> list[dict]:
+        return [{"threshold": r["threshold"],
+                 "easy_fraction": round(r["easy_fraction"], 3),
+                 "accuracy": round(r["accuracy"], 3),
+                 "cost_q": round(r["cost_q"], 5),
+                 "cost_month": round(r["cost_q"] * QPD * 30, 0),
+                 "escalation_precision": round(r["escalation_precision"], 3)}
+                for r in rows]
+
+    base = baseline(cheap_correct=cheap_correct, hard_correct=hard_correct,
+                    cost_easy=cost_easy, cost_hard=cost_hard)
+    base_packed = {k: {"accuracy": round(v["accuracy"], 3),
+                       "cost_q": round(v["cost_q"], 5),
+                       "cost_month": round(v["cost_q"] * QPD * 30, 0)}
+                   for k, v in base.items()}
+
+    return {
+        "name": "A cascade is only as good as its routing signal",
+        "note": ("600 simulated labelled queries (no fabricated model output): cheap "
+                 "model ~97% on easy / ~25% on hard, frontier ~97% on both. Costs from "
+                 "mini_rag.budget.api_cost_usd at stated API-class rates; the routed "
+                 "system credits the cheap model on kept queries and the frontier on "
+                 "escalated ones. Calibrated confidence tracks correctness; "
+                 "miscalibrated is uniform noise. Read the gap between the two."),
+        "qpd": QPD, "cost_easy": round(cost_easy, 5), "cost_hard": round(cost_hard, 5),
+        "baseline": base_packed,
+        "thresholds": thresholds,
+        "calibrated": pack(cascade_sweep(confidences=conf_cal, **common)),
+        "miscalibrated": pack(cascade_sweep(confidences=conf_mis, **common)),
+        "default_threshold": 0.6,
+    }
+
+
 def main() -> None:
     os.makedirs(OUT, exist_ok=True)
     for name, data in [
@@ -1082,6 +1204,8 @@ def main() -> None:
         ("orchestra_demo", orchestra_demo()),
         ("agent_demo", agent_demo()),
         ("monitoring_demo", monitoring_demo()),
+        ("latency_demo", latency_demo()),
+        ("cascade_demo", cascade_demo()),
     ]:
         path = os.path.join(OUT, f"{name}.json")
         with open(path, "w") as f:

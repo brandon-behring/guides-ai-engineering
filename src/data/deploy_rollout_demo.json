@@ -1,0 +1,45 @@
+{
+  "name": "Which safety step was skipped?",
+  "note": "Three changes that reached production and broke. For each, pick the rollout mechanism whose absence let it through — before reading the chapter's answer.",
+  "items": [
+    {
+      "id": "ship-to-100",
+      "prompt": "The mini-tier model just dropped in price. We swapped our model id to it and pushed to 100% of traffic — it passed our three test prompts.",
+      "candidates": [
+        "A model swap is a release: it needs a shadow run and a golden-set gate before any user traffic, because the new model fails on inputs your three prompts never covered",
+        "The price drop isn't worth the risk — never switch models once something works",
+        "Three prompts is fine; the real mistake was not announcing the change to the team",
+        "You should have swapped to the frontier model instead of the mini tier"
+      ],
+      "correct": "A model swap is a release: it needs a shadow run and a golden-set gate before any user traffic, because the new model fails on inputs your three prompts never covered",
+      "explanation": "A different model is a different function behind the same API — same call, different failure surface. Shadow it on real traffic (mirrored, no user impact), gate promotion on the golden set, then canary 1% → 10% → 100%. 'Passed three prompts' is Chapter 0's launch-day myth, now wearing the disguise of a config change.",
+      "principle": "A model-id change is a deploy, not a config tweak — same shadow → gate → canary ladder."
+    },
+    {
+      "id": "provider-auto-upgrade",
+      "prompt": "We didn't deploy anything this week. The provider auto-upgraded the hosted model on their side, and our refusal rate quietly climbed.",
+      "candidates": [
+        "Pin the model version so upgrades are opt-in, and run the provider's next version in shadow against your golden set before it becomes the default — an upstream change is still a change to your system",
+        "Nothing you can do — hosted models change and you have to accept whatever ships",
+        "Switch to self-hosting immediately so the provider can never change anything",
+        "Open a support ticket with the provider every time quality moves"
+      ],
+      "correct": "Pin the model version so upgrades are opt-in, and run the provider's next version in shadow against your golden set before it becomes the default — an upstream change is still a change to your system",
+      "explanation": "The deploy stage owns the changes you didn't make. Pinning a version converts a silent surprise into a scheduled migration you can shadow and gate like any other release. (Self-hosting removes the surprise but trades it for owning the entire serving stack — that's Chapter 10's judgment call, not a reflex.)",
+      "principle": "Upstream model updates are releases; pin versions and shadow the next one before it's forced on you."
+    },
+    {
+      "id": "no-kill-switch",
+      "prompt": "A prompt change regressed quality. Rolling it back means reverting the commit, waiting for CI, and redeploying — about 40 minutes of bad answers in the meantime.",
+      "candidates": [
+        "Put runtime-changeable behavior — the prompt, the model choice, the cascade threshold — behind a feature flag, so rollback is a config flip in seconds instead of a redeploy",
+        "40 minutes is acceptable; the fix is to make CI faster",
+        "Add more reviewers so a bad prompt can never merge in the first place",
+        "Roll the whole service back to yesterday's build until you understand it"
+      ],
+      "correct": "Put runtime-changeable behavior — the prompt, the model choice, the cascade threshold — behind a feature flag, so rollback is a config flip in seconds instead of a redeploy",
+      "explanation": "Flags decouple 'change behavior' from 'ship code.' A kill switch turns a 40-minute incident into a 10-second mitigation while you debug the cause offline. Faster CI and stricter review lower how *often* a bad change merges; only a flag shortens how *long* each one bleeds.",
+      "principle": "Anything you'd want to undo in seconds belongs behind a flag, not a deploy pipeline."
+    }
+  ]
+}

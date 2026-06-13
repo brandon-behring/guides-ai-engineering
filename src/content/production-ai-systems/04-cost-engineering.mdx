@@ -1,0 +1,238 @@
+---
+title: "Cost engineering — routing, cascades, caching economics"
+slug: cost-engineering
+description: "Chapter 0's bot ran 4× over budget. The bill decomposes into per-query token cost times volume, and the two biggest levers aren't efficiency — they're the cascade (route the easy majority to a cheap model, escalate the rest) and the cache (don't run a model on a question you've answered). The catch the island makes visceral: a cascade only saves money if its routing signal is calibrated, and a cost number without a stated accuracy floor is not a saving."
+freshness: literature-survey
+last_verified: 2026-06-13
+tags: [production, cost, cascade, caching, calibration]
+sources: []
+draft: false
+mode: tutorial
+target: transfer
+ordering: problem-first
+commitment: long-lived
+paradigms: [default]
+research_debt_addressed: |
+  "LLM cost optimization" is usually a list of tips (use a smaller model, cache, batch)
+  with no model of which lever moves the bill or what it costs in quality. The result
+  is candidates who say "just use the cheap model" — trading accuracy for cost on
+  exactly the queries that needed the expensive one. This chapter decomposes the bill,
+  makes the cascade's dependence on a *calibrated* routing signal the centerpiece, and
+  insists every cost decision carry a stated accuracy floor that's verified, not assumed.
+task_classes: [cost-optimization, routing-design]
+provenance:
+  ai_tools: ["Claude Opus 4.8 (Anthropic)"]
+  audit_history:
+    - date: 2026-06-13
+      type: authored
+      file: src/content/production-ai-systems/04-cost-engineering.mdx
+  citation_backstop: manual
+los:
+  - id: PAS-4.1
+    bloom: explain
+    statement: "Decompose a production LLM bill into per-query token cost times volume, and identify the levers — token reduction, the model cascade, and the response cache — and which one moves the bill most."
+    anchor: the-bill
+    threshold: true
+  - id: PAS-4.2
+    bloom: analyze
+    statement: "Explain why a cascade's savings depend on a calibrated routing signal — a miscalibrated signal trades accuracy for cost on exactly the hard queries — using escalation precision as the diagnostic."
+    anchor: calibrated-routing
+    threshold: true
+  - id: PAS-4.3
+    bloom: design
+    statement: "Design a cost-reduction plan (cascade plus cache) that states the accuracy floor it must hold and how that floor is verified, rather than optimizing for the cheapest number."
+    anchor: cost-with-a-floor
+    threshold: true
+---
+
+import YouWillLearn from '@brandon_m_behring/book-scaffold-astro/components/YouWillLearn.astro';
+import Pitfall from '@brandon_m_behring/book-scaffold-astro/components/Pitfall.astro';
+import Practice from '@brandon_m_behring/book-scaffold-astro/components/Practice.astro';
+import CascadeExplorer from '../../components/CascadeExplorer.tsx';
+import cascadeData from '../../data/cascade_demo.json';
+
+# Cost engineering — routing, cascades, caching economics
+
+<YouWillLearn prerequisites="Chapter 3 — throughput tuning lowered cost-per-token but not enough. You can do the prefill/decode token arithmetic.">
+- How to **decompose the bill** — per-query token cost × volume — and which lever moves it most.
+- Why a **cascade** only saves money when its routing signal is **calibrated**.
+- Why every cost decision needs a **stated accuracy floor** that you verify, not assume.
+</YouWillLearn>
+
+## The 4× bill
+
+The promo settles, latency is back under SLA — and finance forwards you the inference
+invoice, which is 4× what you projected. Throughput tuning from Chapter 3 helped at the
+margin, but cost-per-token improvements are a fraction when the real problem is that
+*every* query, easy or hard, is hitting the frontier model, and a chunk of them are
+near-duplicates you're paying to answer twice.
+
+The reflex — "switch everything to the cheap model" — would cut the bill by 94% and
+quietly wreck the product, because the cheap model is wrong on exactly the hard queries
+that made the feature worth building. Cost engineering is the discipline of cutting the
+bill *without* paying for it in accuracy, and the interview tell is whether you reach
+for a cost number alone or a cost number with a quality floor attached.
+
+Predict, before reading on: frontier-only is your baseline. If you route the easy
+majority to a cheap model, **what single property of your routing decision determines
+whether you saved money or just degraded quality?**
+
+<Pitfall title="The cheapest number is not the win">
+"We cut inference cost 80%" is a sentence that means nothing on its own. You can cut any
+LLM bill to near zero by answering everything with the smallest model — or with a static
+string. Cost is only a win *relative to a held accuracy floor*. A cost optimization
+reported without what it did to quality is not an optimization; it's an unmeasured
+trade, and in production the quality side is the silent one (Chapter 0).
+</Pitfall>
+
+## The bill and its levers {/* anchor: the-bill */}
+
+The bill is arithmetic. One call costs input and output tokens at the model's per-million
+rates, and the monthly bill is that times volume — `mini_rag.budget` again:
+
+```python
+def api_cost_usd(input_tokens, output_tokens, rate_in_per_m, rate_out_per_m):
+    return (input_tokens * rate_in_per_m + output_tokens * rate_out_per_m) / 1e6
+```
+
+For the bot (1,500 input, 200 output, 10K queries/day), a mini-tier model at \$0.15/\$0.60
+per MTok costs ~\$0.0003/query → **~\$103/month**; a frontier model at \$2.50/\$10.00 costs
+~\$0.0058/query → **~\$1,725/month**. That ~17× spread between tiers is the whole
+opportunity. Three levers act on the bill:
+
+- **Token reduction** — shorter answers, fewer retrieved chunks, prompt caching. This is
+  the Chapter 2–3 link: capping output also raised capacity, so it cuts latency *and*
+  cost. Real, but bounded — you still pay frontier rates on every query.
+- **The cascade** — route the easy majority to the cheap model and escalate only the
+  hard queries to the frontier one. The single biggest lever, because it attacks the
+  *rate*, not the token count.
+- **The cache** — don't call any model for a question you've already answered. A response
+  cache discounts the entire bill by its hit rate.
+
+The cascade is where the leverage and the danger both live, so it gets the next section.
+
+## A cascade is only as good as its routing signal {/* anchor: calibrated-routing */}
+
+A cascade needs a per-query decision: handle this on the cheap model, or escalate? You
+route on a confidence signal against a threshold, and `mini_rag.budget` blends the cost:
+
+```python
+def route_cheap(confidence, threshold):
+    return confidence >= threshold        # keep cheap if confident; else escalate
+
+def cascade_cost_usd(easy_fraction, cost_easy, cost_hard):
+    """Blended per-query cost: the cheap fraction at the cheap rate, the rest escalated."""
+    return easy_fraction * cost_easy + (1 - easy_fraction) * cost_hard
+```
+
+Route 70% to the cheap model and the blended cost drops toward the cheap tier — *if* the
+70% you kept are genuinely the easy ones. That "if" is the entire chapter. The savings
+are only real when the confidence signal is **calibrated** — when high confidence
+actually means the cheap model is right. Route on a signal that doesn't track
+correctness and you keep the hard queries on the cheap model precisely because it's
+*confidently* wrong about them: all of the savings, none of the quality.
+
+The diagnostic is **escalation precision** — of the queries you escalated, how many the
+cheap model would actually have gotten wrong. A calibrated signal escalates the right
+ones (high precision); a miscalibrated one escalates noise (low precision), paying for
+frontier calls it didn't need while leaving hard queries on the cheap model. Calibration
+was the Evaluation guide's subject; here it's the hinge of a six-figure cost decision.
+
+## Cost with a floor {/* anchor: cost-with-a-floor */}
+
+So the cost decision is never "what's cheapest" — it's "what's cheapest *while holding
+accuracy at or above a stated floor*." That makes cost engineering a gated change, the
+same shape as Chapter 1's deploy:
+
+- **State the floor.** "Accuracy within 1 point of frontier-only" is a number you commit
+  to before you start, not a result you accept after.
+- **Verify against it.** Score the cascade (and the cache) on the golden set, segmented
+  into kept-cheap vs escalated; promote only if the floor holds. A cache adds a second
+  risk to verify — **staleness**: a cached answer to a question whose underlying policy
+  changed is confidently wrong (the same drift that bites in Chapter 7), so caches need a
+  TTL and invalidation, not just a hit-rate target.
+
+```python
+def effective_cost_usd(cost_per_query, cache_hit_rate, cached_cost=0.0):
+    """A 30% hit rate is a 30% discount — but only if the cached answers are still right."""
+    return cache_hit_rate * cached_cost + (1 - cache_hit_rate) * cost_per_query
+```
+
+The senior sentence is two-sided: "the cascade cut the bill ~70% **and** held golden-set
+accuracy within a point of frontier; the cache adds ~30% on top **with** a TTL so stale
+policies expire." Cost and floor, always together.
+
+## See it: the cascade's two curves
+
+Frontier-only is the \$1,725/month, high-accuracy baseline; all-cheap is \$103 and much
+worse. **Predict** whether a cascade can cut the bill in half while holding accuracy near
+frontier — then flip the routing signal from calibrated to miscalibrated and watch the
+same threshold fall apart.
+
+<CascadeExplorer client:visible data={cascadeData} />
+
+Read the gap: with a **calibrated** signal you hold ~frontier accuracy at a fraction of
+the cost and escalations are almost all warranted; with a **miscalibrated** one, every
+threshold pays more for less, and escalation precision collapses. Same cascade, same
+prices — the only difference is whether the routing signal tracks correctness.
+
+<Practice id="design-a-cost-plan" difficulty={3}>
+Your frontier-only bot costs \$1,725/month and finance wants it under \$700 without losing
+the product. Design the plan. Name the levers, the accuracy floor, and exactly how you'd
+verify the floor before shipping.
+
+<details>
+<summary>One defensible answer</summary>
+
+- **Levers:** a cascade (cheap model for the easy majority, escalate on a *calibrated*
+  confidence) plus a response cache with a TTL. The cascade does the heavy lifting on the
+  rate; the cache discounts what's left.
+- **Floor:** "golden-set accuracy within 1 point of frontier-only" — stated up front.
+- **Verify:** shadow the cascade on live traffic (Chapter 1), score the kept-cheap slice
+  on the golden set, and promote only if the floor holds; watch escalation precision as
+  the calibration read. For the cache, verify hits against fresh answers on a sample and
+  set the TTL by how fast the underlying corpus changes. Ship behind a flag (the
+  threshold) so you can flip back to frontier-only in seconds if accuracy dips.
+- **Expected:** a calibrated cascade routing ~70% cheap lands near \$500/month at
+  ~frontier accuracy; the cache takes it lower. If the floor *can't* be held, the honest
+  answer is "this model mix can't hit \$700 without quality loss," not a quiet regression.
+</details>
+</Practice>
+
+## How this is graded
+
+- **Technical Correctness** — you decompose the bill (per-query cost × volume), know the
+  cascade attacks the rate while token cuts attack the count, and can do the cascade-cost
+  arithmetic.
+- **Trade-off Awareness** — you treat cost as a trade against accuracy and latency, not a
+  number to minimize, and you know the cache trades freshness for cost.
+- **Evaluation Rigor** — this chapter's weighted dimension: you attach an accuracy floor
+  to every cost claim and verify it on the golden set, and you read escalation precision
+  to know whether the routing signal is calibrated.
+- **Communication** — "the cascade cut the bill 70% *and* held accuracy within a point;
+  here's the escalation precision that proves the signal is calibrated" is the two-sided
+  sentence that signals seniority.
+
+### Industry variation
+
+- **Startups** — a hand-tuned threshold and a simple exact-match cache is often the whole
+  cost program, and it's enough; the discipline is stating the floor, not the tooling.
+- **Enterprise / high volume** — routing is a tuned classifier with cost-per-query and
+  accuracy as tracked, owned metrics; caches are layered (exact then semantic) with
+  invalidation tied to content changes.
+- **Regulated** — a cached or cheap-model answer may carry compliance implications;
+  "which model answered, from which cache, how fresh" is auditable.
+- **AI-assisted coding interviews** — asked to cut cost, the signal is naming the floor
+  and the verification in the same breath as the cascade — never "just use the cheap one."
+
+## Stretch: you can't run any of these loops blind
+
+Deploy, latency, throughput, cost — every decision in this block assumed you could *see*
+what the system did: the canary's golden-set score, the p99 distribution, the batch
+utilization, the cascade's escalation precision and the cache's hit rate. None of those
+are visible by default. A cascade silently slipping to a miscalibrated signal, a cache
+serving stale answers, p99 creeping back up — you only know if the system is emitting the
+right signals and something is watching them. So the loop turns from *serving* to
+*observing*: what do you instrument, and how do you see the one dimension infra
+telemetry can't? (That's **Chapter 5 — the observability stack**, and the start of the
+evaluate half of the loop.)

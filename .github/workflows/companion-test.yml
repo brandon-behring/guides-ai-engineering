@@ -34,3 +34,5 @@ jobs:
         run: python3 companion/tests/test_mini_rag.py
       - name: mini_agent
         run: python3 companion/tests/test_mini_agent.py
+      - name: mini_prod
+        run: python3 companion/tests/test_mini_prod.py
