@@ -1,0 +1,45 @@
+{
+  "name": "Capstone design decisions",
+  "note": "Three moments in a whiteboard 'design a production AI system' round. Pick the senior move before the chapter names it — each is a place candidates reveal their level.",
+  "items": [
+    {
+      "id": "start-with-requirements",
+      "prompt": "Asked to design a production document-Q&A bot, a candidate opens with: 'I'd use a vector database, an embedding model, and a frontier LLM.'",
+      "candidates": [
+        "Start with requirements and SLOs — scale (queries/day), latency target, cost ceiling, and a quality bar — because the architecture and every component choice follow from them; leading with boxes is the junior tell",
+        "That's a fine start; the components are what matter most",
+        "Ask which vector database the company already uses first",
+        "Begin by choosing the largest model to guarantee quality"
+      ],
+      "correct": "Start with requirements and SLOs — scale (queries/day), latency target, cost ceiling, and a quality bar — because the architecture and every component choice follow from them; leading with boxes is the junior tell",
+      "explanation": "The strongest signal in a system-design round is leading with requirements and SLOs before architecture. 'p99 < 2s, under $X/month, groundedness ≥ 0.8 at 50K queries/day' makes every later choice defensible — model tier, cascade, self-host vs API — because each traces to a target. A candidate who opens with components is solving before they know what they're solving for.",
+      "principle": "Requirements and SLOs first; the architecture is derived from them, not the other way around."
+    },
+    {
+      "id": "defend-the-model-choice",
+      "prompt": "The proposed design routes every query to a single frontier model 'for the best quality.' The cost SLO is $500/month at 10K queries/day.",
+      "candidates": [
+        "Frontier-everything blows the cost SLO (~$1,700/month here); route on a calibrated confidence — cheap model for the easy majority, escalate the hard queries — to hit the quality bar near the cost ceiling",
+        "Quality always wins; exceed the cost SLO and justify it later",
+        "Switch entirely to the cheap model to meet the cost SLO",
+        "Cache everything so the model choice doesn't matter"
+      ],
+      "correct": "Frontier-everything blows the cost SLO (~$1,700/month here); route on a calibrated confidence — cheap model for the easy majority, escalate the hard queries — to hit the quality bar near the cost ceiling",
+      "explanation": "A design has to satisfy the cost SLO *and* the quality SLO together — defaulting to 'always frontier' ignores the first, and 'always cheap' ignores the second. The cascade (Chapter 4) is the lever that hits both: calibrated routing holds accuracy near frontier at a fraction of the bill. Naming the cascade — and the calibration it depends on — is the answer the cost ceiling demands.",
+      "principle": "Defend each component against the SLOs it must satisfy; a cascade reconciles a quality bar with a cost ceiling."
+    },
+    {
+      "id": "name-the-failure-mode",
+      "prompt": "The interviewer asks: 'What's the riskiest failure of this design, and how would you know it happened?'",
+      "candidates": [
+        "Silent quality decay — the system stays up and fast while answers rot as the corpus ages — bounded by eval-in-prod (sampled, CI-gated) plus a drift monitor on rolling windows, because infra dashboards can't see it",
+        "The server going down, caught by an uptime monitor",
+        "Running out of GPU memory, caught by an OOM alert",
+        "There aren't really failure modes once it passes launch eval"
+      ],
+      "correct": "Silent quality decay — the system stays up and fast while answers rot as the corpus ages — bounded by eval-in-prod (sampled, CI-gated) plus a drift monitor on rolling windows, because infra dashboards can't see it",
+      "explanation": "The riskiest failure of an AI system is the silent one: green dashboards, confidently wrong answers (Chapter 0). Naming it — and the specific mechanisms that catch it (sampled eval-in-prod, a rolling-window drift monitor on the quality signal) — demonstrates you know the AI-specific failure mode, not just the classical ones. 'It might go down' is true of any service; the silent quality failure is the one this guide exists for.",
+      "principle": "The headline risk in an AI design is silent quality decay — name it, and the eval + drift machinery that makes it visible."
+    }
+  ]
+}

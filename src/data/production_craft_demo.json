@@ -1,0 +1,45 @@
+{
+  "name": "The production story: weak vs strong",
+  "note": "Three interview moments where production experience shows (or doesn't). Pick the answer that signals seniority before the chapter explains the tell.",
+  "items": [
+    {
+      "id": "lead-with-slos",
+      "prompt": "'Design an AI feature that answers customer questions from our docs.' Where does a strong candidate begin?",
+      "candidates": [
+        "With requirements and SLOs — expected volume, latency target, cost ceiling, quality bar — and the clarifying questions to pin them down, before naming a single component",
+        "By naming the stack: a vector DB, an embedding model, and an orchestration framework",
+        "By describing the most advanced retrieval technique they know",
+        "By asking what model the interviewer prefers"
+      ],
+      "correct": "With requirements and SLOs — expected volume, latency target, cost ceiling, quality bar — and the clarifying questions to pin them down, before naming a single component",
+      "explanation": "Leading with requirements and SLOs is the clearest IC5 signal in a design round: it shows you solve for stated targets, not for the tools you happen to know. The weak version jumps to components — a stack list answers a question nobody asked yet. The senior opens by establishing what 'good' means, then derives the design.",
+      "principle": "Open with requirements and SLOs; the interviewer is watching whether you define 'good' before you build."
+    },
+    {
+      "id": "estimate-unprompted",
+      "prompt": "Mid-design, you're asked 'how would you serve this at scale?' What separates a senior answer?",
+      "candidates": [
+        "Estimating the numbers unprompted — service time from prefill/decode, capacity = slots ÷ service, a rough monthly bill — and only then choosing serving and cost levers against the SLOs",
+        "Saying 'we'd use an API and it would autoscale' and moving on",
+        "Naming as many serving technologies as possible",
+        "Deferring all numbers to a future load test"
+      ],
+      "correct": "Estimating the numbers unprompted — service time from prefill/decode, capacity = slots ÷ service, a rough monthly bill — and only then choosing serving and cost levers against the SLOs",
+      "explanation": "Estimating compute, memory, and cost without being prompted is a documented IC5 tell (Chapter 2's arithmetic, Chapter 4's bill). It shows you reason about feasibility from first principles, not by reaching for a managed service and hoping. 'It'll autoscale' is the answer of someone who hasn't sized a deployment; the back-of-envelope is the answer of someone who has.",
+      "principle": "Estimate latency, capacity, and cost out loud and unprompted — it's the senior tell that you've actually operated systems."
+    },
+    {
+      "id": "eval-before-asked",
+      "prompt": "A candidate finishes a strong architecture but never mentions how they'd know it works in production. What's the gap?",
+      "candidates": [
+        "They skipped the evaluate stage — a senior answer raises, unprompted, how quality is measured live (sampled eval-in-prod, a regression gate, a drift monitor), because 'how do you know it still works' is the question production exists to answer",
+        "Nothing — a clean architecture speaks for itself",
+        "They should have added more components to the diagram",
+        "They should have picked a bigger model to be safe"
+      ],
+      "correct": "They skipped the evaluate stage — a senior answer raises, unprompted, how quality is measured live (sampled eval-in-prod, a regression gate, a drift monitor), because 'how do you know it still works' is the question production exists to answer",
+      "explanation": "Two of the most-cited reasons strong-on-paper candidates fail are 'no production experience' and 'ignoring ops/cost/eval.' Bringing up evaluation and monitoring before being asked is the antidote — it signals you've watched a system in production and know launch isn't the finish line. An architecture with no answer to 'how do you know it still works' is a demo, not a production design.",
+      "principle": "Raise eval-in-prod and monitoring unprompted; 'how do you know it still works' is the question that separates shipped from demoed."
+    }
+  ]
+}

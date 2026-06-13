@@ -1,0 +1,210 @@
+---
+title: "System-design capstone — production-grade"
+slug: system-design-capstone
+description: "Ten chapters built the production loop one stage at a time; an interview hands you a blank whiteboard and 'design a production AI system' all at once. The method that composes them: lead with requirements and SLOs before architecture, derive the design from the loop's stages, defend each trade-off against a stated target, and anticipate the failure modes — naming the loop mechanism that bounds each. A worked capstone (a bank's internal policy-Q&A bot) walks the whole thing end to end."
+freshness: literature-survey
+last_verified: 2026-06-13
+tags: [production, system-design, capstone, interview]
+sources: []
+draft: false
+mode: tutorial
+target: transfer
+ordering: problem-first
+commitment: long-lived
+paradigms: [default]
+research_debt_addressed: |
+  System-design rounds for AI roles are where strong-on-paper candidates most visibly fail
+  — by leading with components, defaulting to the frontier model, and never mentioning how
+  they'd know the system works. This capstone gives a composition method (requirements and
+  SLOs first, derive the loop, defend each trade-off, name the failure modes) and works it
+  end to end on a fresh system, so the reader can transfer the whole guide to a blank
+  whiteboard rather than recite its parts.
+task_classes: [system-design, capstone]
+provenance:
+  ai_tools: ["Claude Opus 4.8 (Anthropic)"]
+  audit_history:
+    - date: 2026-06-13
+      type: authored
+      file: src/content/production-ai-systems/11-system-design-capstone.mdx
+  citation_backstop: manual
+los:
+  - id: PAS-11.1
+    bloom: design
+    statement: "Design a production-grade AI system by leading with requirements and SLOs (latency, cost, quality) before architecture, then deriving the design from the production loop's stages."
+    anchor: requirements-first
+    threshold: true
+  - id: PAS-11.2
+    bloom: analyze
+    statement: "Justify the system's key trade-offs — model choice and cascade, self-host vs API, sampling rate, guardrail strictness — against the stated SLOs, rather than defaulting to the most powerful or familiar option."
+    anchor: the-trade-offs
+    threshold: true
+  - id: PAS-11.3
+    bloom: analyze
+    statement: "Anticipate the system's failure modes — led by silent quality decay — and name the loop mechanism that bounds each (gate, capacity, guardrail, drift monitor, runbook)."
+    anchor: failure-modes
+    threshold: true
+---
+
+import YouWillLearn from '@brandon_m_behring/book-scaffold-astro/components/YouWillLearn.astro';
+import Pitfall from '@brandon_m_behring/book-scaffold-astro/components/Pitfall.astro';
+import Practice from '@brandon_m_behring/book-scaffold-astro/components/Practice.astro';
+import ScenarioQuiz from '../../components/ScenarioQuiz.tsx';
+import capstoneData from '../../data/capstone_production_demo.json';
+
+# System-design capstone — production-grade
+
+<YouWillLearn prerequisites="Chapters 1–10 — the whole production loop. This chapter composes them; it introduces little new.">
+- The method: **requirements and SLOs first**, then derive the architecture from the loop.
+- How to **defend every trade-off** against a stated target instead of defaulting.
+- How to **anticipate failure modes** and name the loop mechanism that bounds each.
+</YouWillLearn>
+
+## The blank whiteboard
+
+Every prior chapter handed you one stage of the loop in isolation. The interview does the
+opposite: "design a production AI assistant for our internal policy questions," a blank
+whiteboard, forty minutes. The panic response is to start drawing boxes — a vector DB, an
+embedding model, an LLM — and narrate a stack. The senior response is a *method* that turns
+the whole guide into a repeatable sequence, so you're composing known pieces against stated
+targets rather than improvising an architecture.
+
+Predict, before reading on: you have forty minutes and a vague prompt. **What is the first
+thing out of your mouth** — and what makes it the senior move rather than the junior one?
+
+<Pitfall title="Drawing boxes before you know the targets">
+The most common system-design failure is solving before you know what you're solving for:
+naming components, defaulting to the frontier model, sketching a diagram — all before
+establishing scale, latency, cost, and quality targets. Every one of those choices is
+*derivable* from requirements you haven't gathered yet, so leading with them means defending
+arbitrary decisions for forty minutes. Requirements first isn't process for its own sake;
+it's what makes every later choice defensible.
+</Pitfall>
+
+## Lead with requirements and SLOs {/* anchor: requirements-first */}
+
+The method is four moves, and the first two are the whole game:
+
+1. **Requirements & scale** — clarifying questions: who uses it, how many queries/day, how
+   sensitive is the data, what's "correct" here? For the policy bot: ~5,000 employees,
+   maybe 10K queries/day, answers must cite the authoritative policy, and the documents are
+   confidential.
+2. **SLOs** — turn those into numbers: p95 latency < 3s (internal tool, some patience), a
+   cost ceiling, groundedness ≥ 0.9 (a wrong policy answer is costly), and — because the data
+   is confidential — a hard data-residency constraint.
+3. **Architecture** — *now* derive it: RAG over the policy corpus (groundedness demands
+   citations, not parametric recall), an embedding model + vector store, an LLM, and the
+   serving path. Each box traces to a requirement.
+4. **The loop** — wrap the architecture in the production loop: deploy (Ch 1), serve
+   (Ch 2–4), observe (Ch 5), evaluate (Ch 6–7), respond (Ch 8–9). The loop *is* the
+   "production-grade" part; an architecture without it is a demo.
+
+Said out loud: "Before I draw anything — who's asking, how many, how sensitive, and what's
+correct? Let me propose SLOs: p95 under 3s, groundedness ≥ 0.9, data stays in our VPC. Now
+the architecture follows." That opening is the difference the round is measuring.
+
+## Defend the trade-offs {/* anchor: the-trade-offs */}
+
+A design is a set of choices, and a senior candidate defends each against an SLO rather than
+defaulting. For the policy bot:
+
+- **Model & cascade** — not "frontier everything." The groundedness SLO is high, but a
+  calibrated cascade (Ch 4) routes the easy majority to a cheaper model and escalates hard
+  policy questions, hitting the quality bar near the cost ceiling. Defend it with the
+  escalation precision that proves the routing is calibrated.
+- **Self-host vs API** — the residency constraint likely *forces* a self-hosted or private
+  deployment (Ch 10): confidential policy data can't egress to a third party. Cost doesn't
+  decide this one; the constraint does — and you note that self-hosting makes serving and
+  on-call your problem.
+- **Sampling rate** — eval-in-prod at, say, 5%, stratified by policy area (Ch 6), gated on a
+  confidence interval. Defend the rate as detection-vs-cost.
+- **Guardrails** — an output gate for groundedness/PII and an input gate for injection (Ch 8);
+  a wrong policy citation is the failure you most need to block, not merely detect.
+
+Every one of these is "I chose X *because* SLO Y," which is the sentence a design round
+rewards.
+
+## Anticipate the failure modes {/* anchor: failure-modes */}
+
+Close by naming how it breaks and what bounds each break — and lead with the AI-specific one:
+
+- **Silent quality decay** (the headline) — policies get updated, the index goes stale, and
+  answers cite superseded rules while every dashboard stays green. Bounded by eval-in-prod +
+  a drift monitor (Ch 6–7), and a re-index pipeline tied to policy updates.
+- **A bad change** — a prompt or model update regresses groundedness. Bounded by the deploy
+  gate on the golden set (Ch 1).
+- **A load spike** — onboarding season triples traffic. Bounded by capacity planning and
+  autoscaling (Ch 2–3).
+- **A harmful or manipulated output** — an injected prompt, an unauthorized commitment.
+  Bounded by the guardrail stack (Ch 8).
+- **The bad day** — provider/GPU outage. Bounded by a degradation mode and a runbook (Ch 9).
+
+Leading with silent decay — not "the server might go down" — is the tell that you understand
+the failure mode this entire guide was built around.
+
+## See it: the senior move at three decision points
+
+Three moments from a design round. **Predict** the senior move before the reveal — each is a
+place candidates show their level.
+
+<ScenarioQuiz client:visible data={capstoneData} />
+
+The throughline of all three: requirements before architecture, every choice defended
+against an SLO, and the silent failure named first. That's the method; the architecture is
+just its output.
+
+<Practice id="full-capstone" difficulty={3}>
+Design a production AI system that drafts replies to customer support emails for a
+mid-size e-commerce company (it suggests a reply a human agent edits and sends). Walk the
+four moves: two clarifying questions, three SLOs, the architecture in one line, and the two
+failure modes you'd call out first.
+
+<details>
+<summary>One defensible answer</summary>
+
+- **Clarifying:** volume (emails/day) and the human-in-the-loop boundary (does the agent
+  always review, or auto-send below a confidence?) — the latter changes the guardrail design
+  entirely.
+- **SLOs:** drafts ready in < 5s (an agent is waiting); cost ceiling per draft; quality =
+  "agent accepts the draft with minor edits ≥ 70% of the time" (a task-fit metric, not raw
+  accuracy).
+- **Architecture (one line):** RAG over past resolved tickets + the help center → a cascade
+  (cheap model for routine replies, escalate refunds/complaints) → an output guardrail (no
+  unauthorized promises) → the draft to the agent's queue.
+- **Failure modes first:** (1) silent quality decay as products/policies change — eval-in-prod
+  on agent-acceptance rate + a drift monitor; (2) an unauthorized commitment in a draft (a
+  refund the policy forbids) — an output guardrail, and the human review as the backstop.
+</details>
+</Practice>
+
+## How this is graded
+
+- **Technical Correctness** — your architecture is sound and each component is the right tool
+  (RAG for groundedness, a cascade for the cost/quality bind, a self-host for residency).
+- **Trade-off Awareness** — every choice is defended against an SLO, and you reach for the
+  reconciling option (cascade, hybrid) instead of a default.
+- **Evaluation Rigor** — you specify how quality is measured live and gated, unprompted,
+  because a design with no answer to "how do you know it works" is incomplete.
+- **Communication** — this chapter's weighted dimension: you lead with requirements and SLOs,
+  structure the design as a method, and name the silent failure first — the round is as much
+  about how you sequence the answer as what's in it.
+
+### Industry variation
+
+- **Startups** — the same method, smaller: one model behind a flag, a 5% eval, a one-page
+  runbook; the senior move is still requirements-first and naming the silent failure.
+- **Enterprise / regulated** — residency, audit, and per-tenant isolation enter the SLOs
+  early; the design leads with constraints as much as targets.
+- **Frontier / high scale** — capacity, cost-per-query, and serving efficiency dominate; the
+  loop is assumed and the bar is how cleanly you compose it.
+- **AI-assisted coding interviews** — increasingly the capstone includes writing and
+  *verifying* a piece live; the contract-and-test habit (and naming how you'd eval it) is
+  exactly what's assessed.
+
+## Stretch: you can design it — now you have to tell the story
+
+You can compose the loop on a whiteboard. But an interview is also a conversation, and the
+same design told two ways reads as junior or senior depending on what you lead with, what you
+estimate unprompted, and whether you raise evaluation before you're asked. The last chapter
+isn't new machinery — it's the craft of making ten chapters of production experience legible
+in forty minutes, and transferring it to whatever system the interviewer invents. (That's
+**Chapter 12 — interview craft & transfer**.)

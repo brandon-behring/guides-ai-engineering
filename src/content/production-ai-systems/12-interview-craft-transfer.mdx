@@ -1,0 +1,206 @@
+---
+title: "Interview craft & transfer — the production story"
+slug: interview-craft-transfer
+description: "The same production experience reads as junior or senior depending on how you tell it. The signals interviewers actually read for seniority — leading with requirements and SLOs, estimating cost and latency unprompted, raising evaluation before being asked — and the documented failure modes they counter ('no production experience', 'ignoring ops/cost/eval'). How to transfer the production loop to any system the interviewer invents, and how to rewrite a weak answer into a strong one. The closing chapter, which returns to the question that opened the guide."
+freshness: literature-survey
+last_verified: 2026-06-13
+tags: [production, interview, craft, transfer]
+sources: []
+draft: false
+mode: tutorial
+target: transfer
+ordering: problem-first
+commitment: long-lived
+paradigms: [default]
+research_debt_addressed: |
+  Candidates with real production experience routinely under-signal it — burying the SLOs,
+  waiting to be asked about evaluation, skipping the estimates — and map straight onto the
+  two most-cited rejection reasons, 'no production experience' and 'ignoring ops/cost/eval.'
+  This closing chapter makes the seniority signals explicit, frames the production loop as
+  the transferable artifact that survives any prompt, and drills the weak-to-strong rewrite,
+  so the reader can make the whole guide legible in an interview.
+task_classes: [interview-craft, transfer]
+provenance:
+  ai_tools: ["Claude Opus 4.8 (Anthropic)"]
+  audit_history:
+    - date: 2026-06-13
+      type: authored
+      file: src/content/production-ai-systems/12-interview-craft-transfer.mdx
+  citation_backstop: manual
+los:
+  - id: PAS-12.1
+    bloom: explain
+    statement: "Explain the production-engineering signals interviewers read for seniority — leading with requirements/SLOs, estimating cost and latency unprompted, raising evaluation before being asked — and the documented failure modes each one counters."
+    anchor: the-signals
+    threshold: true
+  - id: PAS-12.2
+    bloom: design
+    statement: "Transfer the production loop to a novel system on demand — name the stage that owns a given concern (deploy, serve, observe, evaluate, respond) without re-deriving the guide from scratch."
+    anchor: transfer-the-loop
+    threshold: true
+  - id: PAS-12.3
+    bloom: analyze
+    statement: "Diagnose a weak production answer — vague, component-first, eval-silent — and rewrite it into a senior one that leads with targets and names the mechanism."
+    anchor: weak-to-strong
+    threshold: true
+---
+
+import YouWillLearn from '@brandon_m_behring/book-scaffold-astro/components/YouWillLearn.astro';
+import Pitfall from '@brandon_m_behring/book-scaffold-astro/components/Pitfall.astro';
+import Practice from '@brandon_m_behring/book-scaffold-astro/components/Practice.astro';
+import ScenarioQuiz from '../../components/ScenarioQuiz.tsx';
+import craftData from '../../data/production_craft_demo.json';
+
+# Interview craft & transfer — the production story
+
+<YouWillLearn prerequisites="Chapters 0–11 — the whole loop and the capstone method. This chapter is about telling it, not building more.">
+- The **signals** interviewers read for seniority — and the failure modes each one counters.
+- How to **transfer the loop** to any system the interviewer invents.
+- How to rewrite a **weak answer into a strong one** — vague-and-component-first into targets-and-mechanism.
+</YouWillLearn>
+
+## The same design, two ways
+
+Two candidates have shipped the same production AI feature. One says "I built a RAG bot with
+a vector database and GPT, and it worked well." The other says "We had a 10K-query/day
+support bot with a p99 SLA of 2 seconds and a groundedness bar of 0.85; the interesting part
+was keeping quality there as the corpus drifted." Same experience. One sounds like a
+tutorial-follower; the other sounds like someone who has operated a system. The difference
+isn't what they did — it's what they led with.
+
+This closing chapter is about that gap. You've built the loop; now you have to make it
+legible in forty minutes to someone deciding your level. The good news is that the signals
+are learnable and specific, and they map directly onto the reasons strong candidates get
+rejected — so closing the gap is mostly a matter of not burying what you already know.
+
+Predict, before reading on: two candidates know the same production material. **What three
+things does the senior-sounding one do that the other doesn't** — before being asked?
+
+<Pitfall title="Knowing it is not signaling it">
+The cruelest interview failure is knowing the material and not getting credit for it, because
+the signals of seniority are things you have to *volunteer*. Wait to be asked about cost and
+you read as someone who doesn't think about it; skip the SLOs and you read as someone who
+draws boxes; never mention evaluation and you read as someone who ships demos. The two most
+common rejection reasons for otherwise-strong candidates — "no real production experience"
+and "ignored ops, cost, and eval" — are usually *signaling* failures, not knowledge gaps.
+</Pitfall>
+
+## The signals interviewers read {/* anchor: the-signals */}
+
+Three behaviors separate the senior read from the junior one, each volunteered, not extracted:
+
+- **Lead with requirements and SLOs.** Before architecture, state the targets — scale,
+  latency, cost, quality (Ch 11). Counters "draws boxes without knowing the problem."
+- **Estimate cost and latency unprompted.** Do the back-of-envelope out loud — service time
+  from prefill/decode, capacity = slots ÷ service, a rough monthly bill (Ch 2, 4). Counters
+  "no sense of feasibility or cost." This is the single clearest IC5-vs-IC4 tell: the senior
+  estimates compute, memory, and cost without being asked.
+- **Raise evaluation before you're asked.** Bring up how you'd know it works in production —
+  sampled eval-in-prod, a regression gate, a drift monitor (Ch 6–7) — unprompted. Counters
+  "ignored eval," and answers the question this whole guide is built around.
+
+A fourth, quieter signal ties them together: **naming the silent failure first** when asked
+about risk (Ch 0). "It might go down" is true of any service; "answers could decay silently
+while the dashboards stay green, so we monitor quality on live traffic" is the sentence only
+someone who has run an AI system in production says.
+
+## Transfer the loop {/* anchor: transfer-the-loop */}
+
+The interviewer will invent a system you've never built — a voice agent, a code-review bot, a
+fraud-explanation tool — to test whether you have a *method* or just memorized one
+architecture. The production loop is the transferable artifact: whatever the system, ask
+which stage owns each concern.
+
+Take "design a real-time voice assistant," cold:
+
+- **Serve** is now the headline — TTFT is the product (Ch 2), so streaming and speculative
+  decoding (Ch 3) move from nice-to-have to required, and the latency SLO drives everything.
+- **Respond** carries new weight — a voice agent that takes actions needs gated actions
+  (Ch 8), and a degradation mode for ASR/LLM failures (Ch 9).
+- **Evaluate** adapts — quality is now transcription accuracy *and* answer quality, sampled
+  and drift-monitored (Ch 6–7).
+- **Deploy** and **observe** transfer unchanged — pin versions, gate on a golden set, trace
+  the request.
+
+You didn't re-derive anything; you walked the five stages and asked which dominates for *this*
+system. That's transfer, and it's what the novel prompt is testing.
+
+## Weak to strong {/* anchor: weak-to-strong */}
+
+The most useful drill is rewriting your own answers. The move is always the same: replace
+vague-and-component-first with targets-and-mechanism.
+
+- **Weak:** "I'd use a good model and add caching to make it cheaper."
+- **Strong:** "At 10K queries/day the frontier model is ~$1,700/month, over our ceiling. I'd
+  route on a calibrated confidence — cheap model for the easy majority, escalate the rest —
+  to hold groundedness near frontier at ~$500, and add a response cache with a TTL tied to how
+  often the corpus changes. I'd verify the cascade held the quality bar on the golden set
+  before shipping it behind a flag."
+
+Same idea, but the strong version has a number, a named mechanism (cascade, cache, gate, flag),
+and a verification — which is the texture of having done it. Practice the rewrite until
+leading with the target is automatic.
+
+## See it: weak vs strong, three times
+
+Three interview moments. **Predict** the senior move before the reveal — they're the three
+signals in action.
+
+<ScenarioQuiz client:visible data={craftData} />
+
+The pattern is the whole chapter: the knowledge is necessary but not sufficient; the craft is
+volunteering the target, the estimate, and the eval before anyone asks for them.
+
+<Practice id="rewrite-weak-to-strong" difficulty={2}>
+Rewrite this answer into a senior one: *"For a chatbot, I'd pick the best LLM and a vector
+database, and we'd monitor it to make sure it stays good."* Add a target, a named mechanism,
+and how you'd know it works.
+
+<details>
+<summary>One defensible answer</summary>
+
+"First the targets — say 20K queries/day, p95 under 2s, groundedness ≥ 0.85, a cost ceiling.
+RAG over our corpus for citable answers, with a calibrated cascade to hit the cost ceiling
+without dropping below the groundedness bar. To *know* it stays good, I'd sample ~5% of live
+traffic through a validated judge and gate on the confidence interval of any drop, plus a
+rolling-window drift monitor on groundedness — because the dangerous failure here is silent:
+green dashboards while the corpus ages out from under the answers." Now it has targets, named
+mechanisms (cascade, sampled eval, drift monitor), and a clear answer to "how do you know."
+</details>
+</Practice>
+
+## How this is graded
+
+- **Technical Correctness** — when you do reach for a mechanism, it's the right one, and your
+  estimates are sound — the craft amplifies real knowledge, it doesn't replace it.
+- **Trade-off Awareness** — you frame choices as trades against targets, out loud, rather than
+  asserting a default.
+- **Evaluation Rigor** — you volunteer how quality is measured and gated, every time, because
+  it's the signal that most separates shipped from demoed.
+- **Communication** — this chapter's weighted dimension: you lead with targets, estimate
+  unprompted, raise eval first, and rewrite vague into specific — the craft of making
+  production experience legible under time pressure.
+
+### Industry variation
+
+- **Startups** — signal pragmatism: which corners you'd cut and which you wouldn't (never the
+  eval gate), and the smallest version that ships responsibly.
+- **Enterprise / regulated** — lead with constraints (residency, audit, SLAs) as first-class
+  requirements; the senior read is treating compliance as design input, not friction.
+- **Frontier / high scale** — estimates and serving efficiency dominate; the bar is composing
+  the loop cleanly and reasoning about cost-per-query at scale.
+- **AI-assisted coding interviews** — you'll write and verify live; narrate the contract, the
+  test, and how you'd eval it — the same habits, now demonstrated in code.
+
+## The question that started the guide
+
+Chapter 0 opened with the sentence that ends a weak interview: *"Your dashboards are green —
+how do you know your AI feature still works?"* You now have the answer, and it's a walk
+through the loop: *changes — yours and the provider's — pass a golden-set gate before full
+traffic; live traffic is sampled and scored continuously, with drift tests on rolling windows;
+when quality does break, guardrails and degradation modes bound the blast radius while you
+attribute the cause.* Three sentences, and each one is a chapter you can defend.
+
+That's the whole guide: production is where AI systems live or die, the loop is how you keep
+them alive, and the craft is making it legible. Take the loop to whatever you build next — and
+to whatever whiteboard you're handed.
