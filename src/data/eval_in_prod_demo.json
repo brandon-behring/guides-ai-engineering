@@ -1,0 +1,45 @@
+{
+  "name": "Eval-in-production: spot the mistake",
+  "note": "Three reasonable-sounding moves for evaluating quality on live traffic. Pick the flaw before the chapter names it — each maps to sampling, significance, or what you sample.",
+  "items": [
+    {
+      "id": "eval-everything",
+      "prompt": "To never miss a regression, we'll run the full LLM judge on 100% of production traffic and alert on any quality drop.",
+      "candidates": [
+        "Scoring every request doubles your inference bill (a judge call per query) for little gain — sample a fraction, sized so you can still detect a regression of the magnitude you care about",
+        "Judges are too unreliable to run in production at all",
+        "100% is fine; the real problem is you should alert on latency too",
+        "You should only evaluate traffic that users complain about"
+      ],
+      "correct": "Scoring every request doubles your inference bill (a judge call per query) for little gain — sample a fraction, sized so you can still detect a regression of the magnitude you care about",
+      "explanation": "Eval-in-prod is sampling: a judge call costs roughly what the original call did, so 100% coverage doubles spend (Chapter 4). You don't need it — a sampled few-hundred-per-day is enough to detect a meaningful drop. The sampling rate is a detection-speed-vs-cost dial, not an all-or-nothing switch.",
+      "principle": "You evaluate a sample of live traffic, not all of it; the rate trades detection speed against spend."
+    },
+    {
+      "id": "rollback-on-noise",
+      "prompt": "Sampled prod accuracy went from 0.94 last week to 0.91 this week, measured on 40 sampled queries each. Roll back the release.",
+      "candidates": [
+        "A 3-point move on 40 samples is well within sampling noise — gate on whether the paired difference's confidence interval excludes zero, not on the point estimate, or you'll roll back on coin flips",
+        "Roll back immediately; any drop in accuracy is unacceptable",
+        "Ignore it — accuracy always fluctuates and never matters",
+        "Raise the guardrail to 0.91 so the alert stops firing"
+      ],
+      "correct": "A 3-point move on 40 samples is well within sampling noise — gate on whether the paired difference's confidence interval excludes zero, not on the point estimate, or you'll roll back on coin flips",
+      "explanation": "Because you sampled, the measured accuracy is an estimate with error bars. On 40 examples a 3-point swing easily straddles zero — rolling back on it means thrashing on noise. The gate is a significance test (a bootstrap CI on the paired difference, as in the Evaluation guide): block only when the regression survives the noise. The fix for a genuinely ambiguous signal is a bigger sample, not a hair-trigger.",
+      "principle": "Gate on the confidence interval, not the point estimate — a drop must beat sampling noise to count."
+    },
+    {
+      "id": "uniform-sampling-blind-spot",
+      "prompt": "We sample traffic uniformly and score it with an LLM judge. The aggregate quality number looks healthy, but a specific user segment keeps complaining.",
+      "candidates": [
+        "Uniform sampling drowns a small hard segment in the easy majority, so its failures never move the aggregate — stratify the sample by segment, and validate the judge against human labels so it's scoring the thing that's failing",
+        "The complaining users are wrong; the aggregate number is the truth",
+        "LLM judges can't be trusted, so ignore the eval entirely",
+        "Just increase the overall sampling rate and the problem will surface"
+      ],
+      "correct": "Uniform sampling drowns a small hard segment in the easy majority, so its failures never move the aggregate — stratify the sample by segment, and validate the judge against human labels so it's scoring the thing that's failing",
+      "explanation": "A healthy aggregate can hide a failing slice: if 3% of traffic is a hard segment, even a total failure there barely dents the overall mean. Stratified sampling (guarantee coverage of segments you care about) plus a judge you've checked against human labels is how eval-in-prod sees the failure the average smooths away. Raising the uniform rate just collects more of the easy majority.",
+      "principle": "A healthy average can hide a failing slice — stratify the sample, and trust the judge only after you've validated it."
+    }
+  ]
+}

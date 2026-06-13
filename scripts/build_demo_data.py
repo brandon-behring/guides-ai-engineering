@@ -34,6 +34,8 @@ from mini_rag import (  # noqa: E402
 from mini_prod import (  # noqa: E402
     request_service_ms, poisson_arrivals, simulate_queue, latency_summary,
     cascade_sweep, baseline,
+    Span, span_rows, rollup_by_attribute, slowest_span, self_time_ms,
+    total_duration_ms, rolling_mean, slo_breach_index,
 )
 
 # The ACME refund policy — shared by the Ch 3 chunking demo and the Ch 4
@@ -1186,6 +1188,73 @@ def cascade_demo() -> dict:
     }
 
 
+def trace_demo() -> dict:
+    """Ch 5 observability, for the SpanWaterfallExplorer island. One support-bot
+    request as a span tree built with mini_prod.trace; the island reads the waterfall
+    rows plus the self-time rollup by stage. The lesson a trace teaches that a metric
+    can't: *where* in this one request the time went — generate (decode) dominates,
+    and within retrieve, rerank is the hotspot. Times are stated estimates consistent
+    with Chapter 2's arithmetic, not a measurement."""
+    root = Span("request", 0, 868, {"stage": "request"}, children=[
+        Span("retrieve", 8, 120, {"stage": "retrieve"}, children=[
+            Span("embed", 8, 30, {"stage": "retrieve"}),
+            Span("search", 30, 48, {"stage": "retrieve"}),
+            Span("rerank", 48, 120, {"stage": "retrieve"}),
+        ]),
+        Span("generate", 120, 868, {"stage": "generate"}),
+    ])
+    total = total_duration_ms(root)
+    roll = rollup_by_attribute(root, "stage")
+    slow = slowest_span(root)
+    return {
+        "name": "One request, span by span",
+        "note": ("A trace is a tree of timed spans carrying attributes (built here with "
+                 "mini_prod.trace). Self-time — a span's own work, excluding children — "
+                 "is where the time actually went: generate (decode) is ~86% of this "
+                 "request, and inside retrieve, rerank dwarfs embed and search. A latency "
+                 "metric gives you the 868ms total; only the trace tells you which stage "
+                 "to optimize."),
+        "total_ms": round(total),
+        "rows": span_rows(root),
+        "rollup": [{"stage": k, "ms": round(v), "pct": round(100 * v / total)}
+                   for k, v in sorted(roll.items(), key=lambda kv: -kv[1])],
+        "slowest": {"name": slow.name, "self_ms": round(self_time_ms(slow))},
+    }
+
+
+def drift_demo() -> dict:
+    """Ch 7 drift, reusing guide-1's DriftMonitorExplorer contract (offline vs online
+    series, a guardrail, a breach day). A frozen offline groundedness score stays flat
+    and green all month; the live signal decays after the help center is reorganized
+    (Chapter 0's second failure) and breaches the guardrail. The breach day is found by
+    mini_prod.slo_breach_index on the rolling mean — the alert a drift monitor fires
+    that the offline dashboard never shows. Values sit under the island's 0.8 scale."""
+    rng = random.Random(31)
+    days = 30
+    guardrail = 0.70
+    shift_day = 11            # the corpus reorg lands here
+    offline, online_raw = [], []
+    for d in range(days):
+        offline.append(round(_clamp01(0.78 + rng.gauss(0, 0.004)), 3))   # frozen set: flat
+        decay = 0.0 if d <= shift_day else (d - shift_day) * 0.013
+        online_raw.append(_clamp01(0.78 - decay + rng.gauss(0, 0.012)))
+    online_smooth = rolling_mean(online_raw, 3)
+    breach = slo_breach_index(online_raw, guardrail=guardrail, window=3, above=False)
+    series = [{"day": d, "offline": offline[d], "online": round(online_smooth[d], 3)}
+              for d in range(days)]
+    return {
+        "name": "Drift: the frozen set can't see it",
+        "note": ("Offline groundedness (a frozen eval set) is flat and green all month. "
+                 "The live signal decays after the corpus shifts and the 3-day rolling "
+                 "mean breaches the 0.70 guardrail — detected by mini_prod.slo_breach_index. "
+                 "No single deploy explains it; only a rolling measurement against live "
+                 "traffic catches the slow failure."),
+        "days": days, "guardrail": guardrail, "breach_day": breach,
+        "ylabel": "groundedness (judge score)",
+        "series": series,
+    }
+
+
 def main() -> None:
     os.makedirs(OUT, exist_ok=True)
     for name, data in [
@@ -1206,6 +1275,8 @@ def main() -> None:
         ("monitoring_demo", monitoring_demo()),
         ("latency_demo", latency_demo()),
         ("cascade_demo", cascade_demo()),
+        ("trace_demo", trace_demo()),
+        ("drift_demo", drift_demo()),
     ]:
         path = os.path.join(OUT, f"{name}.json")
         with open(path, "w") as f:

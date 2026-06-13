@@ -1,0 +1,76 @@
+{
+  "name": "One request, span by span",
+  "note": "A trace is a tree of timed spans carrying attributes (built here with mini_prod.trace). Self-time \u2014 a span's own work, excluding children \u2014 is where the time actually went: generate (decode) is ~86% of this request, and inside retrieve, rerank dwarfs embed and search. A latency metric gives you the 868ms total; only the trace tells you which stage to optimize.",
+  "total_ms": 868,
+  "rows": [
+    {
+      "name": "request",
+      "start_ms": 0,
+      "duration_ms": 868,
+      "self_ms": 8,
+      "depth": 0,
+      "stage": "request"
+    },
+    {
+      "name": "retrieve",
+      "start_ms": 8,
+      "duration_ms": 112,
+      "self_ms": 0,
+      "depth": 1,
+      "stage": "retrieve"
+    },
+    {
+      "name": "embed",
+      "start_ms": 8,
+      "duration_ms": 22,
+      "self_ms": 22,
+      "depth": 2,
+      "stage": "retrieve"
+    },
+    {
+      "name": "search",
+      "start_ms": 30,
+      "duration_ms": 18,
+      "self_ms": 18,
+      "depth": 2,
+      "stage": "retrieve"
+    },
+    {
+      "name": "rerank",
+      "start_ms": 48,
+      "duration_ms": 72,
+      "self_ms": 72,
+      "depth": 2,
+      "stage": "retrieve"
+    },
+    {
+      "name": "generate",
+      "start_ms": 120,
+      "duration_ms": 748,
+      "self_ms": 748,
+      "depth": 1,
+      "stage": "generate"
+    }
+  ],
+  "rollup": [
+    {
+      "stage": "generate",
+      "ms": 748,
+      "pct": 86
+    },
+    {
+      "stage": "retrieve",
+      "ms": 112,
+      "pct": 13
+    },
+    {
+      "stage": "request",
+      "ms": 8,
+      "pct": 1
+    }
+  ],
+  "slowest": {
+    "name": "generate",
+    "self_ms": 748
+  }
+}

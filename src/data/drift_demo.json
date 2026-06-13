@@ -1,0 +1,160 @@
+{
+  "name": "Drift: the frozen set can't see it",
+  "note": "Offline groundedness (a frozen eval set) is flat and green all month. The live signal decays after the corpus shifts and the 3-day rolling mean breaches the 0.70 guardrail \u2014 detected by mini_prod.slo_breach_index. No single deploy explains it; only a rolling measurement against live traffic catches the slow failure.",
+  "days": 30,
+  "guardrail": 0.7,
+  "breach_day": 18,
+  "ylabel": "groundedness (judge score)",
+  "series": [
+    {
+      "day": 0,
+      "offline": 0.782,
+      "online": 0.78
+    },
+    {
+      "day": 1,
+      "offline": 0.775,
+      "online": 0.786
+    },
+    {
+      "day": 2,
+      "offline": 0.781,
+      "online": 0.785
+    },
+    {
+      "day": 3,
+      "offline": 0.781,
+      "online": 0.792
+    },
+    {
+      "day": 4,
+      "offline": 0.784,
+      "online": 0.793
+    },
+    {
+      "day": 5,
+      "offline": 0.779,
+      "online": 0.79
+    },
+    {
+      "day": 6,
+      "offline": 0.776,
+      "online": 0.782
+    },
+    {
+      "day": 7,
+      "offline": 0.769,
+      "online": 0.784
+    },
+    {
+      "day": 8,
+      "offline": 0.781,
+      "online": 0.786
+    },
+    {
+      "day": 9,
+      "offline": 0.784,
+      "online": 0.786
+    },
+    {
+      "day": 10,
+      "offline": 0.781,
+      "online": 0.782
+    },
+    {
+      "day": 11,
+      "offline": 0.773,
+      "online": 0.789
+    },
+    {
+      "day": 12,
+      "offline": 0.781,
+      "online": 0.789
+    },
+    {
+      "day": 13,
+      "offline": 0.776,
+      "online": 0.775
+    },
+    {
+      "day": 14,
+      "offline": 0.787,
+      "online": 0.752
+    },
+    {
+      "day": 15,
+      "offline": 0.778,
+      "online": 0.738
+    },
+    {
+      "day": 16,
+      "offline": 0.786,
+      "online": 0.718
+    },
+    {
+      "day": 17,
+      "offline": 0.786,
+      "online": 0.708
+    },
+    {
+      "day": 18,
+      "offline": 0.784,
+      "online": 0.689
+    },
+    {
+      "day": 19,
+      "offline": 0.781,
+      "online": 0.693
+    },
+    {
+      "day": 20,
+      "offline": 0.78,
+      "online": 0.676
+    },
+    {
+      "day": 21,
+      "offline": 0.778,
+      "online": 0.665
+    },
+    {
+      "day": 22,
+      "offline": 0.783,
+      "online": 0.646
+    },
+    {
+      "day": 23,
+      "offline": 0.778,
+      "online": 0.639
+    },
+    {
+      "day": 24,
+      "offline": 0.775,
+      "online": 0.622
+    },
+    {
+      "day": 25,
+      "offline": 0.791,
+      "online": 0.606
+    },
+    {
+      "day": 26,
+      "offline": 0.787,
+      "online": 0.589
+    },
+    {
+      "day": 27,
+      "offline": 0.779,
+      "online": 0.584
+    },
+    {
+      "day": 28,
+      "offline": 0.776,
+      "online": 0.571
+    },
+    {
+      "day": 29,
+      "offline": 0.779,
+      "online": 0.556
+    }
+  ]
+}

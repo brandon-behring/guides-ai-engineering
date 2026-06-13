@@ -11,6 +11,10 @@ from mini_prod import (  # noqa: E402
     percentile, latency_summary, kv_cache_gb, max_batch_from_memory,
     request_service_ms, poisson_arrivals, simulate_queue, achieved_qps,
     route_cheap, cascade_metrics, cascade_sweep, baseline,
+    Span, flatten, self_time_ms, total_duration_ms, rollup_by_attribute,
+    slowest_span, span_rows,
+    sample, golden_accuracy, regression_gate, sampling_plan,
+    rolling_mean, mann_whitney_u, detect_drift, slo_breach_index,
 )
 
 
@@ -217,6 +221,132 @@ def test_baseline_endpoints():
     assert _close(b["all_cheap"]["cost_q"], 1.0)
     assert _close(b["all_hard"]["accuracy"], 1.0)
     assert _close(b["all_hard"]["cost_q"], 10.0)
+
+
+# ---- trace -------------------------------------------------------------------
+
+def _sample_trace():
+    return Span("request", 0, 100, {"stage": "request"}, children=[
+        Span("retrieve", 0, 40, {"stage": "retrieve"}, children=[
+            Span("embed", 0, 20, {"stage": "embed"}),
+        ]),
+        Span("generate", 40, 100, {"stage": "generate"}),
+    ])
+
+
+def test_span_duration():
+    assert _close(Span("x", 5, 30).duration_ms, 25.0)
+
+
+def test_self_time_excludes_children():
+    root = _sample_trace()
+    retrieve = root.children[0]
+    assert _close(self_time_ms(retrieve), 20.0)        # 40 total − 20 embed child
+    assert _close(self_time_ms(root), 0.0)             # 100 − (40 + 60): pure wrapper
+
+
+def test_flatten_is_preorder():
+    names = [s.name for s in flatten(_sample_trace())]
+    assert names == ["request", "retrieve", "embed", "generate"]
+
+
+def test_rollup_by_attribute_sums_self_time():
+    r = rollup_by_attribute(_sample_trace(), "stage")
+    assert _close(r["generate"], 60.0)
+    assert _close(r["retrieve"], 20.0)
+    assert _close(r["embed"], 20.0)
+    assert _close(r["request"], 0.0)
+    assert _close(sum(r.values()), total_duration_ms(_sample_trace()))   # self-times tile the total
+
+
+def test_slowest_span_by_self_time():
+    assert slowest_span(_sample_trace()).name == "generate"
+
+
+def test_span_rows_depth_and_offset():
+    rows = span_rows(_sample_trace())
+    assert rows[0]["depth"] == 0 and _close(rows[0]["start_ms"], 0.0)
+    gen = next(r for r in rows if r["name"] == "generate")
+    assert gen["depth"] == 1 and _close(gen["start_ms"], 40.0)
+
+
+# ---- monitor -----------------------------------------------------------------
+
+def test_sample_deterministic_and_bounds():
+    items = list(range(1000))
+    assert sample(items, rate=0.3, seed=5) == sample(items, rate=0.3, seed=5)
+    assert sample(items, rate=1.0, seed=5) == items
+    assert sample(items, rate=0.0, seed=5) == []
+    assert _raises(lambda: sample(items, rate=1.5, seed=5))
+
+
+def test_golden_accuracy_is_fraction_correct():
+    assert _close(golden_accuracy([1, 1, 0, 1]), 0.75)
+    assert _raises(lambda: golden_accuracy([]))
+
+
+def test_regression_gate_identical_passes_as_noise():
+    g = regression_gate([1, 1, 0, 1, 1, 0, 1, 1, 0, 1],
+                        [1, 1, 0, 1, 1, 0, 1, 1, 0, 1], seed=0)
+    assert _close(g["delta"], 0.0)
+    assert g["passed"] is True
+    assert g["significant"] is False
+
+
+def test_regression_gate_clear_regression_fails():
+    g = regression_gate([1] * 40, [1] * 20 + [0] * 20, seed=0)
+    assert _close(g["delta"], -0.5)
+    assert g["significant"] is True
+    assert g["passed"] is False
+
+
+def test_regression_gate_errors():
+    assert _raises(lambda: regression_gate([1, 0], [1], seed=0))
+    assert _raises(lambda: regression_gate([], [], seed=0))
+
+
+def test_sampling_plan_arithmetic():
+    p = sampling_plan(qpd=10000, rate=0.05, cost_per_eval_usd=0.002)
+    assert p["sampled_per_day"] == 500
+    assert _close(p["daily_cost"], 1.0)
+    assert _close(p["monthly_cost"], 30.0)
+    assert _raises(lambda: sampling_plan(qpd=100, rate=2.0, cost_per_eval_usd=0.01))
+
+
+# ---- drift -------------------------------------------------------------------
+
+def test_rolling_mean_trailing_window():
+    assert rolling_mean([1, 2, 3, 4], 2) == [1.0, 1.5, 2.5, 3.5]
+    assert rolling_mean([5, 6, 7], 1) == [5.0, 6.0, 7.0]
+    assert _raises(lambda: rolling_mean([1, 2], 0))
+
+
+def test_mann_whitney_same_distribution_high_p():
+    a = list(range(20))
+    assert mann_whitney_u(a, list(range(20)))["p"] > 0.9
+
+
+def test_mann_whitney_shifted_low_p():
+    a = list(range(20))
+    b = [x + 100 for x in range(20)]               # fully separated
+    assert mann_whitney_u(a, b)["p"] < 0.01
+    assert _raises(lambda: mann_whitney_u([], [1.0]))
+
+
+def test_detect_drift():
+    ref = [0.9, 0.91, 0.89, 0.9, 0.92, 0.9, 0.88, 0.9]
+    same = [0.9, 0.9, 0.91, 0.89, 0.9, 0.92, 0.9, 0.9]
+    shifted = [0.6, 0.58, 0.62, 0.59, 0.6, 0.57, 0.61, 0.6]
+    assert detect_drift(ref, same) is False
+    assert detect_drift(ref, shifted) is True
+
+
+def test_slo_breach_index():
+    series = [0.9, 0.88, 0.85, 0.7, 0.6]
+    assert slo_breach_index(series, guardrail=0.8, window=1) == 3       # first day below
+    assert slo_breach_index([0.9] * 5, guardrail=0.8, window=1) is None  # never breaches
+    latency = [100, 120, 150, 300, 280]
+    assert slo_breach_index(latency, guardrail=200, window=1, above=True) == 3
 
 
 def _run_all() -> None:

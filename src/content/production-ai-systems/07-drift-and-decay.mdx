@@ -1,0 +1,216 @@
+---
+title: "Drift & quality decay — detecting the slow failure"
+slug: drift-and-decay
+description: "Chapter 0's worst failure had no change to blame: groundedness slid for a month as the help center was reorganized and the query mix drifted, and every point-in-time gate stayed green. Drift is the failure a frozen offline set and a two-point regression gate both miss. The three pieces of a drift monitor — a rolling window to smooth the signal, a non-parametric rank test (Mann-Whitney) to detect a distribution shift, and an SLO guardrail to fire the alert — and how to tell drift from a regression."
+freshness: literature-survey
+last_verified: 2026-06-13
+tags: [production, drift, monitoring, evaluation]
+sources: []
+draft: false
+mode: tutorial
+target: transfer
+ordering: problem-first
+commitment: long-lived
+paradigms: [default]
+research_debt_addressed: |
+  Drift is the failure mode interviews probe with "your dashboards are green, how do you
+  know it still works" — and most candidates conflate it with a regression or reach for a
+  t-test on skewed data. This chapter separates drift (no single cause; needs rolling
+  measurement) from a regression (a change; caught by a gate), builds the rank-test
+  detector that works on heavy-tailed production signals, and shows why a frozen eval set
+  is structurally blind to the slow decay.
+task_classes: [drift-detection, monitoring]
+provenance:
+  ai_tools: ["Claude Opus 4.8 (Anthropic)"]
+  audit_history:
+    - date: 2026-06-13
+      type: authored
+      file: src/content/production-ai-systems/07-drift-and-decay.mdx
+  citation_backstop: manual
+los:
+  - id: PAS-7.1
+    bloom: explain
+    statement: "Explain why drift — slow quality decay from a shifting input mix or aging corpus — is invisible to a frozen offline eval and to a two-point regression gate, and requires rolling measurement against live traffic."
+    anchor: frozen-set-is-blind
+    threshold: true
+  - id: PAS-7.2
+    bloom: design
+    statement: "Build a drift monitor from a rolling window, a non-parametric rank test (Mann-Whitney) for a distribution shift, and an SLO guardrail that fires the alert."
+    anchor: detecting-the-shift
+    threshold: true
+  - id: PAS-7.3
+    bloom: analyze
+    statement: "Distinguish drift (no single cause, detected by rolling measurement) from a regression (a change, caught by a gate), and locate each at the right stage of the production loop."
+    anchor: drift-vs-regression
+    threshold: true
+---
+
+import YouWillLearn from '@brandon_m_behring/book-scaffold-astro/components/YouWillLearn.astro';
+import Pitfall from '@brandon_m_behring/book-scaffold-astro/components/Pitfall.astro';
+import Practice from '@brandon_m_behring/book-scaffold-astro/components/Practice.astro';
+import DriftMonitorExplorer from '../../components/DriftMonitorExplorer.tsx';
+import driftData from '../../data/drift_demo.json';
+
+# Drift & quality decay — detecting the slow failure
+
+<YouWillLearn prerequisites="Chapter 6 — a regression gate that compares two points and fires on a significant drop. You know what a sampled quality score is.">
+- Why a **frozen offline set** and a two-point gate are both blind to slow decay.
+- How to **detect a distribution shift** with a rolling window and a rank test, then alert on an SLO.
+- How to tell **drift** (no change) from a **regression** (a change), and place each in the loop.
+</YouWillLearn>
+
+## The decay nobody shipped
+
+This is Chapter 0's worst failure, the one the whole guide was pointed at. The support bot's
+answer quality slid over a month — not a cliff, a slope. The help center was reorganized so
+the chunk index slowly went stale; the promo brought a different mix of questions than the
+golden set ever covered. No deploy caused it. Every release passed its gate, because no
+single week looked significantly worse than the week before. The frozen offline eval set
+scored a steady 0.92 the entire time, because its inputs never changed — and the world's did.
+
+This is the failure that the previous chapter's gate cannot catch. A regression gate compares
+two points and asks "did this change make it worse?" Drift has no change and no two adjacent
+points that differ significantly — it is a slope that only becomes visible when you step back
+and look at the trend against *live* traffic, which the frozen set, by construction, never sees.
+
+Predict, before reading on: your offline eval set scores a flat 0.92 all month while users
+churn. **What is structurally different about the offline set that makes it blind here** — and
+what kind of measurement would have caught the slope?
+
+<Pitfall title="A green frozen set is a clock that stopped">
+A frozen eval set scores the system you launched on the inputs you imagined — forever. Its
+flat green line is not evidence the system is healthy; it's evidence the *inputs didn't move*,
+which says nothing about the inputs that did. Trusting a static eval set to certify a live
+system is trusting a stopped clock because it's right twice a day. Drift lives precisely in
+the gap between the frozen inputs and the moving ones.
+</Pitfall>
+
+## The frozen set is blind {/* anchor: frozen-set-is-blind */}
+
+Two instruments from the last chapters are structurally unable to see drift, for the same
+reason — they both hold something fixed:
+
+- **The offline eval set** holds the *inputs* fixed. It re-scores the same cases forever, so
+  it can only detect a change in the *model*, never a change in the *world* (the query mix,
+  the corpus). Drift is a change in the world.
+- **The two-point regression gate** holds the *comparison* fixed at adjacent points. Drift's
+  week-over-week step is inside the noise (Chapter 6), so the gate never fires — even though
+  the month-over-month slope is enormous.
+
+What sees drift is the third option: a **rolling measurement of live traffic** — score the
+real queries continuously, smooth the signal, and watch the trend and its distribution, not
+two snapshots. That's a drift monitor, and it's three small pieces.
+
+## Detecting the shift {/* anchor: detecting-the-shift */}
+
+`mini_prod.drift` is the monitor: smooth, test, alert.
+
+```python
+def rolling_mean(series, window):
+    """Trailing mean so a real downward trend separates from daily jitter."""
+    return [sum(series[max(0, i-window+1):i+1]) / len(series[max(0, i-window+1):i+1])
+            for i in range(len(series))]
+
+def mann_whitney_u(a, b):
+    """A non-parametric rank test: did sample b shift from a? It ranks the pooled data
+    and asks if one side's ranks are systematically higher — no normality assumed,
+    robust to the heavy tails of latency and judge-score data. Returns U and a p-value."""
+    # ... rank, sum, normal-approx p-value ...
+
+def slo_breach_index(series, *, guardrail, window, above=False):
+    """First day the rolling mean crosses the guardrail — the alert the monitor fires."""
+```
+
+Why a **rank test** and not a t-test: production quality and latency signals are skewed and
+heavy-tailed, and a t-test assumes neither. Mann–Whitney compares a recent window against a
+reference window by *ranks*, so it detects a distribution shift — including a fattening tail
+that leaves the mean unmoved — without assuming a shape. The rolling mean gives you the trend
+line a human reads; the rank test gives you the statistical alarm; the SLO guardrail gives you
+the page. Together they turn a month-long slope into an alert on day 18.
+
+## Drift vs regression {/* anchor: drift-vs-regression */}
+
+These are different failures with different owners, and naming which one you're looking at is
+the senior tell:
+
+| | **Regression** | **Drift** |
+| --- | --- | --- |
+| Cause | a *change* — deploy, model swap, prompt edit | *no single change* — input mix, corpus age |
+| Detector | a two-point gate on the change (Ch 6) | rolling measurement of live traffic (this ch) |
+| Loop stage | deploy (gate the change) | evaluate (watch the trend) |
+| Fix | roll back the change | retrain / re-index / re-ground; sometimes re-scope |
+
+The mistake is treating drift as a regression — bisecting deploys for a cause that doesn't
+exist — or treating a regression as drift, waiting for a trend when a single change broke it
+yesterday. Run Chapter 0's three failures through the table: the provider swap was a
+regression (a change → deploy gate); the stale index was drift (no change → rolling
+detection); the latency breach was neither (a serving capacity problem). Placing each
+correctly is the diagnosis the loop exists to make.
+
+## See it: the frozen set can't see it
+
+The offline line (frozen set) is flat and green all month; the online line (live traffic)
+drifts as the corpus ages. **Predict** roughly when the live signal breaches the guardrail —
+and notice the offline line never does.
+
+<DriftMonitorExplorer client:visible data={driftData} />
+
+That gap between the two lines is the entire chapter: the offline metric certifies a system
+that no longer exists, while the rolling online signal catches the decay on day 18 — weeks
+before complaint volume would have, and with the cause (the corpus reorg) still in view.
+
+<Practice id="design-a-drift-monitor" difficulty={3}>
+You run a RAG bot whose corpus is updated weekly. Design a drift monitor: what signal, what
+window, what test, what guardrail — and how would you tell a drift alert from a regression
+alert when one fires?
+
+<details>
+<summary>One defensible answer</summary>
+
+- **Signal:** a sampled live-traffic quality score (groundedness/correctness from a validated
+  judge, Chapter 6), logged daily; optionally also input-distribution features (query
+  embeddings, retrieval scores) to catch the *cause* shifting before quality does.
+- **Window + test:** a trailing rolling mean (say 7 days) for the human-readable trend, plus a
+  Mann–Whitney test of the recent window against a healthy reference window for the
+  statistical alarm — a rank test because the scores are skewed.
+- **Guardrail:** an SLO on the rolling mean (e.g., groundedness ≥ 0.70); breach pages someone.
+- **Drift vs regression:** check for a coincident *change*. If a deploy/model swap lines up
+  with the drop, it's a regression — roll back and gate. If quality slides with no change and
+  the input-distribution features moved, it's drift — re-index/re-ground, and consider that
+  the golden set itself has gone stale and needs refreshing.
+</details>
+</Practice>
+
+## How this is graded
+
+- **Technical Correctness** — you build the monitor from the right pieces (rolling window, a
+  rank test, an SLO) and can say why a rank test beats a t-test on skewed signals.
+- **Trade-off Awareness** — you weigh window length (responsiveness vs noise), alert
+  thresholds (false pages vs missed decay), and the cost of the sampled signal feeding it.
+- **Evaluation Rigor** — this chapter's weighted dimension: you treat "still works" as a
+  continuously re-measured claim against live traffic, and you refuse the frozen set as
+  evidence about a moving world.
+- **Communication** — "the offline set is green because its inputs are frozen; the live
+  rolling signal breached the SLO on day 18 — that's drift, not a regression" is the sentence
+  that ends Chapter 0's interview question.
+
+### Industry variation
+
+- **Startups** — a daily sampled score and a simple rolling-mean SLO alert is a complete drift
+  program; the senior move is having *any* live signal, not the fanciest test.
+- **Enterprise / scale** — drift monitored per segment and per tenant, with input-distribution
+  drift detected ahead of quality drift, wired to on-call.
+- **Regulated** — drift can trigger re-validation duties; the monitor and its breaches are
+  audit artifacts, and "we didn't notice" carries consequences.
+- **AI-assisted coding interviews** — asked "how do you catch quality decay," the signal is
+  rolling measurement + a rank test + an SLO, and cleanly separating drift from a regression.
+
+## Stretch: you can see the bad day coming — but seeing isn't stopping
+
+You can now detect the bad change (a regression gate) and the slow decay (a drift monitor).
+You can *see* trouble. But seeing isn't stopping: when a confidently-wrong answer is about to
+reach a user, or someone feeds the bot an adversarial prompt, detection bounds nothing — by
+the time the eval samples it, the user already got the answer. The loop's last stage isn't
+about noticing; it's about *responding*: what mechanism refuses the bad output in real time,
+and what do you do when the bad day actually arrives? (That's **Chapter 8 — guardrails in
+production**, and the start of the respond stage.)

@@ -1,0 +1,219 @@
+---
+title: "Evaluating in production — sampling, judges, and regression gates"
+slug: evaluating-in-production
+description: "The eval pillar, operated on live traffic. You can't score every request, so eval-in-prod is sampling — grade a fraction with the same metric you validated offline. And because you sampled, the number has error bars, so a regression gate must fire on a confidence interval (a drop beating sampling noise), not the point estimate. Plus what you sample (stratify the hard segments) and whether your judge is valid matter as much as how much."
+freshness: literature-survey
+last_verified: 2026-06-13
+tags: [production, evaluation, sampling, regression-gate, judges]
+sources: []
+draft: false
+mode: tutorial
+target: transfer
+ordering: problem-first
+commitment: long-lived
+paradigms: [default]
+research_debt_addressed: |
+  "Eval in production" is talked about as if it were free and obvious, leaving two
+  failure modes that show up constantly: teams either don't sample (and pay to judge
+  100% of traffic) or roll back on a sampled point estimate that's inside the noise.
+  This chapter makes eval-in-prod a sampling problem with a significance-gated decision,
+  reusing the Evaluation guide's bootstrap CI directly, and adds the stratification and
+  judge-validity caveats that decide whether the number means anything.
+task_classes: [evaluation, monitoring]
+provenance:
+  ai_tools: ["Claude Opus 4.8 (Anthropic)"]
+  audit_history:
+    - date: 2026-06-13
+      type: authored
+      file: src/content/production-ai-systems/06-evaluating-in-production.mdx
+  citation_backstop: manual
+los:
+  - id: PAS-6.1
+    bloom: design
+    statement: "Design evaluation-in-production as sampling — score a fraction of live traffic with the same metric validated offline — and explain why you sample rather than score every request."
+    anchor: sample-not-all
+    threshold: true
+  - id: PAS-6.2
+    bloom: analyze
+    statement: "Explain why a sampled production metric is an estimate with error, so a regression gate must fire on a confidence interval (a drop that beats sampling noise), not on the point estimate."
+    anchor: gate-on-the-interval
+    threshold: true
+  - id: PAS-6.3
+    bloom: analyze
+    statement: "Reason about what you sample (stratifying hard segments) and judge validity as determining whether the eval number means anything — not just the sampling rate."
+    anchor: what-you-sample
+    threshold: true
+---
+
+import YouWillLearn from '@brandon_m_behring/book-scaffold-astro/components/YouWillLearn.astro';
+import Pitfall from '@brandon_m_behring/book-scaffold-astro/components/Pitfall.astro';
+import Practice from '@brandon_m_behring/book-scaffold-astro/components/Practice.astro';
+import ScenarioQuiz from '../../components/ScenarioQuiz.tsx';
+import evalProdData from '../../data/eval_in_prod_demo.json';
+
+# Evaluating in production — sampling, judges, and regression gates
+
+<YouWillLearn prerequisites="Chapter 5 — evals are the fourth pillar, the only one that sees quality. You know what a golden set and a judge are (Evaluation guide, or equivalent).">
+- Why eval-in-prod is **sampling** — score a fraction with the metric you validated offline.
+- Why a sampled score has **error bars**, so the gate fires on a **confidence interval**, not a point.
+- Why **what** you sample (and whether the judge is valid) matters as much as how much.
+</YouWillLearn>
+
+## The score you can't afford to compute
+
+You have the eval pillar named, and a clean instinct: score every production answer, alert
+on any drop. Then you do the arithmetic from Chapter 4. Judging an answer costs about what
+generating it did — another model call — so scoring 100% of 10,000 daily requests *doubles*
+your inference bill to watch a number that barely moves day to day. Nobody does this.
+
+So eval-in-prod is a sampling problem, and sampling brings a statistical catch that trips
+up most teams: the number you get is an *estimate*. When this week's sampled quality reads
+0.91 against last week's 0.94, you do not actually know whether something regressed or you
+drew an unlucky sample — and rolling back on the difference is as likely to be thrashing on
+noise as fixing a problem.
+
+Predict, before reading on: you sample 40 requests a week and grade them. The score drops
+3 points. **What do you need to know before you can call that a regression** — and is the
+point estimate enough?
+
+<Pitfall title="A drop is not a regression">
+A measured drop in a sampled metric is two things added together: a real change (maybe
+zero) and sampling noise (never zero). On 40 examples the noise band is several points
+wide, so a 3-point dip is comfortably inside it. Treating every downward wiggle as a
+regression means rolling back on coin flips — and teaching your team to ignore the alert,
+which is worse. The discipline is to separate the signal from the noise before you act.
+</Pitfall>
+
+## Sample, don't score everything {/* anchor: sample-not-all */}
+
+Eval-in-prod scores a sample of live traffic with the *same metric you validated offline* —
+reuse is the whole point, so the prod number is comparable to the launch number.
+`mini_prod.monitor` does the sampling and the cost arithmetic, and delegates the scoring to
+`mini_eval`:
+
+```python
+def sample(items, *, rate, seed):
+    """Keep ~rate of live traffic for scoring. You evaluate the sample, not the
+    population — which is exactly why the result has error bars."""
+    rng = random.Random(seed)
+    return [x for x in items if rng.random() < rate]
+
+def sampling_plan(*, qpd, rate, cost_per_eval_usd):
+    """The cost side: rate x volume x per-eval cost. Higher rate detects faster and
+    tighter, and costs more — a detection-vs-spend dial, not a free setting."""
+    per_day = qpd * rate
+    return {"sampled_per_day": round(per_day),
+            "monthly_cost": round(per_day * cost_per_eval_usd * 30, 2)}
+```
+
+At 10,000 queries/day, a 5% sample is 500 graded requests a day — enough to detect a
+meaningful regression, at a twentieth of the cost of judging everything. The rate is a
+dial: turn it up to detect smaller regressions faster, down to save money. There is no
+"eval everything" obligation — there is a regression size you care about and a sample big
+enough to see it.
+
+## Gate on the interval, not the point {/* anchor: gate-on-the-interval */}
+
+Here is the catch resolved. Because the score is an estimate, the regression gate compares
+candidate against baseline on the *same* sampled items and asks whether the difference
+*survives the noise* — which is exactly `paired_diff_ci` from the Evaluation guide,
+reused unchanged:
+
+```python
+from mini_eval.confidence import paired_diff_ci   # the same CI you validated offline
+
+def regression_gate(baseline_correct, candidate_correct, *, margin=0.0, seed=0):
+    """Block only when the regression is real: the whole confidence interval on
+    (candidate - baseline) accuracy sits below -margin. A 3-point drop on 40 samples
+    straddles zero, so it passes — you do not roll back on noise."""
+    res = paired_diff_ci(...)                  # CI on the paired accuracy difference
+    real_regression = res["hi"] < -margin      # even the optimistic bound is a loss
+    return {"passed": not real_regression, "delta": ..., "ci_lo": res["lo"], "ci_hi": res["hi"]}
+```
+
+Now the 0.94 → 0.91 alarm has a principled answer: compute the CI on the difference; if it
+straddles zero, the drop is inside the noise and you do **not** block — you collect more
+sample if you want a tighter read. The gate fires only when the interval clears the margin,
+which means the regression is real. This is the single most common eval-in-prod mistake,
+and the fix is the bootstrap you already built.
+
+## What you sample matters as much as how much {/* anchor: what-you-sample */}
+
+Two things decide whether the number means anything, beyond the rate:
+
+- **What you sample.** Uniform sampling drowns a small hard segment in the easy majority: if
+  3% of traffic is a difficult segment, a total failure there barely dents the aggregate. A
+  healthy average can hide a failing slice — so **stratify**: guarantee coverage of the
+  segments you care about (a query type, a tenant, a language) and watch each, not just the
+  pooled mean.
+- **Whether the judge is valid.** Eval-in-prod usually scores with an LLM judge, and a judge
+  is itself a model with biases (the Evaluation guide's subject). A drift in *judge* behavior
+  reads as a drift in *quality*. Validate the judge against human labels before you trust its
+  prod scores, and re-check periodically — a metric is only as good as the instrument
+  producing it.
+
+The senior framing: "we sample 5%, stratified by segment, scored by a judge we've validated
+against human labels, and gate on the bootstrap CI of the difference." Every clause closes a
+way the number could lie.
+
+## See it: eval-in-prod, three ways to get it wrong
+
+Three plausible moves, each with a flaw. **Predict** the flaw before the reveal — they map
+to sampling, significance, and what-you-sample.
+
+<ScenarioQuiz client:visible data={evalProdData} />
+
+The pattern: eval-in-prod is not "run the eval, watch the number." It's a sampled estimate,
+gated by a significance test, on a stratified slice, scored by a validated judge — four
+decisions, each of which can quietly invalidate the result.
+
+<Practice id="design-eval-in-prod" difficulty={3}>
+Design eval-in-prod for the support bot (10K queries/day). Specify the sample rate, the
+metric, the gate, and one thing you'd stratify on — and say what you'd do when the weekly
+number drops 2 points.
+
+<details>
+<summary>One defensible answer</summary>
+
+- **Rate + metric:** sample ~5% (500/day), scored for groundedness/correctness by a judge
+  validated against a human-labelled set — the *same* metric used to gate releases offline.
+- **Gate:** compute the bootstrap CI on the paired difference vs the prior baseline; alert
+  only when the CI excludes zero by your margin (a real regression), not on the raw drop.
+- **Stratify:** by query type (e.g., order-status vs policy questions) so a failure confined
+  to one segment isn't smoothed away by the easy majority.
+- **On a 2-point drop:** check whether the CI excludes zero. If it straddles zero, it's
+  noise — collect more sample rather than roll back. If it excludes zero, treat it as a
+  regression: bisect against recent changes (deploy, corpus, provider) and gate the fix.
+</details>
+</Practice>
+
+## How this is graded
+
+- **Technical Correctness** — you size a sample to a regression you care about and reuse the
+  offline metric, rather than inventing a prod-only number that isn't comparable.
+- **Trade-off Awareness** — you treat the sampling rate as detection-speed vs spend, and know
+  stratification trades simplicity for the ability to see a failing slice.
+- **Evaluation Rigor** — this chapter's weighted dimension: you gate on a confidence interval,
+  not a point estimate, and you validate the judge before trusting its scores.
+- **Communication** — "we sample 5%, stratified, judged by a validated judge, gated on the CI
+  of the difference" is the sentence that proves you've operated an eval-in-prod loop.
+
+### Industry variation
+
+- **Startups** — a 5% sample, a single judge, and a manual weekly look is a real program; the
+  unskippable rigor is the CI gate, not the platform.
+- **Enterprise / scale** — continuous sampling per segment and per tenant, judge-validation
+  pipelines, and regression gates wired into the deploy system as a blocking check.
+- **Regulated** — sampled evals become evidence; judge validity and human-in-the-loop review
+  are auditable, and "we eyeballed it" is not a control.
+- **AI-assisted coding interviews** — asked "how do you know quality in prod," the signal is
+  sampling + a significance-gated comparison, not "we have a dashboard."
+
+## Stretch: the gate catches changes — but the worst failure had no change
+
+Your regression gate is built to catch a drop caused by a *change* — a deploy, a model swap.
+But Chapter 0's worst failure had no change at all: groundedness slid for a month as the
+help center was reorganized and the query mix drifted, and every point-in-time gate stayed
+green because no single week looked significantly worse than the one before it. A gate
+compares two points; it can't see a slow slope. How do you detect decay that no deploy
+explains? (That's **Chapter 7 — drift & quality decay**.)

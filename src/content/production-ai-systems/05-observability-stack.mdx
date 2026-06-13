@@ -1,0 +1,218 @@
+---
+title: "The observability stack — metrics, logs, traces, and evals"
+slug: observability-stack
+description: "Every serving decision in the last block assumed you could see what the system did — but a metric tells you p99 is high, not where in which request the time went, and none of the classic three pillars watch the one dimension that matters for an AI feature: was the answer right. The four pillars (metrics, logs, traces, evals), how to read a trace to locate where a request spent its time, and which pillar answers which question."
+freshness: literature-survey
+last_verified: 2026-06-13
+tags: [production, observability, tracing, evals]
+sources: []
+draft: false
+mode: tutorial
+target: transfer
+ordering: problem-first
+commitment: long-lived
+paradigms: [default]
+research_debt_addressed: |
+  Observability content for AI is dominated by vendor pitches for a single pillar (a
+  tracing product, an eval product), which leaves candidates unable to say which signal
+  answers which question — and unaware that classic three-pillar observability (metrics,
+  logs, traces) is structurally blind to answer quality. This chapter builds the four
+  pillars with evals as the AI-specific fourth, and makes reading a trace (spans,
+  attributes, self-time) a concrete skill rather than a tool demo.
+task_classes: [observability, diagnosis]
+provenance:
+  ai_tools: ["Claude Opus 4.8 (Anthropic)"]
+  audit_history:
+    - date: 2026-06-13
+      type: authored
+      file: src/content/production-ai-systems/05-observability-stack.mdx
+  citation_backstop: manual
+los:
+  - id: PAS-5.1
+    bloom: explain
+    statement: "Name the four pillars of observability — metrics, logs, traces, evals — and the question each answers, and explain why evals are the AI-specific fourth pillar that the classic three cannot supply."
+    anchor: four-pillars
+    threshold: true
+  - id: PAS-5.2
+    bloom: analyze
+    statement: "Read a trace — spans, attributes, and self-time — to locate where a single request spent its time, distinguishing a slow stage from a wrapper that is merely the sum of its children."
+    anchor: reading-a-trace
+    threshold: true
+  - id: PAS-5.3
+    bloom: analyze
+    statement: "Given a production symptom, choose the pillar that diagnoses it: a metric for how often, a trace for where in this request, a log for what exactly happened, an eval for whether the answer was right."
+    anchor: pillar-for-the-question
+    threshold: true
+---
+
+import YouWillLearn from '@brandon_m_behring/book-scaffold-astro/components/YouWillLearn.astro';
+import Pitfall from '@brandon_m_behring/book-scaffold-astro/components/Pitfall.astro';
+import Practice from '@brandon_m_behring/book-scaffold-astro/components/Practice.astro';
+import SpanWaterfallExplorer from '../../components/SpanWaterfallExplorer.tsx';
+import traceData from '../../data/trace_demo.json';
+
+# The observability stack — metrics, logs, traces, and evals
+
+<YouWillLearn prerequisites="Chapters 1–4 — you've made serving decisions (rollouts, batching, cascades) that all assumed you could see their effect. You know what a span is, roughly.">
+- The **four pillars** — metrics, logs, traces, evals — and the question each one answers.
+- How to **read a trace** (spans, attributes, self-time) to find where a request's time went.
+- Which **pillar** diagnoses which symptom — and why evals are the one infra can't supply.
+</YouWillLearn>
+
+## Flying blind
+
+Look back at the last block. The cascade only saves money if it stays calibrated; the
+cache only helps if its answers stay fresh; the latency fix only holds if p99 actually
+recovered. Every one of those is a claim about what the *running* system is doing — and
+you have no way to check any of them without instrumentation. A latency dashboard might
+show p99 climbing again, but it won't tell you whether the cause is the rerank stage, a
+cache miss storm, or one pathological 2,000-token answer. "Something is slow" is not a
+diagnosis.
+
+So before the evaluate half of the loop, the observe stage: what signals do you emit,
+and which question does each one answer? Get this wrong and you have dashboards that tell
+you a problem exists and nothing that tells you what it is — or, worse, dashboards that
+stay green while the answers rot.
+
+Predict, before reading on: your p99 latency alarm just fired. **Which signal tells you
+*which stage* of *which request* burned the time** — and is it the same signal that told
+you p99 was high?
+
+<Pitfall title="Monitoring tells you something's wrong; observability tells you why">
+A dashboard of aggregate metrics is monitoring: it fires when a number crosses a line.
+But the moment you ask "why," a metric is useless — it averaged away the individual
+request that holds the answer. Observability is the property that you can ask a question
+you didn't predict in advance ("why is *this* request slow," "what did the model see
+when it gave *that* answer") and the system can answer it. Metrics alone can't.
+</Pitfall>
+
+## The four pillars {/* anchor: four-pillars */}
+
+Classical observability has three pillars; AI serving needs a fourth. Each answers a
+different question, and the skill is knowing which:
+
+| Pillar | Answers | Shape |
+| --- | --- | --- |
+| **Metrics** | *How often / how much?* — p99, error rate, QPS, cache hit rate | aggregated numbers over time |
+| **Logs** | *What exactly happened?* — this request's inputs, the retrieved chunks, the error | discrete, timestamped events |
+| **Traces** | *Where did the time/decision go?* — per-request causal breakdown across stages | a tree of timed spans |
+| **Evals** | ***Was the answer right?*** — groundedness, correctness, refusal behavior | scored samples of outputs |
+
+The first three are blind to the dimension Chapter 0 was built around. A request can be
+counted (metric), logged (log), and traced (trace) — fast, 200 OK, every stage healthy —
+and still be *wrong*, and nothing in the classic three pillars scores the answer. **Evals
+are the fourth pillar**: the only one that watches quality, and the one this guide's
+evaluate stage (Chapters 6–7) is built on. "We have observability" without evals means
+"we can see everything except whether it works."
+
+## Reading a trace {/* anchor: reading-a-trace */}
+
+The trace is the pillar that turns "p99 is high" into "rerank is the problem." A trace is
+a tree of **spans** — timed units of work carrying attributes — and the reading that
+matters is **self-time**: a span's own work, excluding its children. `mini_prod.trace`
+makes it mechanical:
+
+```python
+def self_time_ms(span):
+    """Exclusive time — duration minus what the children account for. A parent that is
+    nothing but its children is a wrapper with ~0 self-time, however large its total."""
+    return span.duration_ms - sum(c.duration_ms for c in span.children)
+
+def rollup_by_attribute(root, key):
+    """Sum self-time grouped by an attribute (e.g. 'stage') across the whole trace —
+    this is the bridge from a trace to a metric: a metric is a rollup of spans."""
+    out = {}
+    for s in flatten(root):
+        if key in s.attributes:
+            out[s.attributes[key]] = out.get(s.attributes[key], 0.0) + self_time_ms(s)
+    return out
+```
+
+Run it on a support-bot request and the 868 ms total decomposes: **generate ≈ 86%**
+(decode, exactly Chapter 2's prediction), retrieve ≈ 13% — and *inside* retrieve, rerank
+dwarfs embed and search. That last fact is invisible to any metric; only the trace, with
+its per-stage self-time, says "optimize rerank, not embed." The `request` span itself has
+near-zero self-time — it's a wrapper — which is the distinction the reading turns on: a
+big *total* duration on a parent doesn't mean the work happened there.
+
+## The right pillar for the question {/* anchor: pillar-for-the-question */}
+
+Diagnosis is choosing the pillar that answers the question you actually have:
+
+- "p99 doubled this week" → a **metric** saw it; a **trace** of a slow request says where.
+- "this one user got a bizarre answer" → the **log** has the exact inputs and retrieved
+  context; the **trace** shows whether it hit the cache or escalated.
+- "is quality slipping?" → only an **eval** can answer — no metric, log, or trace scores
+  correctness.
+
+The failure mode is reaching for the wrong pillar: trying to debug a single weird answer
+from an aggregate metric (which averaged it away), or trying to detect quality decay from
+latency dashboards (wrong dimension entirely — Chapter 0's myth). Match the pillar to the
+question, and remember the fourth one exists.
+
+## See it: where did the request's time go?
+
+868 ms total. **Predict** which stage owns it — and which retrieval step is the hotspot —
+before the waterfall reveals the per-span self-time.
+
+<SpanWaterfallExplorer client:visible data={traceData} />
+
+The waterfall makes the lesson physical: the total is one number, but the *shape* —
+generate dominating, rerank the retrieval hotspot, the request span a near-empty wrapper
+— is the diagnosis. A metric could never have told you to look at rerank.
+
+<Practice id="pick-the-pillar" difficulty={2}>
+Four production questions. Name the pillar (metric / log / trace / eval) that answers each
+in one phrase:
+
+1. "Has our cache hit rate dropped since the deploy?"
+2. "Why did *this* specific request take 4 seconds?"
+3. "What context did the model see when it recommended a competitor?"
+4. "Is the bot's groundedness slipping week over week?"
+
+<details>
+<summary>One defensible answer</summary>
+
+1. **Metric** — hit rate is an aggregate counter over time; a dashboard shows the step.
+2. **Trace** — the per-span breakdown of that one request locates the slow stage
+   (and whether it queued, per Chapter 2).
+3. **Log** — the discrete record of that request's inputs and retrieved chunks; the
+   trace tells you *which path* it took, the log tells you *what was in it*.
+4. **Eval** — only a scored sample of outputs measures groundedness; no metric, log, or
+   trace can (Chapters 6–7). If you said "metric" for #4, that's exactly the Chapter 0
+   trap — quality is the fourth pillar.
+</details>
+</Practice>
+
+## How this is graded
+
+- **Technical Correctness** — this chapter's weighted dimension: you name the four pillars,
+  know evals are the AI-specific one, and read a trace via self-time rather than confusing
+  a wrapper's total with where the work happened.
+- **Trade-off Awareness** — you weigh instrumentation cost (sampling traces, log volume,
+  eval spend) against the visibility it buys; you don't trace 100% of traffic by reflex.
+- **Evaluation Rigor** — you treat "is it right?" as a measured pillar, not an assumption,
+  and you know which questions a metric structurally cannot answer.
+- **Communication** — "metrics told us p99 rose; the trace says it's rerank; the eval says
+  quality held" is the sentence that walks an interviewer through a real diagnosis.
+
+### Industry variation
+
+- **Startups** — structured logs plus a few metrics get you far; the senior move is adding
+  the eval pillar early even when the tracing UI waits.
+- **Enterprise / scale** — full distributed tracing with sampling, log retention policies,
+  and per-tenant dashboards; observability has a budget and an owner.
+- **Regulated** — logs are an audit artifact ("what did the model see, what did it say,
+  to whom") with retention and access controls designed in.
+- **AI-assisted coding interviews** — asked to "add observability," the signal is naming
+  the fourth pillar and which question each answers, not "add Datadog."
+
+## Stretch: you named the eval pillar — now you have to run it
+
+Evals are the fourth pillar, the only one that sees quality. But you can't run a full
+judge on every one of 10,000 daily requests (Chapter 4 says what that costs), and a score
+computed on a *sample* of traffic is an estimate with error bars — so when this week's
+sampled quality reads two points below last week's, you genuinely don't know whether
+something broke or you got unlucky. How do you operate the eval pillar on live traffic,
+and gate on it without thrashing on noise? (That's **Chapter 6 — evaluating in
+production**.)
