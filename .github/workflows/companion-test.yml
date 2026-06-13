@@ -1,0 +1,36 @@
+# companion-test.yml — ACTIVE in this repo.
+#
+# Unlike the hub (where this workflow is a dormant Phase-1 sketch because per-guide
+# repos host the companion code), this repo DOES ship companion/ — the build-your-own
+# libraries mini_eval, mini_rag, mini_agent (and mini_prod once guide #3 lands).
+#
+# The suites are stdlib-only and self-bootstrap sys.path (each inserts ../src), so
+# they run directly with no install step. Add a mini_prod step here when that
+# companion is authored (guide #3, Block 1).
+
+name: companion-test
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'companion/**'
+      - '.github/workflows/companion-test.yml'
+  pull_request:
+    paths:
+      - 'companion/**'
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: mini_eval
+        run: python3 companion/tests/test_mini_eval.py
+      - name: mini_rag
+        run: python3 companion/tests/test_mini_rag.py
+      - name: mini_agent
+        run: python3 companion/tests/test_mini_agent.py

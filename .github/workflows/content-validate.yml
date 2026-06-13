@@ -1,0 +1,30 @@
+name: content-validate
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'src/content/**'
+      - 'src/content.config.ts'
+      - '.github/workflows/content-validate.yml'
+  pull_request:
+    paths:
+      - 'src/content/**'
+      - 'src/content.config.ts'
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '22'
+          cache: 'npm'
+      - name: Install dependencies
+        run: npm ci
+      - name: book-scaffold validate
+        # Guide repo composes its style in astro.config (researchPortfolioStyle +
+        # guidesFamilyStyle); `npm run validate` is `book-scaffold validate` with no
+        # preset flag — let the repo's own config drive the schema.
+        run: npm run validate
