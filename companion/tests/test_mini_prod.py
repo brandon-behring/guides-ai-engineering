@@ -333,6 +333,13 @@ def test_mann_whitney_shifted_low_p():
     assert _raises(lambda: mann_whitney_u([], [1.0]))
 
 
+def test_mann_whitney_handles_ties():
+    # heavy ties in both samples; a clear shift must still register (tie-corrected variance)
+    assert mann_whitney_u([0] * 6 + [1] * 2, [2] * 6 + [1] * 2)["p"] < 0.05
+    # identical tied samples → not significant
+    assert mann_whitney_u([1, 1, 2, 2, 3, 3], [1, 1, 2, 2, 3, 3])["p"] > 0.5
+
+
 def test_detect_drift():
     ref = [0.9, 0.91, 0.89, 0.9, 0.92, 0.9, 0.88, 0.9]
     same = [0.9, 0.9, 0.91, 0.89, 0.9, 0.92, 0.9, 0.9]

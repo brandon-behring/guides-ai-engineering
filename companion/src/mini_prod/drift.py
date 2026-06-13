@@ -41,12 +41,14 @@ def mann_whitney_u(a: list[float], b: list[float]) -> dict:
     """Mann–Whitney U statistic and a two-sided normal-approximation p-value for
     'a and b come from different distributions'. Ranks the pooled sample (averaging
     tied ranks), so it tests a distribution *shift* without assuming a shape — the right
-    test for skewed production signals. Returns ``{"u", "p"}``."""
+    test for skewed production signals; the variance carries the standard tie correction.
+    Returns ``{"u", "p"}``."""
     na, nb = len(a), len(b)
     if na == 0 or nb == 0:
         raise ValueError("both samples must be non-empty")
     pooled = sorted([(v, 0) for v in a] + [(v, 1) for v in b], key=lambda t: t[0])
     ranks = [0.0] * len(pooled)
+    tie_sum = 0.0                                # Σ(t³ − t) over tie groups, for the variance
     i = 0
     while i < len(pooled):                       # average ranks within ties
         j = i
@@ -55,12 +57,17 @@ def mann_whitney_u(a: list[float], b: list[float]) -> dict:
         avg_rank = (i + j) / 2.0 + 1.0           # ranks are 1-based
         for k in range(i, j + 1):
             ranks[k] = avg_rank
+        g = j - i + 1
+        tie_sum += g ** 3 - g
         i = j + 1
     r_a = sum(ranks[k] for k in range(len(pooled)) if pooled[k][1] == 0)
     u_a = r_a - na * (na + 1) / 2.0
     u = min(u_a, na * nb - u_a)
+    n = na + nb
     mu = na * nb / 2.0
-    sigma = math.sqrt(na * nb * (na + nb + 1) / 12.0)
+    # variance with the standard tie correction (reduces to na*nb*(n+1)/12 when no ties)
+    var = (na * nb / 12.0) * ((n + 1) - tie_sum / (n * (n - 1))) if n > 1 else 0.0
+    sigma = math.sqrt(var) if var > 0 else 0.0
     if sigma == 0:
         return {"u": u, "p": 1.0}
     z = (u - mu) / sigma                         # u <= mu, so z <= 0

@@ -66,14 +66,14 @@ answer quality slid over a month — not a cliff, a slope. The help center was r
 the chunk index slowly went stale; the promo brought a different mix of questions than the
 golden set ever covered. No deploy caused it. Every release passed its gate, because no
 single week looked significantly worse than the week before. The frozen offline eval set
-scored a steady 0.92 the entire time, because its inputs never changed — and the world's did.
+scored a steady ~0.78 the entire time, because its inputs never changed — and the world's did.
 
 This is the failure that the previous chapter's gate cannot catch. A regression gate compares
 two points and asks "did this change make it worse?" Drift has no change and no two adjacent
 points that differ significantly — it is a slope that only becomes visible when you step back
 and look at the trend against *live* traffic, which the frozen set, by construction, never sees.
 
-Predict, before reading on: your offline eval set scores a flat 0.92 all month while users
+Predict, before reading on: your offline eval set scores a flat ~0.78 all month while users
 churn. **What is structurally different about the offline set that makes it blind here** — and
 what kind of measurement would have caught the slope?
 
