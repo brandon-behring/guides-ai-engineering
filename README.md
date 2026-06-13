@@ -31,7 +31,7 @@ Multi-guide repo: each guide is an Astro **content collection**. Built with
 | --- | --- |
 | **Evaluation & benchmarking** (`src/content/evaluation/`) | **complete** — 13 chapters, independently reviewed; `mini_eval` companion |
 | **LLM application engineering** (`src/content/llm-app-engineering/`) | **complete** — 13 chapters, independently reviewed; `mini_rag` + `mini_agent` companions |
-| **Production AI systems** (`src/content/production-ai-systems/`) | **in progress** — chapter 0 live; `mini_prod` companion to come |
+| **Production AI systems** (`src/content/production-ai-systems/`) | **complete** — 13 chapters, independently reviewed; `mini_prod` companion |
 
 (Craft and working-with-AI guides to follow.)
 

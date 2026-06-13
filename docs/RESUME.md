@@ -19,12 +19,19 @@ collections under `src/content/<guide>/`, one shared `companion/` lib, per-guide
   `/ai-engineering/*` mount on the hub domain waits on scaffold **#140 + #141** (base-unaware links;
   ChapterNav prefix — `_redirects` carries documented stopgaps for both, remove when fixed). Launch
   state + remaining L2 work: `~/guides/docs/plans/active/2026-06-10_series_roadmap_v2.md` §5.
+- **#3 Production AI Systems — COMPLETE, reviewed (2026-06-13).** All 13 chapters (0–12) in the
+  §5 shape — the production loop (deploy/serve/observe/evaluate/respond) + judgment + capstone +
+  craft. `mini_prod` companion (latency·cascade·trace·monitor·drift, 44 tests) builds on
+  `mini_rag.budget` + `mini_eval`. Independent 3-agent review, all findings fixed
+  (`docs/REVIEW_FINDINGS_2026-06-13.md`); LOS↔anchor bijective in all 13. Build doc:
+  `docs/guide-03-production-ai-systems.md`.
 
 ## Companion (`companion/`, stdlib-only, "for learning, not production")
 - `mini_eval` — 6 modules (metrics·confidence·calibration·retrieval·agent·judge), **24/24 tests**.
 - `mini_rag` — 5 modules (search·chunk·pipeline·rerank·budget), **29/29 tests**.
 - `mini_agent` — 3 modules (loop·tools·orchestrate + crew), **12/12 tests**.
-  `pyproject.toml` ships all three packages.
+- `mini_prod` — 5 modules (latency·cascade·trace·monitor·drift), **44/44 tests**; builds on `mini_rag.budget` + `mini_eval`.
+  `pyproject.toml` ships all four packages.
 
 ## Build / test
 ```bash
@@ -32,7 +39,8 @@ npm install && npm run build                 # astro build + book-scaffold valid
 python3 companion/tests/test_mini_eval.py    # 24 tests
 python3 companion/tests/test_mini_rag.py     # 29 tests
 python3 companion/tests/test_mini_agent.py   # 12 tests
-python3 scripts/build_demo_data.py           # regenerate the COMPUTED demo JSON (15 files, seeded)
+python3 companion/tests/test_mini_prod.py    # 44 tests
+python3 scripts/build_demo_data.py           # regenerate the COMPUTED demo JSON (20 files, seeded)
 ```
 ScenarioQuiz / quiz-style demo JSON (`benchmark_demo.json`, `llm_claims_demo.json`,
 `prompt_robustness_demo.json`, …) are **hand-authored**, not emitted by `build_demo_data.py`.

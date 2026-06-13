@@ -9,12 +9,13 @@ prerequisites this guide builds on, not re-teaches).
 Direction: `~/guides/docs/plans/active/2026-06-10_series_roadmap_v2.md` §6 (locked next after
 guide #2) · demand spine: `~/guides/docs/research/role_demand_and_interview_signals/`.
 
-## Status: OUTLINE + Ch 0 (2026-06-10)
+## Status: COMPLETE (2026-06-13)
 
-**Ch 0 authored** in the §5 shape (ScenarioQuiz with hand-authored
-`production_myths_demo.json`; LOS↔anchor bijection; landing picker updated). **Ch 1+ start
-post-launch** (roadmap v2 §5 site launch is the active workstream). Outline below is the
-planning artifact; expect per-chapter adjustment at authoring time, same as guides #1–#2.
+**All 13 chapters (0–12) authored** in the §5 shape, independently reviewed (3-agent
+math / demo-honesty / pedagogy pass — `docs/REVIEW_FINDINGS_2026-06-13.md`), all findings
+fixed; LOS↔anchor bijective in all 13; build + validate clean; `mini_prod` companion
+(latency·cascade·trace·monitor·drift, 44 tests, building on `mini_rag.budget` + `mini_eval`).
+The outline below is the planning artifact it was built from.
 
 ### Build log
 
