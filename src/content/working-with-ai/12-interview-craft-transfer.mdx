@@ -1,0 +1,193 @@
+---
+title: "Interview craft & transfer: the whole loop in one room"
+slug: interview-craft-transfer
+description: "The capstone: the whole skill run at once, under interview conditions, on a problem you haven't seen. Time pressure and an observer make the two highest-value stages — clarify/preregister and explain — the first to drop, so the craft is rehearsing the loop until it survives. A worked mock round, annotated against the four-dimension rubric, then a self-assessment you can run on your own attempt. The loop and the rubric are problem-independent — that's what transfers."
+freshness: literature-survey
+last_verified: 2026-06-14
+tags: [ai-assisted-coding, interview-craft, transfer, capstone, rubric]
+sources: []
+draft: false
+mode: explanation
+target: transfer
+ordering: problem-first
+commitment: long-lived
+paradigms: [default]
+research_debt_addressed: |
+  A guide on a skill has to end by demonstrating transfer: the whole loop applied at once,
+  under realistic interview conditions, to an unseen problem — not a recap. The documented
+  failure under pressure is reverting to jumping-in (skip clarify/preregister) and going
+  silent (skip explain), the two highest-value stages. This capstone provides a worked mock
+  AI-assisted round annotated against the four-dimension rubric, plus a self-assessment tool,
+  and makes the transfer claim explicit: the loop and rubric are problem-independent. It
+  mirrors the series' craft-and-transfer capstone pattern.
+task_classes: [interview-craft, self-assessment, transfer]
+provenance:
+  ai_tools: ["Claude Opus 4.8 (Anthropic)"]
+  audit_history:
+    - date: 2026-06-14
+      type: authored
+      file: src/content/working-with-ai/12-interview-craft-transfer.mdx
+  citation_backstop: manual
+los:
+  - id: WAI-12.1
+    bloom: analyze
+    statement: "Explain why time pressure and observation make clarify/preregister and explain the first stages to drop, and why rehearsing the loop until it is automatic is the craft the capstone builds."
+    anchor: mock-round
+    threshold: true
+  - id: WAI-12.2
+    bloom: design
+    statement: "Run the whole loop on an unseen problem in a mock AI-assisted round, mapping each move (clarify, preregister, prompt, read, verify, explain) to the rubric dimension it earns."
+    anchor: scoring-walkthrough
+    threshold: true
+  - id: WAI-12.3
+    bloom: analyze
+    statement: "Self-assess an AI-assisted attempt against the four-dimension rubric, and articulate why the loop and rubric transfer to any AI-assisted problem rather than to one memorized solution."
+    anchor: self-assessment
+    threshold: true
+---
+
+import YouWillLearn from '@brandon_m_behring/book-scaffold-astro/components/YouWillLearn.astro';
+import Pitfall from '@brandon_m_behring/book-scaffold-astro/components/Pitfall.astro';
+import Practice from '@brandon_m_behring/book-scaffold-astro/components/Practice.astro';
+import ScenarioQuiz from '../../components/ScenarioQuiz.tsx';
+import capstoneData from '../../data/capstone_round_demo.json';
+
+# Interview craft & transfer: the whole loop in one room
+
+<YouWillLearn prerequisites="The whole guide — the loop (Ch 2–6), communication (Ch 7), the anti-patterns (Ch 8), scale (Ch 9–11). This capstone runs all of it at once.">
+- Why the loop's **highest-value stages drop first** under pressure — and why the craft is rehearsal.
+- A **worked mock round** on an unseen problem, annotated against the four-dimension rubric.
+- How to **grade yourself** — and why the loop and rubric **transfer** to any AI-assisted problem.
+</YouWillLearn>
+
+## The round where you forget everything you know
+
+You've learned the whole skill. Now it's a real round: a problem you haven't seen, an AI assistant, a
+clock, and someone watching. Predict, before reading on: **which parts of the loop will you actually
+drop in the first five minutes?**
+
+For almost everyone the answer is the same two — and they're the two that score the most. Under
+pressure you jump straight to prompting (skipping clarify and preregister) and you go quiet
+(skipping explain), because producing code *feels* like progress and talking feels like a tax. You
+drop exactly the stages that separate a hire from a "seemed to get lucky."
+
+<Pitfall title="Under observation, the highest-value stages drop first">
+Time pressure and an audience push you toward visible activity — typing, output, motion — and away
+from the quiet, high-value moves: confirming the problem, committing a standard, and narrating your
+reasoning. So the craft of this capstone isn't new knowledge; it's *rehearsal*. You practice the loop
+until clarify-preregister-explain are what you do automatically when the clock starts, instead of
+what you remember you should have done afterward.
+</Pitfall>
+
+## The mock round {/* anchor: mock-round */}
+
+Here is a realistic prompt, of the deliberately-ambiguous kind the harder rounds use:
+
+> *"You're given a messy export of meeting time-ranges — some overlap, some touch, some are out of
+> order, the format is inconsistent. Write a function that merges them into a clean set of
+> non-overlapping ranges. You can use an AI assistant. You have about 25 minutes; think out loud."*
+
+It's un-one-shottable on purpose: "merge overlapping" hides decisions (do touching ranges merge? what
+counts as a range? is the input sorted?), the messy format needs handling, and the boundaries are where
+it lives or dies. Before reading the walkthrough, plan *your* first five minutes — what you'd confirm,
+what you'd commit, and the first sentence you'd say out loud.
+
+## A walkthrough that scores {/* anchor: scoring-walkthrough */}
+
+Here is the loop run on that prompt, with each move tagged by the rubric dimension it earns:
+
+- **Clarify** *(Trade-off Awareness + Communication):* "Two questions: do ranges that merely *touch* —
+  10:00–11:00 and 11:00–12:00 — count as overlapping and merge? And is the input guaranteed sorted, or
+  do I sort first? I'll assume touching ranges merge and the input is unsorted unless you say otherwise."
+- **Preregister** *(Evaluation Rigor):* "Before I prompt, the invariants: output ranges are disjoint and
+  sorted by start; an empty input returns empty; a single range comes back unchanged; touching ranges
+  merge. Boundary tests: `[10–11],[11–12] → [10–12]`; `[10–12],[10:30–10:45] → [10–12]` (nested);
+  out-of-order input still merges."
+- **Prompt** *(Trade-off Awareness):* hand over the spec — the signature, the invariants, "sort by start
+  then sweep, merging when the next start is ≤ current end; standard library only." One-shot is fine here
+  because it's one well-specified function.
+- **Read** *(Technical Correctness):* "It sorts then sweeps — good. Let me check the merge condition: it
+  uses `<` , so *touching* ranges won't merge. That contradicts my invariant." Caught by reading against
+  the spec, not by style.
+- **Verify** *(Evaluation Rigor):* run the boundary tests; the touching-ranges test fails, confirming the
+  read. Feed the specific failure back: "merge when next start ≤ current end — use ≤, not a strict `<`; touching ranges
+  should merge."
+- **Explain** *(Communication, throughout):* every line above was said out loud, so the interviewer
+  watched the judgment happen — including catching the off-by-one *before* the test, from comprehension.
+
+Notice the catch came from **reading against the preregistered invariant** — the touching-ranges case was
+a committed standard, so a clean-looking `<` couldn't slip past. That's the whole guide in one move.
+**Predict** the rubric-maximizing choice at three pressure points:
+
+<ScenarioQuiz client:visible data={capstoneData} />
+
+## Grade yourself {/* anchor: self-assessment */}
+
+The capstone's real work is yours to do. Run the same loop on a fresh problem and score the result —
+the companion's `review-rubric.md` is this turned into a checklist:
+
+- **Technical Correctness** — could you explain every line and name where it breaks?
+- **Trade-off Awareness** — did you clarify and decide on purpose (one-shot vs decompose, what to delegate)?
+- **Evaluation Rigor** — did you commit a standard *before* prompting and verify against it?
+- **Communication** — could a listener reconstruct your reasoning from what you said *while* you worked?
+
+And the transfer claim, made plain: you were never memorizing solutions. The **loop is
+problem-independent** — clarify, preregister, prompt, read, verify, explain works on the merge problem,
+on a problem you'll see next week, on one that doesn't exist yet. The rubric is what's scored on *any*
+AI-assisted task. That's why this skill transfers where a bank of memorized answers doesn't: you learned
+a process, and the process is the thing the interview — and the job — actually tests.
+
+<Practice id="run-the-capstone" difficulty={3}>
+Run the full mock round yourself on a fresh prompt: *"Given a messy list of `[start, end]` intervals,
+return the total covered duration (overlaps counted once), with an AI assistant."* Write your first five
+minutes (clarify + preregister) and the three sentences you'd narrate — then score yourself on the four
+dimensions.
+
+<details>
+<summary>One defensible answer</summary>
+
+- **Clarify:** do touching intervals count as continuous coverage (yes)? Are negative/zero-length
+  intervals possible (assume skip zero-length, flag negatives)? Input sorted (assume not)?
+- **Preregister:** invariants — result is the measure of the union, so overlaps count once; empty input →
+  0; a single interval → its length; fully-nested intervals don't double-count. Boundary tests:
+  `[0–2],[1–3] → 3`; `[0–2],[2–4] → 4` (touching); `[0–5],[1–2] → 5` (nested).
+- **Narrate (three sentences, loop stages):** "I'll confirm touching counts as continuous, since it
+  changes the answer. I'm committing that overlaps count once and nested intervals don't double-count,
+  with a touching and a nested test. After it generates, I'll read whether it merges before summing —
+  summing raw lengths would double-count — and run the nested case to confirm."
+- **Self-score:** correctness (can you explain the merge-before-sum?), trade-off (did you clarify
+  touching?), rigor (committed the union invariant first?), communication (was the reasoning audible?).
+
+If your loop held under the (self-imposed) pressure, that's the transfer working. If a stage dropped,
+that stage is your rehearsal target — which is the most useful thing this capstone can tell you.
+</details>
+</Practice>
+
+## How this is graded
+
+The capstone grades on all four dimensions equally, because the skill is running them *together*:
+
+- **Technical Correctness** — you reason about the AI's output and catch the spec violation by reading.
+- **Trade-off Awareness** — you clarify and decide deliberately, under the clock.
+- **Evaluation Rigor** — you commit a standard before prompting and verify against it, not against the demo.
+- **Communication** — you narrate throughout, so the judgment is visible while it happens.
+
+### Industry variation
+
+- **Frontier labs** — some rounds ban the assistant to test raw reasoning; the loop minus the prompt stage
+  still applies (clarify, commit invariants, verify, explain), so it transfers even there.
+- **Big tech** — the explicit comprehension round and the system-design conversation are this capstone in
+  two halves; narration carries both.
+- **Startups** — a collaborative pair or take-home; the craft is making your loop legible async, in a PR
+  or a short write-up.
+- **Regulated (fintech, health)** — the round probes verification and ownership hardest; lead with the gate
+  and the provenance.
+
+## You've finished the guide — now lower the stakes
+
+The interview is a compressed, observed version of the job: a problem you haven't seen, a tool that writes
+fast, and the need to own the result out loud. Everything you practiced here — clarify, preregister, prompt,
+read, verify, explain, and own it — is not interview theater; it *is* the work, with the clock and the
+audience turned up. So the last move isn't another chapter. It's to run the loop on your real work this
+week, where the stakes are lower and the reps are free, until governing the tool is simply how you build.
+That's when it transfers for good.

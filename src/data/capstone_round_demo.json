@@ -1,0 +1,45 @@
+{
+  "name": "The capstone round, scored",
+  "note": "Moments from a mock AI-assisted round. Each tests whether the whole loop survives time pressure and an interviewer watching. Pick the rubric-maximizing move.",
+  "items": [
+    {
+      "id": "minute-one",
+      "prompt": "Capstone round, minute 1. The strongest opening move is:",
+      "candidates": [
+        "Restate the problem, confirm the one ambiguity, and say the invariants you'll commit before prompting — clarify + preregister + communication in the first minute, the three the rubric weights most under pressure",
+        "Start prompting immediately to show speed",
+        "Write the whole solution by hand to prove you don't need AI",
+        "Ask which model you're allowed to use"
+      ],
+      "correct": "Restate the problem, confirm the one ambiguity, and say the invariants you'll commit before prompting — clarify + preregister + communication in the first minute, the three the rubric weights most under pressure",
+      "explanation": "The first minute is where clarify, preregister, and narration pay off most — and exactly where pressure makes people skip them. Opening with them sets the tone for the whole round and front-loads the highest-scoring behaviours.",
+      "principle": "Spend minute one on clarify, preregister, and saying so — the stages pressure makes you skip."
+    },
+    {
+      "id": "the-followup",
+      "prompt": "The interviewer asks 'why this approach?' about AI-generated code. The rubric-maximizing answer:",
+      "candidates": [
+        "Explain the design in your own words and what you verified it against — demonstrating comprehension (you read it) and rigor (you checked it), which is exactly what the question probes",
+        "'That's how the AI implemented it.' — cedes comprehension and ownership",
+        "'It passes the tests.' — rigor with no comprehension",
+        "Re-read the code silently for a while, then guess"
+      ],
+      "correct": "Explain the design in your own words and what you verified it against — demonstrating comprehension (you read it) and rigor (you checked it), which is exactly what the question probes",
+      "explanation": "The follow-up is a comprehension-and-ownership test. Answering from your own understanding — not from the AI's authorship — is the signal; 'the AI did it' and 'the tests pass' each concede half of what's being scored.",
+      "principle": "Answer 'why this approach' from your understanding, not the AI's authorship."
+    },
+    {
+      "id": "transfer",
+      "prompt": "The capstone problem is one you've never seen. What actually transfers?",
+      "candidates": [
+        "The loop — clarify, preregister, prompt, read, verify, explain — is problem-independent, and the rubric dimensions are what's scored on any AI-assisted task, so the process carries even when the problem is novel",
+        "Nothing — each problem needs its own memorized approach",
+        "Only if you happen to have seen a similar problem before",
+        "The specific prompt that worked on the last problem"
+      ],
+      "correct": "The loop — clarify, preregister, prompt, read, verify, explain — is problem-independent, and the rubric dimensions are what's scored on any AI-assisted task, so the process carries even when the problem is novel",
+      "explanation": "The whole bet of the guide is transfer: the loop and the rubric are problem-independent, so they carry to unseen problems — which is exactly what interviews (and real work) throw at you.",
+      "principle": "The loop transfers; memorized solutions don't — that's the point of learning the process."
+    }
+  ]
+}

@@ -25,13 +25,14 @@ collections under `src/content/<guide>/`, one shared `companion/` lib, per-guide
   `mini_rag.budget` + `mini_eval`. Independent 3-agent review, all findings fixed
   (`docs/REVIEW_FINDINGS_2026-06-13.md`); LOS↔anchor bijective in all 13. Build doc:
   `docs/guide-03-production-ai-systems.md`.
-- **#4 Working with AI — IN PROGRESS (2026-06-14).** Engineering *with* an AI assistant the way
-  interviews now judge it (governing/verifying/explaining code you didn't type). Ch 0–11 authored
+- **#4 Working with AI — CONTENT COMPLETE, independent review pending (2026-06-14).** Engineering *with* an AI assistant the way
+  interviews now judge it (governing/verifying/explaining code you didn't type). Ch 0–12 authored (all 13) + companion artifacts
   (Ch 0 `why-working-with-ai` — the shift + the working-with-AI loop clarify→preregister→prompt→review→run→explain
   + 3 AI-productivity myths via `ScenarioQuiz`). Ships **workflow artifacts, not a `mini_*` lib**
   (roadmap §6); demos hand-authored. Content-flow spine **LOCKED at 13 ch (0–12)** after the Movement-B
-  draft; Movements A–D done, remaining: E (Ch 12 capstone +
-  companion artifacts + completion gate). Outline + work-order: `docs/guide-04-working-with-ai.md`. Plan of record:
+  draft; Movements A–E done — all 13 chapters + companion artifacts
+  (`companion/working-with-ai/`); build green (58 pages, validate 53 chapters). Remaining: independent
+  multi-agent review (the #1–3 gate) → `REVIEW_FINDINGS`, then flip status to reviewed. Outline + work-order: `docs/guide-04-working-with-ai.md`. Plan of record:
   `~/.claude/plans/what-is-the-roadmap-crystalline-sky.md`. Weighted dimension: **Communication**.
 
 ## Companion (`companion/`, stdlib-only, "for learning, not production")
@@ -41,7 +42,7 @@ collections under `src/content/<guide>/`, one shared `companion/` lib, per-guide
 - `mini_prod` — 5 modules (latency·cascade·trace·monitor·drift), **44/44 tests**; builds on `mini_rag.budget` + `mini_eval`.
   `pyproject.toml` ships all four packages.
 - **Working with AI (#4)** ships **no Python package** — workflow artifacts (preregistration
-  template · loop checklist · review rubric), planned Phase 2; demos are hand-authored ScenarioQuiz JSON.
+  template · loop checklist · review rubric, + README) in `companion/working-with-ai/`; demos are hand-authored ScenarioQuiz JSON.
 
 ## Build / test
 ```bash
