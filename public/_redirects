@@ -3,16 +3,8 @@
 # The site builds with base=/ai-engineering/ (its mount path on the hub domain),
 # but Astro emits files at the dist root. So: send the bare root to the
 # canonical base path, normalize the slashless base path, and rewrite (200, no
-# redirect) base-prefixed URLs onto the real asset paths. Scaffold-emitted
-# links that ignore the base (upstream bug, filed consumer:guides) resolve
-# directly against the dist root, so both link shapes work standalone.
+# redirect) base-prefixed URLs onto the real asset paths at the dist root.
+# (Scaffold nav links are base-aware as of book-scaffold-astro v4.24.0, #140/#141.)
 / /ai-engineering/ 302
 /ai-engineering /ai-engineering/ 302
 /ai-engineering/* /:splat 200
-
-# Stopgap for scaffold ChapterNav links (upstream #141): the component emits
-# /{collection}/{slug}/ instead of /chapters/{collection}/{slug}/, 404ing every
-# prev/next link. 301 to the canonical path; remove when #141 ships.
-/evaluation/* /chapters/evaluation/:splat 301
-/llm-app-engineering/* /chapters/llm-app-engineering/:splat 301
-/production-ai-systems/* /chapters/production-ai-systems/:splat 301
