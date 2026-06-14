@@ -1,0 +1,45 @@
+{
+  "name": "Which narration earns the signal?",
+  "note": "Same engineering, different words. With the AI doing the typing, narration is the interviewer's main window into your judgment. Pick the line that conveys judgment, not noise.",
+  "items": [
+    {
+      "id": "lead-with-intent",
+      "prompt": "You're about to ask the AI to implement the dedup. What's the strongest thing to say first?",
+      "candidates": [
+        "'Before I prompt: a duplicate here means the same person, possibly with a different email — so I'm matching on normalized name + email, not exact rows, and I'll commit that as the invariant.' — leads with the decision that determines correctness",
+        "'Now I'm going to write a prompt for the dedup function.' — narrates the action, not the reasoning",
+        "Say nothing; let the code speak for itself once it's done",
+        "'This should be easy — dedup is a common task.' — confidence with no content"
+      ],
+      "correct": "'Before I prompt: a duplicate here means the same person, possibly with a different email — so I'm matching on normalized name + email, not exact rows, and I'll commit that as the invariant.' — leads with the decision that determines correctness",
+      "explanation": "Leading with the pivotal decision shows trade-off awareness and comprehension before any code exists. Narrating the mechanical action ('now I'll write a prompt') conveys nothing gradable, and silence conveys less.",
+      "principle": "Narrate the decision that determines correctness, not the action you're taking."
+    },
+    {
+      "id": "narrate-override",
+      "prompt": "The AI returned a parser. You'll accept most of it but check the ragged-row case yourself. Best narration?",
+      "candidates": [
+        "'I'll take its happy-path parsing, but I'm verifying the ragged-row handling myself — that's the failure this kind of code usually hides.' — voices what you delegated, what you're checking, and why",
+        "'Looks good.' — accepts without showing any judgment",
+        "'The AI is usually reliable for parsers.' — defers to the tool instead of governing it",
+        "Silently scroll through it and move on"
+      ],
+      "correct": "'I'll take its happy-path parsing, but I'm verifying the ragged-row handling myself — that's the failure this kind of code usually hides.' — voices what you delegated, what you're checking, and why",
+      "explanation": "Voicing the delegate/verify split is governance over automation made audible — the single strongest signal in an AI-assisted round, because it shows you direct the tool rather than trust it.",
+      "principle": "Say what you delegated, what you're checking, and why — that's governance out loud."
+    },
+    {
+      "id": "vague-to-specific",
+      "prompt": "The interviewer asks 'is it robust?' You realize 'robust' is vague. Best move?",
+      "candidates": [
+        "Make it specific out loud: 'Define robust as handling empty input, malformed rows, and 10x the expected size without degrading — let me check it against those three.' — converts a vague word into testable criteria in real time",
+        "'Yes, it's robust.' — accepts the vague frame and asserts",
+        "'I think so?' — hedges without adding information",
+        "'The AI wrote it to be robust.' — defers the definition to the tool"
+      ],
+      "correct": "Make it specific out loud: 'Define robust as handling empty input, malformed rows, and 10x the expected size without degrading — let me check it against those three.' — converts a vague word into testable criteria in real time",
+      "explanation": "Rewriting vague into specific is a communication skill the rubric rewards — and the loaded word is often the test. It demonstrates rigor at the same time, by turning an adjective into a checklist.",
+      "principle": "When a vague word appears, replace it with testable criteria out loud."
+    }
+  ]
+}
