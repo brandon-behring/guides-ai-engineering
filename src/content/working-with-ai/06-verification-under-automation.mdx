@@ -1,0 +1,178 @@
+---
+title: "Verification under automation"
+slug: verification-under-automation
+description: "Executing AI code on the example you were handed is the weakest possible evidence — it's the case most likely to pass. Verification is running the output against the standard you preregistered: the boundaries, the invariants, the adversarial cases. This chapter closes the loop's solo stages — prompt, review, run, confirm — and turns a failure into a precise debugging prompt instead of prompt-roulette."
+freshness: literature-survey
+last_verified: 2026-06-14
+tags: [ai-assisted-coding, verification, testing, debugging, evaluation]
+sources: []
+draft: false
+mode: tutorial
+target: transfer
+ordering: problem-first
+commitment: long-lived
+paradigms: [default]
+research_debt_addressed: |
+  The documented AI-assisted rubric weights verification & debugging (prompt → review →
+  run → confirm) as a core dimension, and the visible failure mode is stopping at "it ran."
+  Public material conflates running with verifying. This chapter draws the line: a happy-path
+  run is a demo, verification is passing the preregistered gate, and debugging AI output means
+  feeding the verification result back as a precise prompt rather than re-rolling. It closes
+  the five solo loop stages before communication (which runs through all of them).
+task_classes: [verification, debugging]
+provenance:
+  ai_tools: ["Claude Opus 4.8 (Anthropic)"]
+  audit_history:
+    - date: 2026-06-14
+      type: authored
+      file: src/content/working-with-ai/06-verification-under-automation.mdx
+  citation_backstop: manual
+los:
+  - id: WAI-6.1
+    bloom: explain
+    statement: "Distinguish 'it ran' from 'it's verified': a single happy-path execution is the case most likely to pass, while verification is passing the preregistered boundary and invariant cases — and explain why AI makes stopping at 'it ran' more tempting."
+    anchor: ran-vs-verified
+    threshold: true
+  - id: WAI-6.2
+    bloom: design
+    statement: "Verify AI output against the committed gate — running the preregistered tests and invariants plus cases surfaced while reading — treating the gate as binary rather than negotiating with happy-path green."
+    anchor: the-gate
+    threshold: true
+  - id: WAI-6.3
+    bloom: analyze
+    statement: "Debug AI output by feeding the specific verification failure back as a targeted prompt (localize, explain why, constrain the fix) rather than blind re-prompting."
+    anchor: debugging-ai
+    threshold: true
+---
+
+import YouWillLearn from '@brandon_m_behring/book-scaffold-astro/components/YouWillLearn.astro';
+import Pitfall from '@brandon_m_behring/book-scaffold-astro/components/Pitfall.astro';
+import Practice from '@brandon_m_behring/book-scaffold-astro/components/Practice.astro';
+import ScenarioQuiz from '../../components/ScenarioQuiz.tsx';
+import verificationData from '../../data/verification_demo.json';
+
+# Verification under automation
+
+<YouWillLearn prerequisites="Chapter 5 — you can read AI output against your spec. This chapter is about proving the parts you can't confirm by reading.">
+- Why **"it ran" is not "it's verified"** — and why AI makes stopping at the first one more tempting.
+- How to verify against **the gate** you preregistered, treating it as binary.
+- How to **debug AI output** by feeding the failure back as a precise prompt, not prompt-roulette.
+</YouWillLearn>
+
+## The "done" that wasn't
+
+A candidate gets the AI's solution, runs it on the sample input the problem provided, sees the
+right answer, and says "done" — eight minutes, green. The interviewer types one more input: an
+empty list. It throws. The candidate's confidence evaporates, and so does the signal.
+
+Predict, before reading on: **what's the gap between what the candidate did and verification?** The
+sample input is the case the code is *most* likely to handle — it's the one everybody, including the
+model, designed for. Running it proves almost nothing.
+
+<Pitfall title="Ran once ≠ verified">
+Executing AI code on the example you already have is the weakest evidence there is: that case was
+the target of both the prompt and the model's training prior. Verification is running the output
+against the standard you committed *before* you saw it — the boundaries, the invariants, the
+adversarial inputs. With AI the temptation is sharper, because the output looks finished sooner, so
+"it ran" arrives while you're still impressed.
+</Pitfall>
+
+## "It ran" is not "it works" {/* anchor: ran-vs-verified */}
+
+Two claims hide inside "it works," and they're miles apart. *It ran* means one input produced a
+plausible output once — a demo. *It's verified* means the output passes the gate you preregistered:
+the empty case returns `[]` not a crash, the invariant holds across inputs, the boundary behaves.
+The demo is evidence about the easiest case; verification is evidence about the cases that actually
+fail.
+
+Automation widens the gap in two ways. The output looks complete earlier, so the felt distance from
+"ran" to "done" shrinks even though the real distance hasn't. And because you didn't write it, you
+have *less* implicit knowledge of where it's weak than you would for your own code — so the run you
+should least trust is exactly the one that feels most convincing. The discipline is to refuse "it
+ran" as a stopping point, every time, and go to the gate.
+
+## Verify against the gate {/* anchor: the-gate */}
+
+The gate is your preregistration, executed: run the committed tests, check each invariant, and add
+the cases you turned up while reading (Ch 5). It is **binary** — the output passes the gate or it
+doesn't — and the one move that matters is refusing to negotiate with happy-path green. "It passes
+the example" is not a partial pass of the gate; it's the gate untouched.
+
+This is the loop closing on itself: **prompt → review → run → confirm**, iterated. You run against
+the gate; if it fails you go back through review and prompt with the failure in hand; you repeat
+until the gate is green for real. **Predict** the right call in each case:
+
+<ScenarioQuiz client:visible data={verificationData} />
+
+The through-line: a run against the handed-down example proves the least, an independent
+preregistered standard proves the point, and the gap between them is where shipped-vs-demoed lives.
+
+## Debugging AI output {/* anchor: debugging-ai */}
+
+When the gate fails, you have a choice that separates the people who use AI well from the people it
+uses. The weak move is blind re-prompting — "it's broken, please fix" — which throws away the one
+piece of information you just earned and lets the model rediscover (or re-miss) the problem. That's
+prompt-roulette.
+
+The strong move treats the verification result as the *best debugging prompt you'll ever have*.
+Three steps: **localize** (which invariant or test failed), **understand why** (read it, Ch 5 — don't
+fix what you don't understand), then **constrain the fix**: "this fails on empty input — returns
+`None`, should return `[]`; fix that without changing the non-empty behaviour." You're feeding the
+model the exact gap and fencing off what must not change. That's prompt → review → run → confirm
+turned into a debugging loop, and it converges; blind re-prompting wanders.
+
+<Practice id="verify-the-limiter" difficulty={2}>
+Your rate limiter passes its one preregistered boundary test, but you're not fully confident.
+Describe a verification step *beyond* re-running that test, and show how you'd turn a failure into a
+debugging prompt.
+
+<details>
+<summary>One defensible answer</summary>
+
+- **Beyond the single test:** exercise the invariants directly. Simulate many requests across
+  *several* users and assert no window ever exceeds N and that users don't consume each other's
+  allowance; add the adversarial case of a burst landing exactly on the window boundary. This hits
+  the per-user-independence and reset invariants a single-user test can't.
+- **Failure → debugging prompt:** suppose two users share a counter. The prompt isn't "it's broken"
+  — it's "users A and B share a limit; the count must be keyed per user; fix the keying without
+  changing the windowing logic." Localized, explained, fenced.
+
+This is the loop closing: reading surfaced the risk, verification proved it, and the failure becomes a
+precise re-prompt — not a re-roll.
+</details>
+</Practice>
+
+## How this is graded
+
+**Evaluation Rigor is this chapter's weighted dimension** — verification is rigor made operational:
+
+- **Evaluation Rigor** *(weighted)* — you run the preregistered gate, not the handed-down example,
+  and you treat green as meaningful only because the standard was independent of the code.
+- **Technical Correctness** — your debugging localizes the actual failing invariant and you understand
+  the cause before fixing, rather than mutating code until it passes.
+- **Trade-off Awareness** — you choose how much verification the stakes warrant (a boundary test vs a
+  property check vs an adversarial sweep) instead of all-or-nothing.
+- **Communication** — saying "it ran on the sample, but I haven't verified the empty case or the
+  per-user invariant yet" is the honesty that reads as senior, not the premature "done."
+
+### Industry variation
+
+- **Startups** — verify the core invariant even when you skip the polished test harness; the one gate
+  that prevents shipping a broken feature is non-negotiable, the rest is triage.
+- **Big tech** — verification is automated and reviewed: AI code passes CI gates and human review, and
+  "the gate" is institutional, not personal.
+- **Regulated (fintech, health)** — verification *is* the audit record; the committed standard and its
+  pass history document what the AI-written code was held to and by whom.
+- **Frontier labs** — verify novel code against theory and properties, not just examples, because the
+  "expected output" for a new method is itself uncertain.
+
+## Stretch: you can run the whole loop perfectly — in silence — and still fail
+
+You've now closed the five solo stages: clarify, preregister, prompt, review, run. A candidate can
+do all five flawlessly and still get a no, because the sixth stage — explaining — runs through all of
+them and is where the most offers are actually lost. Before the next chapter: think back over the
+limiter you just built and verified. How much of your *reasoning* would an interviewer have seen if
+you'd done all of it without narrating?
+
+Next: **Chapter 7 — Communication while you delegate**, the weighted dimension of the whole guide, and
+the one most strong candidates underweight.

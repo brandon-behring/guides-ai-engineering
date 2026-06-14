@@ -1,0 +1,187 @@
+---
+title: "Strategic prompting: the prompt is a specification"
+slug: strategic-prompting
+description: "Prompting is not incantation and not the whole skill — it's the stage where your committed spec becomes a precise request. A vague prompt outsources the specification to the model's statistical defaults; a precise one hands over the invariants and constraints you preregistered. The judgment calls: decompose or one-shot, and what to constrain — including the negatives the model will otherwise fill in for you."
+freshness: literature-survey
+last_verified: 2026-06-14
+tags: [ai-assisted-coding, prompting, decomposition, specification]
+sources: []
+draft: false
+mode: tutorial
+target: transfer
+ordering: problem-first
+commitment: long-lived
+paradigms: [default]
+research_debt_addressed: |
+  "Prompt engineering" is either mystified into incantations or dismissed as a fad; both
+  miss the point that, for engineering work, a prompt is a specification and the durable
+  skill is the judgment around it — decomposition granularity and constraint-setting — not
+  magic phrasing. This chapter reframes prompting as handing over the preregistered spec,
+  teaches the one-shot-vs-decompose decision (including the un-one-shottable problem the
+  Canva-style rounds probe), and treats negative constraints as first-class. It deliberately
+  avoids tool-specific prompt tricks that age out.
+task_classes: [prompting, decomposition]
+provenance:
+  ai_tools: ["Claude Opus 4.8 (Anthropic)"]
+  audit_history:
+    - date: 2026-06-14
+      type: authored
+      file: src/content/working-with-ai/04-strategic-prompting.mdx
+  citation_backstop: manual
+los:
+  - id: WAI-4.1
+    bloom: explain
+    statement: "Explain why a prompt is a specification — a vague prompt outsources the spec to the model's statistical defaults, while a precise one supplies the preregistered invariants and constraints — and why this framing outlasts tool-specific prompt tricks."
+    anchor: prompt-as-spec
+    threshold: true
+  - id: WAI-4.2
+    bloom: analyze
+    statement: "Decide between one-shotting and decomposing a task by its specification and architecture content, keeping the seams (where bugs concentrate) under your control."
+    anchor: decompose
+    threshold: true
+  - id: WAI-4.3
+    bloom: design
+    statement: "Write a prompt that supplies the needed context (interfaces, types, invariants, examples) and the binding constraints, including the negative constraints the model will otherwise fill with defaults."
+    anchor: constraints-context
+    threshold: false
+---
+
+import YouWillLearn from '@brandon_m_behring/book-scaffold-astro/components/YouWillLearn.astro';
+import Pitfall from '@brandon_m_behring/book-scaffold-astro/components/Pitfall.astro';
+import Practice from '@brandon_m_behring/book-scaffold-astro/components/Practice.astro';
+import ScenarioQuiz from '../../components/ScenarioQuiz.tsx';
+import promptingData from '../../data/prompting_demo.json';
+
+# Strategic prompting: the prompt is a specification
+
+<YouWillLearn prerequisites="Chapter 3 — you can preregister a contract (shape, invariants, tests). This chapter hands that contract to the model as a precise request.">
+- Why a prompt is a **specification**, not a wish — and why this framing outlasts every prompt trick.
+- The **decompose-or-one-shot** decision, and why you keep the seams.
+- How to supply **context and constraints** — including the negatives the model fills with defaults.
+</YouWillLearn>
+
+## Two prompts, one task, different programs
+
+Two engineers need the same thing: validate an email for their signup form. One prompts *"write a
+function to validate emails."* The other prompts *"validate an email for a signup form: require
+exactly one @, a non-empty local part, and a dotted domain; treat tagged addresses (user+tag@…) as
+valid; return a bool; don't pull in a validation library."*
+
+The first gets a 200-line regex copied from a decade of Stack Overflow folklore that rejects the
+team's own `user+tag@` addresses. The second gets the function the team actually needs. Same task,
+same model, same minute.
+
+Predict, before reading on: **the model didn't get smarter for the second engineer — so where did
+the difference come from?** It came from which of them supplied the specification, and which left
+it to the model to guess.
+
+<Pitfall title="A prompt is a specification, not a wish">
+A vague prompt doesn't get a vague answer — it gets a *confident* answer built on the model's
+statistical defaults: the most common interpretation in its training data, which may be nothing
+like yours. Precision in a prompt isn't a magic phrasing trick; it's just your preregistered spec,
+written down for the model. The skill that lasts isn't the incantation — it's having a spec to hand over.
+</Pitfall>
+
+## Prompt as spec {/* anchor: prompt-as-spec */}
+
+If you did Chapter 3, the hard part of prompting is already done. The prompt should carry your
+clarified problem and your preregistered invariants and constraints — that *is* the precise prompt.
+The difference between the two email prompts above is exactly the difference between handing over a
+spec and asking the model to invent one.
+
+This is also why chasing prompt "tricks" is a trap. Phrasings, magic words, and tool-specific
+syntax drift with every model release; "supply the specification the model would otherwise guess"
+is true of every model, this year and next. When a prompt underperforms, the durable fix is almost
+never a cleverer sentence — it's a missing piece of spec. Ask what decision you left to the
+model's defaults, and put it in the prompt.
+
+## Decompose or one-shot? {/* anchor: decompose */}
+
+The main judgment call at this stage is granularity: ask for the whole thing at once, or break it
+up? The heuristic is about **architecture content**, not size:
+
+- **One-shot** when the task is well-specified and has a single obvious shape — a pure function
+  with clear inputs and outputs, your invariants attached. There are no architecture decisions to
+  own, so let the model produce it and move to reading.
+- **Decompose** the moment real architecture decisions appear: multiple components, ambiguous
+  structure, anything large enough that a single output is hard to review. You prompt for the pieces
+  and keep the *seams* — the interfaces between parts — because seams are where integration bugs
+  concentrate and where your design judgment shows.
+
+The un-one-shottable problem is the point of the harder modern rounds (Canva's "complex, ambiguous,
+realistic" tasks): they can't be vibe-prompted in one shot, so they reveal whether you can carve a
+problem into verifiable pieces. **Predict** the right approach in each case:
+
+<ScenarioQuiz client:visible data={promptingData} />
+
+The thread: state the spec, decompose where architecture lives, and steer at the prompt rather than
+patching the output.
+
+## Constraints and context {/* anchor: constraints-context */}
+
+A precise prompt supplies two things beyond the goal. **Context**: the interfaces and types it must
+match, the invariants from your preregistration, a representative example. **Constraints**: the
+boundaries — and crucially the *negative* ones. The model fills every unstated gap with a common
+default, so "don't add a dependency," "don't change the public signature," "handle the empty case
+explicitly" are not nags; they're you closing the gaps before they open. A constraint in the prompt
+costs a clause; the same constraint enforced by hand-editing every regenerated output costs the rest
+of your session.
+
+Context economy matters too: supply what's *relevant* — the interface, the invariant, the one
+tricky example — not the entire codebase. A precise, scoped prompt beats an exhaustive one, the same
+way a good spec beats a data dump.
+
+<Practice id="prompt-the-limiter" difficulty={2}>
+Take your preregistered rate-limiter contract from Chapter 3. Write the prompt you'd give the model.
+Then name the one part you'd **decompose out** and verify separately, and why.
+
+<details>
+<summary>One defensible answer</summary>
+
+- **Prompt (spec handed over):** "Implement `allow(user_id, now) -> bool`, a fixed-window rate
+  limiter, max N requests per W seconds per user. Invariants: never more than N per window; users are
+  independent; the window boundary resets cleanly with no carry-over. Standard library only; keep
+  state in a structure I can inspect in a test."
+- **Decompose out:** the window-bookkeeping — the logic that decides which window `now` falls in and
+  when the count resets. That's where the off-by-one risk concentrates, so prompt for it (or at least
+  read and test it) in isolation before wrapping the limiter around it.
+
+Notice the prompt is essentially your Chapter-3 preregistration, addressed to the model, plus the
+interface and one negative constraint. That's strategic prompting.
+</details>
+</Practice>
+
+## How this is graded
+
+**Trade-off Awareness is this chapter's weighted dimension** — the decompose/constrain decisions
+are trades made out loud:
+
+- **Trade-off Awareness** *(weighted)* — you choose one-shot vs decompose by where architecture and
+  risk live, and you scope context to what's relevant rather than dumping or starving it.
+- **Technical Correctness** — your prompt carries the invariants, so the spec you hand over is the
+  correct one, not the model's default.
+- **Evaluation Rigor** — you constrain the output (including negatives) so it's gateable, and you
+  decompose the risky seam so it can be verified on its own.
+- **Communication** — narrating *why* you're decomposing here and constraining there shows the
+  interviewer the judgment behind the prompt, not just the prompt.
+
+### Industry variation
+
+- **Startups** — one-shot the small stuff to move; decompose only the core that must be right. Speed
+  with a verified spine.
+- **Big tech** — prompts become reviewable artifacts; decomposition tends to mirror service and
+  module boundaries the team already reasons about.
+- **Regulated (fintech, health)** — constraints encode compliance: "no PII in logs," "no external
+  calls," stated in the prompt and enforceable in review.
+- **Frontier labs** — precision matters most exactly where the problem is novel, because the model's
+  defaults were trained on the *common* case, which is the one you're not solving.
+
+## Stretch: a good prompt earns good code — reading earns the right to ship it
+
+A precise prompt dramatically raises the odds the output is right. It does not make it certain, and
+it does nothing about your *understanding* of what came back. Before the next chapter: when the model
+returns your rate limiter, what are the first two things you'd actually read — not skim — and why
+would a clean, well-commented result make that reading *harder*, not easier?
+
+Next: **Chapter 5 — Reading AI-generated code**, where comprehension becomes the skill, and the
+fluency of the output is the trap.

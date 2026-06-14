@@ -1,0 +1,185 @@
+---
+title: "Reading AI-generated code"
+slug: reading-ai-code
+description: "Comprehension is the loop stage automation can't do for you, and reading code you didn't write is harder than reading your own — you must reconstruct intent from output instead of building it as you go. Worse, AI code is fluent by construction: clean, idiomatic, well-commented whether or not it's correct, and that polish actively suppresses your skepticism. The discipline is active reading against the spec you committed, hardest exactly where the code looks cleanest."
+freshness: literature-survey
+last_verified: 2026-06-14
+tags: [ai-assisted-coding, code-comprehension, code-review, correctness]
+sources: []
+draft: false
+mode: tutorial
+target: transfer
+ordering: problem-first
+commitment: long-lived
+paradigms: [default]
+research_debt_addressed: |
+  Code comprehension is assessed explicitly in the new rounds (Google's "code comprehension"
+  format), and the documented failure is reliance — accepting fluent output without
+  understanding it ("failing while the code looks fine"). Public material treats reading AI
+  code as trivial; it isn't, and the fluency of LLM output makes it actively harder by
+  suppressing scrutiny. This chapter names the fluency trap, frames reading as a distinct
+  trainable skill, and ties it back to preregistration: the committed spec is what turns
+  "does this look reasonable?" into a checklist.
+task_classes: [code-comprehension, review]
+provenance:
+  ai_tools: ["Claude Opus 4.8 (Anthropic)"]
+  audit_history:
+    - date: 2026-06-14
+      type: authored
+      file: src/content/working-with-ai/05-reading-ai-code.mdx
+  citation_backstop: manual
+los:
+  - id: WAI-5.1
+    bloom: explain
+    statement: "Explain why reading code you didn't write is harder than reading your own — you reconstruct intent from output rather than building the mental model as you write — and why this comprehension debt is now a first-class skill."
+    anchor: reading-is-hard
+    threshold: true
+  - id: WAI-5.2
+    bloom: analyze
+    statement: "Identify the fluency trap: AI output is plausible by construction, so readability suppresses scrutiny; name concrete tells (boundaries skipped, comments asserting properties the code lacks) and read hardest where the code looks cleanest."
+    anchor: fluency-trap
+    threshold: true
+  - id: WAI-5.3
+    bloom: analyze
+    statement: "Read AI output against the preregistered spec — diffing behaviour against the committed invariants and boundaries rather than judging style — and explain why preregistration is what makes comprehension tractable."
+    anchor: read-against-spec
+    threshold: true
+---
+
+import YouWillLearn from '@brandon_m_behring/book-scaffold-astro/components/YouWillLearn.astro';
+import Pitfall from '@brandon_m_behring/book-scaffold-astro/components/Pitfall.astro';
+import Practice from '@brandon_m_behring/book-scaffold-astro/components/Practice.astro';
+import ScenarioQuiz from '../../components/ScenarioQuiz.tsx';
+import readingData from '../../data/reading_ai_code_demo.json';
+
+# Reading AI-generated code
+
+<YouWillLearn prerequisites="Chapter 4 — you can hand the model a precise spec. This chapter is about understanding what it hands back.">
+- Why reading code you didn't write is **harder** than writing it — the comprehension debt.
+- The **fluency trap**: why polished AI output suppresses your scrutiny, and the tells that cut through it.
+- How to **read against the spec** you preregistered, so comprehension is a checklist, not a vibe.
+</YouWillLearn>
+
+## The bug that hid behind good formatting
+
+You prompt for a function and get back forty lines: clear names, sensible structure, a couple of
+tidy comments. It reads well. You skim it, it looks right, you accept it and move on. Buried in it
+is an off-by-one on a boundary you didn't trace — and it shipped *because* the code was pleasant to
+read, not despite it.
+
+Predict, before reading on: **why was this bug harder to catch than the same bug in a tangle of
+messy code?** The messiness of bad code makes you slow down and scrutinize. The polish of AI code
+does the opposite — and that's the trap this whole chapter is about.
+
+<Pitfall title="Fluent code reads as correct code">
+An AI produces syntactically clean, idiomatic, well-commented code regardless of whether it is
+correct — fluency is what it was trained to do, independent of truth. Readability is not
+correctness, and for AI output high readability *actively lowers* your guard: the nicer it looks,
+the less you scrutinize, exactly when you should scrutinize more. You have to read against the
+spec, not for style.
+</Pitfall>
+
+## Reading is harder than writing {/* anchor: reading-is-hard */}
+
+When you write code, you build the mental model as you go — every line is a decision you made, so
+you understand it by construction. When you read code you didn't write, that's reversed: you have
+to *reconstruct* the intent and the model from the finished output, with no record of the decisions
+that produced it. That's strictly harder, and it's a different skill — the one senior reviewers have
+and juniors underestimate.
+
+AI assistance turns this from an occasional task (reading a teammate's PR) into the core of the job:
+most of the code you "write" is now code you *read*. So comprehension stops being a background skill
+and becomes the bottleneck. The practical form is **active reading**: trace the data through the
+function, evaluate the boundaries by hand, and map each part to what you expected — not a top-to-bottom
+skim for whether it "seems fine." Skimming is how the formatting wins.
+
+## The fluency trap {/* anchor: fluency-trap */}
+
+Be precise about the danger. The model is optimized to produce output that *looks like* correct code
+— plausible by construction — which is a different target from being correct. Most of the time
+plausible and correct coincide; the trap is the gap, and the gap is invisibly smooth. The most
+dangerous code an AI gives you is not the obviously-broken kind (you'll catch that); it's the kind
+clean enough that you stop reading.
+
+Concrete tells that something fluent deserves a harder look:
+
+- **Confident handling of a case you never specified** — the model invented a behaviour for the
+  empty/null/overflow case; invented behaviour is a guess wearing the same clean style as the rest.
+- **A comment asserting a property the code doesn't guarantee** — "safely handles concurrent access"
+  over an unlocked dict. The comment is generated text, not a proof.
+- **The boundary that isn't there** — the happy path is immaculate and the edge case simply isn't
+  addressed, which reads as "fine" because nothing looks wrong.
+
+The rule of thumb: **read hardest where the code looks cleanest**, because that's where your
+scrutiny drops and the model's confidence is least earned.
+
+## Read against the spec {/* anchor: read-against-spec */}
+
+The antidote to "does this look reasonable?" is "does this match what I committed?" Your
+preregistration (Ch 3) is the checklist: read the code against each invariant and each boundary
+test, diffing the code's actual behaviour against the standard you set before you saw it. This is
+the concrete reason preregistration pays off here — without a committed spec, reading degenerates
+into style judgment and fluency wins; with one, reading is a finite list of properties to confirm.
+
+**Predict** the real issue in each case (the fluent red herrings are right there with it):
+
+<ScenarioQuiz client:visible data={readingData} />
+
+In every one, the catch comes from reading against the spec or the boundary — never from how the
+code looks. Style is the distraction; the committed standard is the lens.
+
+<Practice id="read-the-limiter" difficulty={2}>
+You prompt for the rate limiter and get back clean code that passes your one preregistered boundary
+test. Name **two** things you'd specifically read for before accepting it — and explain why a passing
+test isn't enough on its own.
+
+<details>
+<summary>One defensible answer</summary>
+
+- **Read for the per-user independence invariant.** A boundary test on a single user won't reveal a
+  shared-counter bug across users; you have to read the keying to confirm each user's count is
+  isolated.
+- **Read the window-reset logic at the edge.** The off-by-one zone — does a request exactly at the
+  boundary count toward the old window or the new one? — is precisely where fluent code glides past.
+
+Why a passing test isn't enough: a test only exercises the cases you wrote down; reading against *all*
+your preregistered invariants covers the ones you haven't turned into tests yet. Comprehension and
+verification are complementary — reading finds what you can see, the next chapter proves what you can't
+hold in your head.
+</details>
+</Practice>
+
+## How this is graded
+
+**Technical Correctness is this chapter's weighted dimension** — comprehension *is* the ability to
+reason about correctness in code you didn't type:
+
+- **Technical Correctness** *(weighted)* — you can explain what the code does and name where it
+  breaks, rather than asserting it "looks fine"; the re-read-to-answer tell is gone.
+- **Evaluation Rigor** — you read against the committed invariants and boundaries, treating the spec
+  as the lens rather than judging style.
+- **Trade-off Awareness** — you spend your reading budget where risk concentrates (boundaries, seams),
+  not uniformly or on cosmetics.
+- **Communication** — narrating what the code does as you read it ("this is a streaming pass, which
+  handles the large-input case") is the proof to an interviewer that you actually comprehended it.
+
+### Industry variation
+
+- **Startups** — you can't read everything; read the risky 20% (the core invariant, the boundary) and
+  let the cosmetic rest go.
+- **Big tech** — reviewing AI output is now a core competency; Google's code-comprehension round tests
+  exactly this, and large-scale review culture assumes you own what you approve.
+- **Regulated (fintech, health)** — reading *is* sign-off: approving AI-written code means you accept
+  accountability for it, so comprehension is a compliance act, not a courtesy.
+- **Frontier labs** — reading AI-written research code for subtle method bugs (a wrong axis, a leaked
+  label) where the output runs fine and the error is silent.
+
+## Stretch: reading is necessary, not sufficient
+
+Reading catches what you can see and hold in your head. It won't catch the interaction you didn't
+imagine or the case you can't simulate by eye — for those you need to *run* the code against the
+standard. Before the next chapter: for the rate limiter, name one property you'd struggle to confirm
+by reading alone and would have to verify by executing.
+
+Next: **Chapter 6 — Verification under automation**, where "it ran" and "it's verified" turn out to be
+very different claims, and the loop's solo stages close.
