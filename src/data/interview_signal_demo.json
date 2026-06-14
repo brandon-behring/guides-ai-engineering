@@ -1,0 +1,45 @@
+{
+  "name": "Read the signal: which dimension is weak?",
+  "note": "Each is a moment from an AI-assisted round where the final code is fine. Name the rubric dimension the behaviour actually exposes — that's what the interviewer is scoring.",
+  "items": [
+    {
+      "id": "reread-to-answer",
+      "prompt": "A candidate ships the AI's solution fast and correct. Asked 'what happens on an empty list?', they re-read the code for thirty seconds before answering.",
+      "candidates": [
+        "Comprehension (Technical Correctness) — they accepted code they hadn't internalized; the re-reading is the tell that they're reasoning about it for the first time, live",
+        "Communication — they just need to answer more confidently next time",
+        "Trade-off Awareness — they should have picked a different algorithm",
+        "Nothing is weak — correct code that passes the tests is a full pass"
+      ],
+      "correct": "Comprehension (Technical Correctness) — they accepted code they hadn't internalized; the re-reading is the tell that they're reasoning about it for the first time, live",
+      "explanation": "Comprehension is the ability to reason about code you didn't type. The fix is the review stage: read the diff and trace the boundaries before you say 'done', so the empty-list answer is instant instead of excavated. Re-reading to answer is reviewing too late, in front of the interviewer.",
+      "principle": "If you have to re-read it to answer, you reviewed it too late."
+    },
+    {
+      "id": "polished-wrong-target",
+      "prompt": "Given an ambiguous spec, a candidate immediately prompts for a full implementation and builds something polished — that solves a slightly different problem than intended.",
+      "candidates": [
+        "Strategic clarification (Trade-off Awareness) — they delegated before pinning the problem; one clarifying question, or a restated assumption, would have aimed the whole effort correctly",
+        "Comprehension — they didn't understand the code the AI produced",
+        "Evaluation Rigor — they simply didn't write enough test cases",
+        "Communication — they only needed to type and talk faster"
+      ],
+      "correct": "Strategic clarification (Trade-off Awareness) — they delegated before pinning the problem; one clarifying question, or a restated assumption, would have aimed the whole effort correctly",
+      "explanation": "The most expensive AI-assisted mistake is a confident solution to the wrong problem — automation makes producing it fast and polished. Clarifying is the loop's first stage and cheap insurance; interviewers specifically watch whether you confirm the target before you delegate.",
+      "principle": "Polished output aimed at the wrong target is the costliest thing AI makes easy."
+    },
+    {
+      "id": "given-tests-only",
+      "prompt": "The candidate's code passes the tests they were handed. They declare it done with no cases of their own — then it fails on a boundary the interviewer probes.",
+      "candidates": [
+        "Verification (Evaluation Rigor) — passing handed-down tests isn't verifying; they never defined what 'right' means beyond the given cases, so the boundary was never a gate",
+        "Comprehension — they understood it fine, so nothing here is wrong",
+        "Communication — they explained it clearly, so it should count as a pass",
+        "Trade-off Awareness — they merely chose the wrong data structure"
+      ],
+      "correct": "Verification (Evaluation Rigor) — passing handed-down tests isn't verifying; they never defined what 'right' means beyond the given cases, so the boundary was never a gate",
+      "explanation": "Verification is deciding the standard and checking against it (prompt → review → run → confirm). The fix is preregistering invariants and tests before prompting, so boundaries are gates the solution must satisfy, not surprises the interviewer finds for you.",
+      "principle": "Given tests check what someone already feared; verification checks what you decided matters."
+    }
+  ]
+}

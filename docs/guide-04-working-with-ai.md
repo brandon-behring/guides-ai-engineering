@@ -14,7 +14,7 @@ candidate → planned 2026-06-14) · demand spine:
 
 ## Status: IN PROGRESS (2026-06-14)
 
-**Phase 1 (outline + scaffold) underway.** Ch 0 authored; outline + companion shape locked; index
+**Phase 1 (outline + scaffold) underway.** Ch 0–1 authored; outline + companion shape locked; index
 + RESUME entries added. Chapter count is **emergent from the content arc** (user steer 2026-06-14):
 expected **~11–13 chapters**, locked after the Movement-B block is drafted (densest movement).
 
@@ -25,6 +25,10 @@ expected **~11–13 chapters**, locked after the Movement-B block is drafted (de
   (clarify → preregister → prompt → review → run → explain) as the guide's spine, and three
   AI-productivity myths via `ScenarioQuiz` (`ai_productivity_myths_demo.json`, hand-authored). No
   companion code (by design — this guide ships workflow artifacts, not a lib).
+- **Ch 1 authored** (2026-06-14) — "What interviewers actually test." Maps the four assessed
+  AI-coding dims onto the 4-dim rubric (`the-mapping`); why automating the typing *raises* the bar
+  on comprehension/verification/communication (`stakes-rise`); a "read the signal" `ScenarioQuiz`
+  (`interview_signal_demo.json`) diagnosing which dimension a behaviour exposes (`reading-the-signal`).
 
 ## Demand basis
 

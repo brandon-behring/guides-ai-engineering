@@ -1,0 +1,199 @@
+---
+title: "What interviewers actually test"
+slug: what-interviewers-test
+description: "Two candidates, the same problem, the same AI, the same correct final code — one passes, one fails. The artifact isn't the assessment. AI-assisted rounds score four things the model can't do for you: strategic clarification, comprehension, verification, and communication — which map exactly onto the series' four-dimension rubric, with the stakes raised because the typing no longer proves you understood anything."
+freshness: literature-survey
+last_verified: 2026-06-14
+tags: [orientation, ai-assisted-coding, rubric, assessment, communication]
+sources: []
+draft: false
+mode: explanation
+target: transfer
+ordering: problem-first
+commitment: long-lived
+paradigms: [default]
+research_debt_addressed: |
+  Candidates prepping for AI-assisted rounds optimize for producing working code —
+  the one thing interviewers already assume the AI can do. The documented assessment
+  rubrics (Meta, Google, Canva — 2025–26) score four other things: strategic
+  prompting/clarification, genuine code comprehension, verification & debugging, and
+  communication during automation. This chapter maps those onto the series' standing
+  4-dim rubric (Technical Correctness · Trade-off Awareness · Evaluation Rigor ·
+  Communication) and explains why automating the typing *raises* the bar on the last
+  three rather than lowering it — you can no longer hide weak understanding behind the
+  act of writing code.
+task_classes: [orientation, self-assessment]
+provenance:
+  ai_tools: ["Claude Opus 4.8 (Anthropic)"]
+  audit_history:
+    - date: 2026-06-14
+      type: authored
+      file: src/content/working-with-ai/01-what-interviewers-test.mdx
+  citation_backstop: manual
+los:
+  - id: WAI-1.1
+    bloom: explain
+    statement: "Name the four dimensions an AI-assisted-coding round assesses (strategic clarification, comprehension, verification & debugging, communication) and map each onto the series' four-dimension rubric."
+    anchor: the-mapping
+    threshold: true
+  - id: WAI-1.2
+    bloom: analyze
+    statement: "Explain why moving the typing to the AI raises the bar on comprehension, verification, and communication — the act of writing code no longer certifies that you understood it."
+    anchor: stakes-rise
+    threshold: true
+  - id: WAI-1.3
+    bloom: analyze
+    statement: "Given a candidate's behaviour in an AI-assisted round where the final code is correct, identify which rubric dimension the behaviour exposes and the single change that would strengthen it."
+    anchor: reading-the-signal
+    threshold: true
+---
+
+import YouWillLearn from '@brandon_m_behring/book-scaffold-astro/components/YouWillLearn.astro';
+import Pitfall from '@brandon_m_behring/book-scaffold-astro/components/Pitfall.astro';
+import Practice from '@brandon_m_behring/book-scaffold-astro/components/Practice.astro';
+import ScenarioQuiz from '../../components/ScenarioQuiz.tsx';
+import interviewSignalData from '../../data/interview_signal_demo.json';
+
+# What interviewers actually test
+
+<YouWillLearn prerequisites="Chapter 0 — that working with AI means governing, verifying, and explaining code you didn't type. This chapter is what an interview scores when you do.">
+- The **four dimensions** an AI-assisted round assesses — and how each maps onto the series' four-dim rubric.
+- Why moving the typing to the AI **raises** the bar on comprehension, verification, and communication.
+- How to **read the signal**: spot which dimension a behaviour exposes, even when the final code is correct.
+</YouWillLearn>
+
+## Two candidates, one solution
+
+Two candidates get the same task, the same assistant, the same hour. Both arrive at the
+*same* final code — clean, correct, all tests green. One gets a strong hire signal. The other
+is a no.
+
+The first spent four minutes restating the problem and confirming one ambiguous requirement
+before touching the keyboard, wrote down two invariants the solution had to hold, prompted,
+read the diff out loud ("it's doing a streaming pass, which is what we want because the input
+can be large"), added a test for the empty case, and narrated the trade-off when the
+interviewer raised load. The second described the task, accepted the AI's implementation,
+ran the given tests, and said "done."
+
+Predict, before reading on: **the artifacts are identical — so what, exactly, did the
+interviewer measure that came out opposite?** Whatever it was, it wasn't the code.
+
+<Pitfall title="The code is the artifact, not the assessment">
+Candidates optimize for producing working code. Interviewers already assume the AI can
+produce working code — that's the premise of the format. What's scored is everything the AI
+*can't* do for you: framing the problem, understanding the result, deciding it's actually
+right, and making all of that legible in real time. Optimize for the artifact and you compete
+on the one axis the room has already conceded.
+</Pitfall>
+
+## The mapping {/* anchor: the-mapping */}
+
+The documented AI-assisted rubrics (Meta, Google, Canva) name four things they assess. They
+are not new — they are the series' standing four-dimension rubric, wearing work clothes:
+
+| AI-assisted round assesses… | …which is the rubric dimension | The behaviour that scores it |
+| --- | --- | --- |
+| **Strategic clarification** — aim before you delegate | **Trade-off Awareness** | restating the problem, confirming an ambiguity, choosing one-shot vs decompose out loud |
+| **Code comprehension** — reason about code you didn't type | **Technical Correctness** | naming the invariant that breaks, explaining *why* the AI's design fits |
+| **Verification & debugging** — prove it, don't trust it | **Evaluation Rigor** | preregistered tests/invariants; prompt → review → run → confirm |
+| **Communication during automation** — think aloud while delegating | **Communication** *(weighted)* | narrating intent, decisions, and trade-offs as you steer |
+
+The whole guide is built on this rubric, so this is the spine: every later chapter strengthens
+one of these dimensions, and the loop from Chapter 0 (clarify → preregister → prompt → review →
+run → explain) is simply the rubric run forward in time. Clarify scores trade-off awareness;
+review scores comprehension; preregister-and-run score rigor; explain runs the whole way and
+scores communication.
+
+## Why the stakes rise {/* anchor: stakes-rise */}
+
+Here is the counter-intuitive part, and the reason these rounds are *harder*, not easier.
+
+When you wrote every line by hand, the act of writing forced a floor under three of the four
+dimensions for free. You couldn't type a function without some comprehension of it. You
+couldn't get it running without minimal verification. The labour itself was evidence.
+
+Automate the typing and that floor disappears. You can now ship a correct-looking solution
+with **zero** comprehension, **zero** verification, and **zero** spoken reasoning — fast.
+So the interview moved to test exactly the part the automation cannot supply. The model
+raised the floor on production and, in doing so, made the floor on *judgment* something you
+now have to put there deliberately. "Rely solely on prompting → you fail" is not a warning
+about prompt quality; it is the rubric telling you that the three dimensions writing used to
+guarantee are now yours to demonstrate on purpose.
+
+This is also why **Communication is the weighted dimension** of this guide. With the typing
+gone, narration is the interviewer's main window into whether comprehension and verification
+actually happened — and across the whole demand baseline, failure to communicate is the
+single most common reason strong candidates are rejected.
+
+## Reading the signal {/* anchor: reading-the-signal */}
+
+The skill this chapter builds is diagnostic: given a behaviour where the **final code is
+fine**, name the dimension it exposes. **Predict** each before you reveal it.
+
+<ScenarioQuiz client:visible data={interviewSignalData} />
+
+Now *explain* the pattern. In every case the artifact passed and the signal was negative,
+because each behaviour skipped a loop stage that supplies a dimension: re-reading to answer
+skips **review** (comprehension), polishing the wrong target skips **clarify** (trade-off
+awareness), and leaning on handed-down tests skips **preregister/run** (rigor). The
+interviewer isn't grading the code; they're grading which stages you actually ran.
+
+<Practice id="diagnose-and-fix" difficulty={2}>
+A candidate gets a take-home-style task with an assistant. They read the prompt once, prompt
+"implement a function that does X", get sixty lines back, skim them, run the provided tests
+(green), and say "done" in eight minutes — in silence.
+
+Name the **two** rubric dimensions most at risk, and the single change to the **loop** that
+most improves both at once.
+
+<details>
+<summary>One defensible answer</summary>
+
+- **Most at risk: Evaluation Rigor and Communication.** Only the given tests were run (no
+  standard of their own), and nothing was said aloud. Comprehension is shaky too (a skim), but
+  the two clear failures are rigor and communication.
+- **Single loop change: preregister.** Before prompting, write the invariants and a test or two
+  that define "right," and state them out loud. That one move installs a real standard (rigor),
+  hands you something to narrate (communication), and the act of defining the cases deepens
+  comprehension. One stage, three dimensions — which is why Movement B starts there.
+
+If you said "add tests after the fact," note the difference: tests written *after* you've seen
+the AI's output tend to ratify it; tests written *before* constrain it.
+</details>
+</Practice>
+
+## How this is graded
+
+This chapter *is* the grading, so apply it to yourself — the rubric is a mirror, not just a
+checklist someone else holds:
+
+- **Technical Correctness** — can you, right now, explain why your current AI-assisted habit
+  produces code you understand? If the honest answer is "I usually skim," that's the gap.
+- **Trade-off Awareness** — do you decide one-shot vs decompose, and what to delegate vs do
+  yourself, on purpose — or by default?
+- **Evaluation Rigor** — do you define "right" before you prompt, or inherit whatever tests
+  you're handed?
+- **Communication** *(weighted)* — could a listener reconstruct your reasoning from what you
+  said while you worked? If you work in silence, the answer is no, and so is the round.
+
+### Industry variation
+
+- **Frontier labs** — comprehension and correctness dominate; some rounds *ban* the assistant
+  to test reasoning from first principles, so the technical-correctness column is unforgiving.
+- **Big tech** — all four, with comprehension assessed *explicitly* (Google's code-comprehension
+  round) and trade-off communication central to the system-design portion.
+- **Startups** — trade-off awareness and velocity: "have you shipped?" rewards aiming correctly
+  and fast, which is clarification plus rigor under time pressure.
+- **Regulated (fintech, health)** — evaluation rigor and provenance are weighted hardest; "how
+  do you audit AI-written code?" is a verification question wearing a compliance hat.
+
+## Stretch: turn the rubric on your own loop
+
+You now know the four dimensions and that the loop is how you hit them. Before the next
+chapter, do the honest version: which dimension is *your* weakest under time pressure, and
+which single loop stage — clarify, preregister, review, run, explain — would move it most?
+Most people find their weakest dimension and their most-skipped stage are the same one. That
+overlap is your highest-leverage practice for the rest of the guide.
+
+Next: **Chapter 2 — Clarify before you code**, where the loop starts and the cheapest habit in
+AI-assisted work — pinning the real problem before you prompt — earns the most.
