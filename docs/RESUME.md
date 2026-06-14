@@ -25,6 +25,13 @@ collections under `src/content/<guide>/`, one shared `companion/` lib, per-guide
   `mini_rag.budget` + `mini_eval`. Independent 3-agent review, all findings fixed
   (`docs/REVIEW_FINDINGS_2026-06-13.md`); LOS↔anchor bijective in all 13. Build doc:
   `docs/guide-03-production-ai-systems.md`.
+- **#4 Working with AI — IN PROGRESS (2026-06-14).** Engineering *with* an AI assistant the way
+  interviews now judge it (governing/verifying/explaining code you didn't type). Ch 0 authored
+  (`why-working-with-ai` — the shift + the working-with-AI loop clarify→preregister→prompt→review→run→explain
+  + 3 AI-productivity myths via `ScenarioQuiz`). Ships **workflow artifacts, not a `mini_*` lib**
+  (roadmap §6); demos hand-authored. Content-flow spine (**~11–13 ch, emergent** — count locked after
+  the Movement-B draft). Outline + work-order: `docs/guide-04-working-with-ai.md`. Plan of record:
+  `~/.claude/plans/what-is-the-roadmap-crystalline-sky.md`. Weighted dimension: **Communication**.
 
 ## Companion (`companion/`, stdlib-only, "for learning, not production")
 - `mini_eval` — 6 modules (metrics·confidence·calibration·retrieval·agent·judge), **24/24 tests**.
@@ -32,6 +39,8 @@ collections under `src/content/<guide>/`, one shared `companion/` lib, per-guide
 - `mini_agent` — 3 modules (loop·tools·orchestrate + crew), **12/12 tests**.
 - `mini_prod` — 5 modules (latency·cascade·trace·monitor·drift), **44/44 tests**; builds on `mini_rag.budget` + `mini_eval`.
   `pyproject.toml` ships all four packages.
+- **Working with AI (#4)** ships **no Python package** — workflow artifacts (preregistration
+  template · loop checklist · review rubric), planned Phase 2; demos are hand-authored ScenarioQuiz JSON.
 
 ## Build / test
 ```bash
