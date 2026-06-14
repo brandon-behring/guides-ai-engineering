@@ -16,9 +16,9 @@ collections under `src/content/<guide>/`, one shared `companion/` lib, per-guide
   LOS anchors bijective in all 13. Build log: `docs/guide-02-llm-app-engineering.md`.
   **LAUNCHED 2026-06-12** — this repo is live at `guides-ai-engineering.brandon-m-behring.workers.dev`
   (Workers static assets; root 302 → `/ai-engineering/`), hub at `guides.brandon-behring.dev`. The
-  `/ai-engineering/*` mount on the hub domain waits on scaffold **#140 + #141** (base-unaware links;
-  ChapterNav prefix — `_redirects` carries documented stopgaps for both, remove when fixed). Launch
-  state + remaining L2 work: `~/guides/docs/plans/active/2026-06-10_series_roadmap_v2.md` §5.
+  `/ai-engineering/*` mount on the hub domain is **LIVE (2026-06-14)** — a hub Worker path proxy, unblocked
+  by scaffold **v4.24.0** (#140/#141 base-aware-link fixes; this repo bumped 4.14.2 → 4.24.0, the `_redirects`
+  stopgaps removed). Launch state: `~/guides/docs/plans/active/2026-06-10_series_roadmap_v2.md` §5.
 - **#3 Production AI Systems — COMPLETE, reviewed (2026-06-13).** All 13 chapters (0–12) in the
   §5 shape — the production loop (deploy/serve/observe/evaluate/respond) + judgment + capstone +
   craft. `mini_prod` companion (latency·cascade·trace·monitor·drift, 44 tests) builds on
