@@ -1,0 +1,188 @@
+---
+title: "Communication while you delegate"
+slug: communication-while-you-delegate
+description: "The loop's sixth stage, and the one most strong candidates underweight — it runs through all the others rather than coming last. When you wrote every line, the code was a trace of your thinking; now the AI writes the lines, so the code traces its thinking and yours is invisible unless you voice it. Silent competence reads as luck. Narration is the interviewer's main window into the comprehension and verification that automation hid — which is why communication is this guide's weighted dimension and the single most common reason strong candidates are rejected."
+freshness: literature-survey
+last_verified: 2026-06-14
+tags: [ai-assisted-coding, communication, interview-craft, judgment]
+sources: []
+draft: false
+mode: tutorial
+target: transfer
+ordering: problem-first
+commitment: long-lived
+paradigms: [default]
+research_debt_addressed: |
+  Communication is the #1 documented reason strong candidates are rejected (~40–45% of
+  failures across the demand baseline), and AI assistance sharpens the stakes: with the
+  typing automated, narration becomes the primary evidence that comprehension and
+  verification happened at all. Generic "communicate more" advice doesn't operationalize
+  this. This chapter gives the script the loop already provides — lead with intent, voice
+  the delegate/verify split, rewrite vague into specific in real time — and argues why
+  silence, which once read as focus, now reads as luck.
+task_classes: [communication, interview-craft]
+provenance:
+  ai_tools: ["Claude Opus 4.8 (Anthropic)"]
+  audit_history:
+    - date: 2026-06-14
+      type: authored
+      file: src/content/working-with-ai/07-communication-while-you-delegate.mdx
+  citation_backstop: manual
+los:
+  - id: WAI-7.1
+    bloom: explain
+    statement: "Explain why silent competence fails in AI-assisted rounds: with the typing automated, the artifact traces the model's reasoning, so narration is the only evidence of the engineer's judgment — moving communication from nice-to-have to primary evidence."
+    anchor: silence-fails
+    threshold: true
+  - id: WAI-7.2
+    bloom: design
+    statement: "Narrate the decisions, not the actions: lead with intent and the pivotal trade-off, use the loop as the script, and surface how quality is verified — unprompted."
+    anchor: what-to-narrate
+    threshold: true
+  - id: WAI-7.3
+    bloom: design
+    statement: "Voice the AI collaboration explicitly — what was delegated and why, what is being checked, where the model was overridden — and rewrite vague terms into testable criteria in real time."
+    anchor: narrate-collaboration
+    threshold: true
+---
+
+import YouWillLearn from '@brandon_m_behring/book-scaffold-astro/components/YouWillLearn.astro';
+import Pitfall from '@brandon_m_behring/book-scaffold-astro/components/Pitfall.astro';
+import Practice from '@brandon_m_behring/book-scaffold-astro/components/Practice.astro';
+import ScenarioQuiz from '../../components/ScenarioQuiz.tsx';
+import communicationData from '../../data/communication_demo.json';
+
+# Communication while you delegate
+
+<YouWillLearn prerequisites="Chapters 2–6 — you can run the loop's five solo stages. This chapter is the sixth, which runs through all of them.">
+- Why **silent competence reads as luck** now — with the typing automated, narration is your only evidence.
+- **What to narrate**: the decisions and trade-offs, not the keystrokes — with the loop as your script.
+- How to **voice the AI collaboration** — delegate, check, override — and rewrite vague into specific live.
+</YouWillLearn>
+
+## Same engineering, opposite outcomes
+
+Two candidates run the loop equally well. Both clarify the problem, preregister invariants, prompt
+precisely, read the output against the spec, and verify against the gate. Both finish with correct,
+verified code. One narrated the whole way; the other worked head-down and presented the result at
+the end. The narrator gets the hire signal. The silent one gets the no.
+
+Predict, before reading on: **if the engineering was identical, why does silence lose?** The
+interviewer can only grade what they can see — and with the AI doing the typing, there's almost
+nothing to see *except* what you say.
+
+<Pitfall title="Silent competence reads as luck">
+When you wrote every line by hand, the code was a partial trace of your reasoning — to produce it,
+you had to understand it. Now the AI writes the lines, so the artifact traces *its* reasoning, not
+yours. Your judgment is invisible unless you voice it. Working in silence with an assistant doesn't
+read as "focused"; it reads as "got a lucky prompt," because the one piece of evidence that you
+understood and checked the result — your narration — is missing.
+</Pitfall>
+
+## Why silence fails now {/* anchor: silence-fails */}
+
+This is the sharpest consequence of the "stakes rise" argument from Chapter 1, so it's worth stating
+exactly. Communication used to be a *secondary* signal: the code carried much of the evidence, and
+talking was how you added color. Automation inverts that. The code now evidences the model's
+competence, which the interviewer already assumes; the only channel left for *your* competence — the
+clarifying, the committed standard, the comprehension, the verification — is what you say while you
+work.
+
+So communication is not a soft skill bolted onto the engineering here. It is the **primary evidence
+that the engineering happened**. That is why it is this guide's weighted dimension, and why, across
+the whole demand baseline, failing to communicate is the single most common reason strong candidates
+are cut. It is not that those candidates couldn't engineer; it is that, with the typing gone, an
+interviewer had no way to tell whether they had.
+
+## What to narrate {/* anchor: what-to-narrate */}
+
+The fear is that narrating means a constant monologue — "now I'm writing a for loop." That's noise,
+and it's exhausting. Narrate **decisions, not actions**. The loop hands you the script: every stage
+is a moment of judgment worth one sentence.
+
+- **Lead with intent and the pivotal trade-off.** "A duplicate here means same person, different
+  email, so I'm matching on normalized name+email." The decision that determines correctness, first.
+- **Voice the standard before you prompt.** "I'm committing these two invariants and an empty-case
+  test, so I can check the output against them." Rigor, made audible.
+- **Say how you verified, unprompted.** "It passes the boundary and the multi-user case, so the
+  per-user invariant holds." The signal that most separates shipped from demoed.
+
+Lead with the target, estimate and decide out loud, raise evaluation before you're asked. Mechanical
+narration of keystrokes adds nothing; one sentence per judgment makes your whole loop legible.
+**Predict** the strongest line in each case:
+
+<ScenarioQuiz client:visible data={communicationData} />
+
+The pattern: the winning line always carries a *decision and its reason*, never just an action or a
+bare assertion.
+
+## Narrate the AI collaboration {/* anchor: narrate-collaboration */}
+
+There's one kind of narration unique to working with AI, and it's the highest-value sentence you can
+say: voice your *relationship with the tool*. What you delegated and why, what you're checking, and
+where you overrode it. "I'll let it draft the parser, but I'm verifying the ragged-row handling
+myself, because that's the failure this kind of code hides." That single sentence demonstrates
+governance over automation out loud — it shows you direct the model rather than trust it, which is
+exactly the disposition the new rounds are built to detect.
+
+The companion skill is rewriting **vague into specific in real time**. When a loaded word appears —
+yours or the interviewer's ("is it robust?", "make it clean") — replace it with testable criteria on
+the spot: "robust meaning empty input, malformed rows, and 10× size — let me check those three." You
+convert an adjective into a checklist, which reads as both communication and rigor, and often defuses
+a question that was a test.
+
+<Practice id="narrate-the-limiter" difficulty={2}>
+You verified the rate limiter (Chapter 6) — but you did it in silence, and the interviewer now says
+"walk me through what you did." Explain what should have been different, then give the three-sentence
+narration you'd ideally have produced *live*.
+
+<details>
+<summary>One defensible answer</summary>
+
+- **What's wrong:** after-the-fact narration is weaker and reads as reconstruction — the interviewer
+  can't tell whether you reasoned this way or are rationalizing now. Live narration surfaces the
+  judgment when it counts, and lets the interviewer follow and even help.
+- **Ideal live narration (one sentence per loop stage):** "I confirmed the limit is per-user, not
+  global, since that changes the whole design. I committed three invariants before prompting — never
+  exceed N, users independent, clean window reset — so I'd have something to check against. After it
+  generated, I read the keying to confirm per-user isolation and ran the boundary plus a multi-user
+  burst, which is what actually verifies the independence invariant."
+
+Three sentences, each a loop stage with the judgment visible. That is the difference between a hire
+and a "seemed to get lucky."
+</details>
+</Practice>
+
+## How this is graded
+
+**Communication is this chapter's weighted dimension — and the whole guide's:**
+
+- **Communication** *(weighted)* — a listener can reconstruct your reasoning from what you said: you
+  led with intent, voiced the delegate/verify split, and rewrote vague into specific.
+- **Technical Correctness** — what you narrate is *accurate* — you're explaining real comprehension,
+  not performing fluency over code you didn't read (the next chapter's trap).
+- **Trade-off Awareness** — you voice decisions *and* their alternatives, so the reasoning is visible,
+  not just the conclusion.
+- **Evaluation Rigor** — you state how quality is checked without being asked, every time.
+
+### Industry variation
+
+- **Startups** — much communication is async and written; the skill is a crisp PR description or
+  message that makes your AI-assisted reasoning reviewable without a meeting.
+- **Big tech** — system-design rounds are almost entirely communication; explaining *why* you
+  delegated a piece to the AI and how you'd review it is part of the design answer.
+- **Regulated (fintech, health)** — you communicate the audit trail: what was checked, by whom,
+  against what — the narration becomes part of the record.
+- **Frontier labs** — communicating research reasoning, including how you collaborated with the model
+  on a novel problem and where you didn't trust it.
+
+## Stretch: the costume of competence
+
+Done well, narration is the signal. But narration can also be *performed* — fluent, confident talk
+over code you didn't actually read or verify. That's not communication; it's one of the anti-patterns,
+and interviewers are specifically trained to catch the gap between fluent narration and real
+understanding. Before the next chapter: what one question could an interviewer ask to tell genuine
+narration from performed confidence?
+
+Next: **Chapter 8 — Anti-patterns**, where the failure modes wear the costume of the virtues, and
+telling them apart is the skill.

@@ -14,7 +14,7 @@ candidate → planned 2026-06-14) · demand spine:
 
 ## Status: IN PROGRESS (2026-06-14)
 
-**Phase 1 + Movement B complete.** Ch 0–6 authored (Movement A + the full loop); outline + companion
+**Phase 1 + Movements B–C complete.** Ch 0–8 authored (framing + the full loop + communication & anti-patterns); outline + companion
 shape locked; index + RESUME entries added. **Chapter count LOCKED at 13 (ch 0–12)** after the
 Movement-B draft (2026-06-14), per the content-flow steer: the merge points (clarify/preregister,
 prompting/reading, provenance) were assessed and each kept as a full chapter because each earns its
@@ -41,6 +41,9 @@ place — 13 by content, not padded to match the series.
   `constraints-context`; `prompting_demo`), **Ch 5** reading AI code (`reading-is-hard`/`fluency-trap`/
   `read-against-spec`; `reading_ai_code_demo`), **Ch 6** verification (`ran-vs-verified`/`the-gate`/
   `debugging-ai`; `verification_demo`). Per-chapter weighted dims: rigor · trade-off · correctness · rigor.
+- **Ch 7–8 authored** (2026-06-14, Movement C) — **Ch 7** communication-while-you-delegate (the guide's
+  weighted dimension; `silence-fails`/`what-to-narrate`/`narrate-collaboration`; `communication_demo`),
+  **Ch 8** anti-patterns (`four-antipatterns`/`contrasting-cases`/`short-term-reward`; `antipatterns_demo`).
 
 ## Demand basis
 

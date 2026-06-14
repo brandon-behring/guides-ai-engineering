@@ -1,0 +1,182 @@
+---
+title: "Anti-patterns: failing while the code looks fine"
+slug: anti-patterns
+description: "The named failure modes of AI-assisted work are dangerous precisely because they mimic the virtues: speed looks like skill, confidence looks like comprehension, a passing demo looks like verification. Copy-paste automation, prompt theater, automation bias, and the velocity trap each feel productive and often pass the immediate check — then fail the follow-up question or the boundary input. Each is a skipped loop stage wearing a costume; telling the anti-pattern from its look-alike virtue is the skill, and the loop is the cure."
+freshness: literature-survey
+last_verified: 2026-06-14
+tags: [ai-assisted-coding, anti-patterns, automation-bias, judgment]
+sources: []
+draft: false
+mode: explanation
+target: transfer
+ordering: problem-first
+commitment: long-lived
+paradigms: [default]
+research_debt_addressed: |
+  The signature AI-assisted failure is "failing while the code looks fine" — copy-pasting
+  output you can't defend, tuning prompts until a handed-down test passes, trusting the model
+  over your own check, optimizing output speed over defensibility. These anti-patterns are
+  rewarded short-term (the demo runs, the feature ships) and punished exactly where interviews
+  probe (the follow-up, the boundary). This chapter names them with their tells, contrasts each
+  against the virtue it mimics, and shows that each is a skipped loop stage — so the loop from
+  Movement B is the antidote.
+task_classes: [diagnosis, self-assessment]
+provenance:
+  ai_tools: ["Claude Opus 4.8 (Anthropic)"]
+  audit_history:
+    - date: 2026-06-14
+      type: authored
+      file: src/content/working-with-ai/08-anti-patterns.mdx
+  citation_backstop: manual
+los:
+  - id: WAI-8.1
+    bloom: analyze
+    statement: "Name the four AI-assisted anti-patterns (copy-paste automation, prompt theater, automation bias, the velocity trap) with their behavioural tells, and map each to the loop stage it skips."
+    anchor: four-antipatterns
+    threshold: true
+  - id: WAI-8.2
+    bloom: compare
+    statement: "Distinguish each anti-pattern from the virtue it mimics using contrasting cases — the differentiator is always whether a committed standard and real comprehension sit behind the behaviour."
+    anchor: contrasting-cases
+    threshold: true
+  - id: WAI-8.3
+    bloom: explain
+    statement: "Explain why the anti-patterns are rewarded short-term and punished later, and why interviews compress that timeline (the follow-up question, the boundary input) to expose them."
+    anchor: short-term-reward
+    threshold: false
+---
+
+import YouWillLearn from '@brandon_m_behring/book-scaffold-astro/components/YouWillLearn.astro';
+import Pitfall from '@brandon_m_behring/book-scaffold-astro/components/Pitfall.astro';
+import Practice from '@brandon_m_behring/book-scaffold-astro/components/Practice.astro';
+import ScenarioQuiz from '../../components/ScenarioQuiz.tsx';
+import antipatternsData from '../../data/antipatterns_demo.json';
+
+# Anti-patterns: failing while the code looks fine
+
+<YouWillLearn prerequisites="Chapter 7 — that narration is the signal, and can also be performed. This chapter is the inverse: the behaviours that send the wrong signal even when the code is fine.">
+- The **four anti-patterns** of AI-assisted work, with the tell for each and the loop stage it skips.
+- **Contrasting cases**: how each anti-pattern mimics a genuine virtue, and what distinguishes them.
+- Why they're **rewarded short-term** and punished later — and why interviews compress the timeline.
+</YouWillLearn>
+
+## The candidate who did everything right, fast
+
+A candidate moves fast and looks great: prompts fluently, accepts the output, ships, everything's
+green, and they talk confidently the entire time. It reads like a star performance. They get a no.
+
+Predict, before reading on: **what did the interviewer see that the candidate didn't?** The speed
+was ungoverned, the green was happy-path, and the confident talk was narration of a process with no
+committed standard underneath. Every signal that looked like a virtue was its look-alike
+anti-pattern — and the follow-up question is what told them apart.
+
+<Pitfall title="The anti-patterns look like the virtues">
+Speed looks like skill. Confidence looks like comprehension. A passing demo looks like verification.
+The AI-assisted anti-patterns are dangerous *because* they wear the costume of the good behaviours —
+which is why "looked great, got a no" is such a common outcome. The skill of this chapter is telling
+the costume from the real thing, in others and in yourself.
+</Pitfall>
+
+## The four anti-patterns {/* anchor: four-antipatterns */}
+
+Each has a behavioural tell, and each is a loop stage skipped:
+
+- **Copy-paste automation** — accepting AI output without comprehending it. *Tell:* can't explain a
+  line when asked. *Skips:* review (Ch 5).
+- **Prompt theater** — iterating prompts until something passes, with no committed theory of what
+  "right" is. *Tell:* no preregistration; tests written after the code. *Skips:* preregistration (Ch 3).
+- **Automation bias** — trusting the model over your own contradicting check. *Tell:* "the AI said
+  so" as a reason. *Skips:* verification / comprehension (Ch 5–6).
+- **The velocity trap** — optimizing the speed of producing output over the defensibility of what
+  ships. *Tell:* fast, but can't be defended under questioning. *Skips:* the gate (Ch 6).
+
+The unifying diagnosis: **an anti-pattern is a loop stage you skipped, dressed up as productivity.**
+That's also the cure — name the missing stage and put it back.
+
+## Contrasting cases {/* anchor: contrasting-cases */}
+
+The teaching move is to put each anti-pattern beside the virtue it imitates, because the difference
+is never the surface behaviour — it's whether a committed standard and real comprehension sit behind
+it:
+
+| Looks like… | Virtue (standard + comprehension behind it) | Anti-pattern (costume only) |
+| --- | --- | --- |
+| Moving fast | Governed velocity — clarified, preregistered, verified in the time | Velocity trap — "done" means the demo ran |
+| Iterating on a prompt | Steering toward preregistered invariants | Prompt theater — tuning until handed-down tests pass |
+| Trusting the output | Justified trust *after* a check | Automation bias — trust *instead of* a check |
+| Accepting clean code | Accepted *because* you read and verified it | Copy-paste automation — accepted because it looked fine |
+
+**Predict** which side of the line each case falls on:
+
+<ScenarioQuiz client:visible data={antipatternsData} />
+
+In every pair the observable action is identical; only the committed standard behind it differs. That
+is the whole diagnostic.
+
+## Why they're rewarded short-term {/* anchor: short-term-reward */}
+
+The reason these are hard to resist is that they *work* — at first. Copy-pasted code runs; the
+prompt-theater output passes the demo; the trusted model is usually right; the fast feature ships.
+The cost is deferred to a later moment: the boundary input in production, the follow-up question you
+can't answer, the incident with no provenance. By the time the bill arrives, the behaviour has been
+reinforced many times.
+
+Interviews exist, in part, to **compress that timeline**. The follow-up question ("what does this do
+on empty input?"), the un-one-shottable problem, the request to explain a line — each pulls the
+deferred cost into the room, in minutes instead of months. That's why these anti-patterns are a
+favorite probe: they're invisible on the happy path and obvious one question past it. Resisting them
+means valuing the deferred cost *now* — which is exactly the judgment the loop encodes.
+
+<Practice id="name-the-antipattern" difficulty={2}>
+For each, name the anti-pattern and the loop stage that prevents it:
+
+1. Accepting a 100-line function you can't explain.
+2. Re-prompting until the sample passes, with the tests written afterward.
+3. Shipping fast with no boundary checks.
+4. Keeping the AI's answer over your own failing test because "it's probably right."
+
+<details>
+<summary>One defensible answer</summary>
+
+1. **Copy-paste automation** → prevented by **review** (Ch 5): read and own every line.
+2. **Prompt theater** → prevented by **preregistration** (Ch 3): commit the standard before prompting.
+3. **Velocity trap** → prevented by **verification against the gate** (Ch 6): "done" means it passed.
+4. **Automation bias** → prevented by **verification + comprehension** (Ch 5–6): resolve the
+   contradiction with a check rather than deferring to the tool.
+
+The pattern to take away: every anti-pattern is a skipped loop stage wearing a costume, so the loop
+isn't just how you do the work — it's your defense against the failure modes the work invites.
+</details>
+</Practice>
+
+## How this is graded
+
+- **Communication** *(weighted)* — you don't *perform* the anti-patterns (false confidence, fluent
+  talk over unread code); your narration tracks genuine judgment, which is the gap interviewers probe.
+- **Technical Correctness** — you resolve contradictions instead of deferring (no automation bias),
+  so what you claim about the code is true.
+- **Trade-off Awareness** — you recognize ungoverned velocity for what it is and can name the deferred
+  cost you're choosing to pay or avoid.
+- **Evaluation Rigor** — you have a committed standard, which is precisely what turns prompt theater
+  back into steering.
+
+### Industry variation
+
+- **Startups** — the velocity trap is the endemic risk; the senior skill is naming *which* speed is
+  debt (skip the polish, never skip the gate on the core).
+- **Big tech** — prompt theater fails code review, and automation bias in a scaled system turns one
+  unchecked output into a wide blast radius.
+- **Regulated (fintech, health)** — automation bias plus no provenance is a compliance failure, not
+  just a bug; "the AI decided" is not an acceptable audit answer.
+- **Frontier labs** — copy-paste automation of AI-written research code produces subtle method bugs
+  (a wrong axis, a leaked label) that run cleanly and invalidate results.
+
+## Stretch: the anti-patterns compound at scale
+
+Everything here gets worse when the AI works across many files and runs as an agent: ungoverned
+automation that's a nuisance in one function becomes a systemic risk across a repo, where you can't
+read every line. Before the next chapter: if you can't review everything an agent produces, what do
+you govern instead — and where do you put the checkpoints?
+
+Next: **Chapter 9 — Agentic workflows**, where the loop scales from a single function to multi-file,
+agent-driven work, and governance becomes a question of checkpoints and gates.

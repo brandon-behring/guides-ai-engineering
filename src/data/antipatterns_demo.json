@@ -1,0 +1,45 @@
+{
+  "name": "Virtue, or its look-alike anti-pattern?",
+  "note": "The AI-assisted anti-patterns are dangerous because they mimic the virtues — speed looks like skill, confidence like comprehension. The tell is always whether a committed standard and real understanding sit behind the behaviour.",
+  "items": [
+    {
+      "id": "speed",
+      "prompt": "An engineer ships a feature in 20 minutes with AI. Virtue or anti-pattern?",
+      "candidates": [
+        "Can't tell from speed alone — a virtue if they clarified, committed a standard, and verified against it in those 20 minutes; the velocity trap if 'done' just means 'the demo ran.' The tell is the committed standard, not the clock",
+        "Virtue — 20 minutes proves high productivity",
+        "Anti-pattern — shipping that fast is always reckless",
+        "Virtue — as long as the tests pass"
+      ],
+      "correct": "Can't tell from speed alone — a virtue if they clarified, committed a standard, and verified against it in those 20 minutes; the velocity trap if 'done' just means 'the demo ran.' The tell is the committed standard, not the clock",
+      "explanation": "Velocity is neutral. Governed velocity (speed with a committed standard and verification) is the virtue; ungoverned velocity is the trap. The look-alikes differ only by whether a standard exists behind the speed.",
+      "principle": "Speed is neither virtue nor vice — the committed standard behind it is."
+    },
+    {
+      "id": "iterating",
+      "prompt": "A candidate tries six prompt variations until the output passes the tests. Virtue or anti-pattern?",
+      "candidates": [
+        "Prompt theater if the tests were the handed-down ones and no standard was committed first — they're tuning until the failure hides; it would be steering if they were iterating toward invariants they had already preregistered",
+        "Virtue — persistence in prompting shows skill",
+        "Anti-pattern — you should never iterate on a prompt",
+        "Virtue — six attempts means thoroughness"
+      ],
+      "correct": "Prompt theater if the tests were the handed-down ones and no standard was committed first — they're tuning until the failure hides; it would be steering if they were iterating toward invariants they had already preregistered",
+      "explanation": "Iterating toward a committed spec is steering — each attempt is measured against a standard you set. Iterating until handed-down tests go green is prompt theater: the failure gets hidden, not fixed.",
+      "principle": "Iterating toward your committed standard is steering; iterating until the test goes green is theater."
+    },
+    {
+      "id": "trusting",
+      "prompt": "The AI's output contradicts your own calculation. The candidate goes with the AI 'because it's usually right.' Read?",
+      "candidates": [
+        "Automation bias — deferring to the tool over your own check is the failure; the right move is to resolve the contradiction (re-derive, test it), not to assume the AI wins. Justified trust comes after checking, not instead of it",
+        "Reasonable — modern models are right more often than people",
+        "Always distrust the AI and use your own answer instead",
+        "Fine, as long as the AI explained its reasoning"
+      ],
+      "correct": "Automation bias — deferring to the tool over your own check is the failure; the right move is to resolve the contradiction (re-derive, test it), not to assume the AI wins. Justified trust comes after checking, not instead of it",
+      "explanation": "Automation bias is trusting the automation over contradicting evidence. The cure isn't blanket distrust — it's resolving the conflict with a check, so trust (when it comes) is earned rather than assumed.",
+      "principle": "When the AI and your check disagree, resolve it — don't defer to the tool's reputation."
+    }
+  ]
+}
