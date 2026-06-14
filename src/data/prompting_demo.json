@@ -1,0 +1,45 @@
+{
+  "name": "Which prompt is the spec?",
+  "note": "A prompt is a specification, not a wish. Pick the request that carries your committed spec — versus the ones that outsource the decisions to the model's defaults.",
+  "items": [
+    {
+      "id": "phone-validator",
+      "prompt": "Task: validate a US phone number. Which prompt gets you the right thing?",
+      "candidates": [
+        "'Validate a US phone number: 10 digits, optional +1 country code, allow spaces/dashes/parens as separators, reject everything else, return a bool; standard library only' — states format, edge handling, return type, and a constraint",
+        "'Write a phone number validator' — outsources every decision (which country? what format? what counts as valid?) to the model's defaults",
+        "'Write a really robust, production-grade phone validator' — adjectives, not a spec; 'robust' isn't a testable requirement",
+        "'Validate phone numbers using best practices' — defers the spec to an unstated standard"
+      ],
+      "correct": "'Validate a US phone number: 10 digits, optional +1 country code, allow spaces/dashes/parens as separators, reject everything else, return a bool; standard library only' — states format, edge handling, return type, and a constraint",
+      "explanation": "The precise prompt is your preregistered spec, handed to the AI. The others let the model pick an interpretation — often a reasonable one, rarely the one you actually meant.",
+      "principle": "A good prompt states the spec; a bad one borrows the model's defaults."
+    },
+    {
+      "id": "decompose-cli",
+      "prompt": "Task: build a CLI that ingests a CSV, deduplicates it, and writes JSON. Best approach?",
+      "candidates": [
+        "Decompose: prompt for the dedup function (with its preregistered invariant) first and verify it, then the I/O wrapper — you keep the architecture and verify each seam",
+        "One-shot the entire CLI in a single prompt and run it — the fastest path to 'done'",
+        "Prompt for the whole app plus tests plus docs in one giant request to save round-trips",
+        "Ask the AI to choose the architecture and implement everything without your input"
+      ],
+      "correct": "Decompose: prompt for the dedup function (with its preregistered invariant) first and verify it, then the I/O wrapper — you keep the architecture and verify each seam",
+      "explanation": "Multi-part tasks reward decomposition: you own the seams (where bugs concentrate) and verify incrementally. One-shotting a multi-step task buries failures inside a wall of plausible code.",
+      "principle": "One-shot the well-specified; decompose the moment architecture decisions appear."
+    },
+    {
+      "id": "negative-constraint",
+      "prompt": "The AI keeps adding a third-party dependency you don't want. Most effective fix?",
+      "candidates": [
+        "Put it in the prompt as an explicit negative constraint: 'use only the standard library; do not add dependencies' — close the gap at the source",
+        "Delete the import each time it generates — fight the output instead of the prompt",
+        "Switch models and hope the next one doesn't add it",
+        "Accept the dependency; the AI usually knows best"
+      ],
+      "correct": "Put it in the prompt as an explicit negative constraint: 'use only the standard library; do not add dependencies' — close the gap at the source",
+      "explanation": "The AI fills unstated gaps with common defaults (popular libraries). A negative constraint in the prompt closes the gap once; fixing the output by hand every time is rework you chose.",
+      "principle": "Steer at the prompt, not the output — state the constraints you care about, including the negatives."
+    }
+  ]
+}

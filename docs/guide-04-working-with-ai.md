@@ -14,9 +14,11 @@ candidate → planned 2026-06-14) · demand spine:
 
 ## Status: IN PROGRESS (2026-06-14)
 
-**Phase 1 (outline + scaffold) underway.** Ch 0–2 authored; outline + companion shape locked; index
-+ RESUME entries added. Chapter count is **emergent from the content arc** (user steer 2026-06-14):
-expected **~11–13 chapters**, locked after the Movement-B block is drafted (densest movement).
+**Phase 1 + Movement B complete.** Ch 0–6 authored (Movement A + the full loop); outline + companion
+shape locked; index + RESUME entries added. **Chapter count LOCKED at 13 (ch 0–12)** after the
+Movement-B draft (2026-06-14), per the content-flow steer: the merge points (clarify/preregister,
+prompting/reading, provenance) were assessed and each kept as a full chapter because each earns its
+place — 13 by content, not padded to match the series.
 
 ### Build log
 
@@ -33,6 +35,12 @@ expected **~11–13 chapters**, locked after the Movement-B block is drafted (de
   confident wrong aim, sharpened by AI's no-pushback compliance (`wrong-aim`); finding the pivotal
   term to clarify (`what-to-clarify`); using the AI as a clarification partner without ceding the
   spec (`clarify-with-ai`); `clarify_demo.json` "spot the missing clarification".
+- **Ch 3–6 authored** (2026-06-14, Movement B) — the loop's solo stages, each owning one stage with a
+  hand-authored `ScenarioQuiz`: **Ch 3** preregistration (`theory-before-data`/`what-to-preregister`/
+  `governance`; `preregistration_demo`), **Ch 4** strategic prompting (`prompt-as-spec`/`decompose`/
+  `constraints-context`; `prompting_demo`), **Ch 5** reading AI code (`reading-is-hard`/`fluency-trap`/
+  `read-against-spec`; `reading_ai_code_demo`), **Ch 6** verification (`ran-vs-verified`/`the-gate`/
+  `debugging-ai`; `verification_demo`). Per-chapter weighted dims: rigor · trade-off · correctness · rigor.
 
 ## Demand basis
 
@@ -51,32 +59,34 @@ theater" — governance over automation** (commit files/invariants/tests *before
 anchors on this; volatile company/tool/format specifics live only in dated `### Industry variation`
 callouts so the core does not rot (see Durability policy below).
 
-## Spine & outline (content-flow movements, ~11–13 ch — count emergent)
+## Spine & outline (content-flow movements — count LOCKED at 13, ch 0–12)
 
-Organized as **movements**, not a fixed chapter count (per the plan). Slugs illustrative; chapter
-numbers assigned at authoring. `[private]` seeds live in `~/interview_prep_series/` (optional pull;
-default is author-fresh from the public demand research, which is sufficient).
+Organized as **movements**; the chapter count emerged from the content and was **locked at 13 (ch
+0–12) on 2026-06-14** after the Movement-B draft. `[private]` seeds live in `~/interview_prep_series/`
+(optional pull; default is author-fresh from the public demand research, which is sufficient).
+✅ = authored + verified + committed.
 
-| Mvt | Chapter (illustrative slug) | What it does | Demand seed |
-|----|----|----|----|
-| **A — The shift** | `why-working-with-ai` (Ch 0 ✅) | Bottleneck moved to judgment + communication; the loop; three myths | `_gather_new_topics` §AI-assisted-coding |
-| | `what-interviewers-test` | The 4 assessed dims mapped onto the series 4-dim rubric; how each is scored + fails | L39–40 |
-| **B — The durable loop** | `preregistration` | Commit files/invariants/tests *before* prompting — governance over automation | L41–42 |
-| | `clarify-before-you-code` | Failure mode #2 (jumping-without-understanding), with AI in the loop | baseline failure modes |
-| | `strategic-prompting` | Prompt as spec, not incantation; decomposition, context, constraints; worked-example fading | L39 |
-| | `reading-ai-code` | Comprehension as a first-class skill; spotting plausible-but-wrong | L39 |
-| | `verification-under-automation` | prompt→review→run→confirm; tests as the gate | L39–40 |
-| **C — Hardest dim + failure** | `communication-while-you-delegate` | **#1 failure mode / weighted dim**; narrate intent + trade-offs while the AI works | baseline (~40–45%) |
-| | `anti-patterns` | Copy-paste automation, prompt theater, automation bias; contrasting cases | L43–44 |
-| **D — At scale** | `agentic-workflows` | Un-one-shottable problems; scoping, checkpoints, review gates across a repo | L38 (Canva) |
-| | `evaluating-ai-output` | Gate AI-written code on a golden set — **bridge to `mini_eval`** (eval-rigor dim) | series cross-link |
-| | `provenance-accountability` | Who owns the AI's bug; audit trails for AI code; regulated callouts | A4 sectors L15–16 |
-| **E — Transfer** | `interview-craft-transfer` (capstone) | Mock AI-assisted interview (preregister→build→explain under time), self-graded vs 4-dim rubric | `[private]` vol09 ch19–20 · AIES |
+| Mvt | Ch | Slug | What it does | Demand seed |
+|----|----|----|----|----|
+| **A — The shift** | 0 ✅ | `why-working-with-ai` | Bottleneck moved to judgment + communication; the loop; three myths | `_gather_new_topics` §AI-assisted-coding |
+| | 1 ✅ | `what-interviewers-test` | The 4 assessed dims mapped onto the series 4-dim rubric; how each is scored + fails | L39–40 |
+| **B — The durable loop** | 2 ✅ | `clarify-before-you-code` | Loop stage 1: pin the real problem before prompting (failure mode #2) | baseline failure modes |
+| | 3 ✅ | `preregistration` | Loop stage 2: commit shape/invariants/tests *before* prompting — governance over automation | L41–42 |
+| | 4 ✅ | `strategic-prompting` | Loop stage 3: prompt as spec; decompose vs one-shot; constraints | L39 |
+| | 5 ✅ | `reading-ai-code` | Loop stage 4: comprehension; the fluency trap; read against the spec | L39 |
+| | 6 ✅ | `verification-under-automation` | Loop stage 5: ran vs verified; the gate; debugging AI output | L39–40 |
+| **C — Hardest dim + failure** | 7 | `communication-while-you-delegate` | Loop stage 6 (runs throughout): **#1 failure mode / guide's weighted dim** | baseline (~40–45%) |
+| | 8 | `anti-patterns` | Copy-paste automation, prompt theater, automation bias; contrasting cases | L43–44 |
+| **D — At scale** | 9 | `agentic-workflows` | Un-one-shottable problems; scoping, checkpoints, review gates across a repo | L38 (Canva) |
+| | 10 | `evaluating-ai-output` | Gate AI-written code on a golden set — **bridge to `mini_eval`** | series cross-link |
+| | 11 | `provenance-accountability` | Who owns the AI's bug; audit trails for AI code; regulated callouts | A4 sectors L15–16 |
+| **E — Transfer** | 12 | `interview-craft-transfer` | Capstone: mock AI-assisted interview (preregister→build→explain), self-graded vs rubric | `[private]` vol09 ch19–20 · AIES |
 
-**Merge/split points (resolve at authoring by content density):** `clarify` may fold into
-`preregistration` (both theory-first); `strategic-prompting` + `reading-ai-code` may merge to one
-"prompt-and-comprehend" chapter; `provenance-accountability` may demote to a callout thread. Lock the
-final count after the Movement-B draft.
+**Merge/split points — RESOLVED 2026-06-14:** assessed all three after the Movement-B draft and kept
+each as a full chapter — `clarify` and `preregistration` are distinct stages (understand the problem
+vs commit the solution's contract); `strategic-prompting` and `reading-ai-code` are opposite stages
+(produce vs comprehend); `provenance-accountability` carries a distinct, demand-grounded topic
+(ownership/audit of AI code). Final count: **13**, by content, not padding.
 
 **Narrative chain:** A names the shift + the loop → B builds the loop stage by stage → C confronts the
 hardest dimension and its failure mode → D scales the loop to real repos and gates its output → E

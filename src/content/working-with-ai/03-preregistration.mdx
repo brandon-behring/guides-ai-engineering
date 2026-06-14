@@ -1,0 +1,190 @@
+---
+title: "Preregistration: commit the target before you prompt"
+slug: preregistration
+description: "Borrowed from science, where you register your hypothesis and analysis before seeing the data so the data can't rationalize you. In AI-assisted work the 'data' is the model's output: decide what 'right' means — the interface, the invariants, the tests — before you prompt, so the output is gated against a standard instead of becoming the standard. This is the durable, tool-version-proof skill: governance over automation, not prompt theater."
+freshness: literature-survey
+last_verified: 2026-06-14
+tags: [ai-assisted-coding, preregistration, testing, governance, evaluation]
+sources: []
+draft: false
+mode: tutorial
+target: transfer
+ordering: problem-first
+commitment: long-lived
+paradigms: [default]
+research_debt_addressed: |
+  The design frontier of AI-assisted-coding assessment is "preregistration, not prompt
+  theater" — committing your theory (files, invariants, tests) before invoking the model,
+  which tests governance over automation rather than prompt fluency, and is durable across
+  tool and model versions. No public guide operationalizes it. This chapter does: the
+  science analogy (theory before data), exactly what to preregister, and why doing so is
+  what makes later reading and verification tractable. It is the intellectual core of the
+  guide.
+task_classes: [test-design, specification, governance]
+provenance:
+  ai_tools: ["Claude Opus 4.8 (Anthropic)"]
+  audit_history:
+    - date: 2026-06-14
+      type: authored
+      file: src/content/working-with-ai/03-preregistration.mdx
+  citation_backstop: manual
+los:
+  - id: WAI-3.1
+    bloom: explain
+    statement: "Explain preregistration by analogy to its scientific origin — committing the standard before seeing the output prevents the output from becoming the standard (post-hoc ratification) — and why AI assistance makes the ratification trap easier to fall into."
+    anchor: theory-before-data
+    threshold: true
+  - id: WAI-3.2
+    bloom: design
+    statement: "Given a task, preregister a usable contract before prompting: the shape (files/interfaces), the invariants (properties that must always hold), and concrete boundary tests drawn from the clarification."
+    anchor: what-to-preregister
+    threshold: true
+  - id: WAI-3.3
+    bloom: explain
+    statement: "Explain why preregistration is 'governance over automation' — the tool-version-durable skill that lets you gate AI output against a committed standard — and articulate it as an interview signal."
+    anchor: governance
+    threshold: true
+---
+
+import YouWillLearn from '@brandon_m_behring/book-scaffold-astro/components/YouWillLearn.astro';
+import Pitfall from '@brandon_m_behring/book-scaffold-astro/components/Pitfall.astro';
+import Practice from '@brandon_m_behring/book-scaffold-astro/components/Practice.astro';
+import ScenarioQuiz from '../../components/ScenarioQuiz.tsx';
+import preregData from '../../data/preregistration_demo.json';
+
+# Preregistration: commit the target before you prompt
+
+<YouWillLearn prerequisites="Chapter 2 — you can pin the real problem before prompting. This chapter turns that aim into a binding contract the AI's output must satisfy.">
+- Why committing the standard **before** you see the AI's output is what makes the output trustworthy — the **ratification trap** and how to escape it.
+- **What** to preregister: the shape, the invariants, the boundary tests.
+- Why preregistration is **governance over automation** — the durable skill — and how to say so in an interview.
+</YouWillLearn>
+
+## The test that only confirmed what you already had
+
+You prompt for a function, get back something clean, and — being responsible — you write a test
+to confirm it. You look at the code, see it handles a few cases, and write a test for those
+cases. Green. You feel verified.
+
+But look at where the test came from: you wrote it *after* reading the code, so it encodes the
+behaviour the code already has. The case the AI quietly mishandled — the empty input, the
+duplicate key, the timezone — isn't in your test, because it wasn't in the code you were looking
+at when you wrote the test. Your test didn't check the solution; it photographed it.
+
+Predict, before reading on: **what single change to your process would have caught the case the
+code missed** — without you having to already know which case it was?
+
+<Pitfall title="A test written after the code ratifies it">
+Post-hoc tests inherit the code's blind spots. You test what the implementation *does*, not what
+it *should do*, because the implementation is what you're looking at. With AI this is worse: the
+output arrives fluent and complete-looking, so the pull to write confirmatory tests around it is
+stronger. The fix isn't more tests — it's *earlier* ones.
+</Pitfall>
+
+## Theory before data {/* anchor: theory-before-data */}
+
+Science had this exact problem and named the cure. Given freedom to choose your hypothesis and
+analysis *after* seeing the data, you'll unconsciously fit a story to the noise — so rigorous
+fields **preregister**: you commit the hypothesis and the analysis plan before the data exists,
+and the data either confirms it or doesn't. The commitment removes your ability to rationalize.
+
+AI-assisted coding has the same structure with the roles relabeled. The model's output is the
+"data." If you decide what "right" means *after* seeing the output, the output anchors your
+judgment — it looks reasonable, so your standard quietly shrinks to "what it did." Preregistration
+flips the order: **decide the standard before you prompt**, and the output is measured against it
+instead of defining it. This is the single highest-leverage habit in the guide, because it's what
+makes the *next* two stages — reading (Ch 5) and verification (Ch 6) — into checklists instead of
+vibes. You can't read "against the spec" or verify "against the gate" if the spec and the gate
+were written by the code.
+
+## What to preregister {/* anchor: what-to-preregister */}
+
+Preregistration is fast — a few minutes, not a design doc. You commit three things, in rough
+order of leverage:
+
+- **The shape** — the interface: the function signature(s), the files or modules, the return
+  types. The skeleton the AI fills, so you own the architecture and the seams.
+- **The invariants** — the properties that must *always* hold, regardless of input. Empty input →
+  empty output (not a crash); idempotence for anything that writes; ordering guarantees;
+  conservation ("no row is silently dropped"). Invariants are where you encode the failures the
+  happy path hides.
+- **The tests** — concrete cases, especially the boundaries you surfaced while clarifying
+  (Ch 2): the empty list, the duplicate, the malformed row, the off-by-one at the window edge.
+
+Write them as a short contract before the prompt. **Predict** the highest-leverage item in each
+case below:
+
+<ScenarioQuiz client:visible data={preregData} />
+
+The pattern: the best thing to preregister is the invariant that guards the failure mode the
+AI's fluent happy-path code is most likely to skip — ragged rows, double writes, the empty case.
+
+## Preregistration as governance {/* anchor: governance */}
+
+Step back and name what this is. You are directing a fast, capable, occasionally
+confidently-wrong collaborator against a standard *you* set in advance, so its output is **gated,
+not trusted**. That is governance over automation — and it is the part of this skill that does not
+expire. Models change, tools change, the prompt syntax changes; "decide the standard before you
+delegate, then hold the output to it" survives every one of those changes. It is why this is the
+chapter the interview frontier actually targets: "preregistration, not prompt theater" is a test
+of whether you govern the tool or perform with it.
+
+The interview signal is a single sentence you can say out loud: *"Before I prompt, I'm committing
+these two invariants and a test for the empty case, so I'm checking its output against them rather
+than eyeballing it."* That sentence demonstrates rigor, gives the interviewer your standard to
+follow, and pre-empts the most common failure they're watching for.
+
+<Practice id="preregister-a-limiter" difficulty={2}>
+Task: implement a rate limiter — at most N requests per time window, per user. **Before prompting**,
+preregister: write the three invariants and one boundary test you'd commit.
+
+<details>
+<summary>One defensible answer</summary>
+
+- **Invariants:** (1) the limiter never allows more than N requests to succeed within any single
+  window; (2) different users are independent — one user's traffic never consumes another's
+  allowance; (3) at a window boundary the count resets correctly, with no allowance carried over
+  or double-counted (the off-by-one zone).
+- **Boundary test:** N requests in a window succeed, the (N+1)th in the *same* window is rejected,
+  and after the window elapses the next request succeeds again.
+
+Why before, not after: written first, these *constrain* the AI toward a correct per-user windowing
+design and become gates the output must pass. Written after, they'd likely just ratify whatever
+windowing the model happened to choose — including a shared-counter bug that looks fine on one user.
+</details>
+</Practice>
+
+## How this is graded
+
+**Evaluation Rigor is this chapter's weighted dimension** — preregistration *is* rigor, made
+visible:
+
+- **Evaluation Rigor** *(weighted)* — you define "right" before you prompt and gate the output
+  against it; "green" means something because the test couldn't have been shaped by the code.
+- **Technical Correctness** — your invariants name the real correctness properties (idempotence,
+  conservation), showing you know where this task can actually go wrong.
+- **Trade-off Awareness** — you preregister *enough* to gate the failure modes without over-specifying
+  a tiny task into a design doc; you size the contract to the risk.
+- **Communication** — you say the standard out loud before delegating, which is the clearest signal
+  to an interviewer that the rigor is real and not retrofitted.
+
+### Industry variation
+
+- **Startups** — preregister the *minimal* invariants that prevent shipping a broken core; don't
+  gold-plate a spec for a feature that might pivot next week.
+- **Big tech** — preregistration scales into the design doc and the test plan that precede an
+  AI-assisted implementation, and into how AI code is gated in review and CI.
+- **Regulated (fintech, health)** — preregistered tests *are* audit evidence: the committed standard
+  and its pass record document what the AI-written code was held to.
+- **Frontier labs** — same discipline one level up: preregister the eval and the success criterion
+  before running the experiment, so a fast result can't redefine what you were measuring.
+
+## Stretch: the spec is the prompt
+
+You now have a committed contract. Notice that it is also the best possible *input* to the model:
+a precise prompt is largely your preregistration, handed over. Before the next chapter, take your
+rate-limiter contract and sketch how much of it would drop, almost verbatim, into the prompt — and
+what you'd add to turn a spec into an instruction.
+
+Next: **Chapter 4 — Strategic prompting**, where the committed spec becomes a precise request, and
+the judgment call is how much to ask for at once.

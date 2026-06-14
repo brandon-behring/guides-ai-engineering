@@ -1,0 +1,45 @@
+{
+  "name": "Find the plausible-but-wrong",
+  "note": "AI code is fluent by construction — clean, idiomatic, well-commented — whether or not it's right. Read against your spec, not for style. Pick the real issue, not the red herring.",
+  "items": [
+    {
+      "id": "clean-but-wrong-spec",
+      "prompt": "The AI's dedup function is clean and passes the sample. Reading against your spec (fuzzy match on name + email), you see it builds a set() of exact tuples. The issue?",
+      "candidates": [
+        "It implements exact-match dedup, not the fuzzy match your spec requires — fluent, idiomatic, and solving the wrong problem you'd already clarified against",
+        "set() is slower than a list here and should be replaced",
+        "The function is missing a docstring",
+        "Nothing — it passes the sample input cleanly"
+      ],
+      "correct": "It implements exact-match dedup, not the fuzzy match your spec requires — fluent, idiomatic, and solving the wrong problem you'd already clarified against",
+      "explanation": "The code is clean and wrong-by-spec. Reading against your preregistered definition of 'duplicate' catches what a style-skim sails past, because the polish actively suppresses skepticism.",
+      "principle": "Read against the spec you committed, not against whether the code looks nice."
+    },
+    {
+      "id": "boundary-first",
+      "prompt": "An AI-written average(nums) is clean and correct on every example. What do you check first?",
+      "candidates": [
+        "The empty-input case — average([]) divides by zero; clean code on the happy path tells you nothing about the boundary, which is exactly where AI output skips",
+        "Whether it uses sum() or a manual loop — a style preference",
+        "Whether the parameter is called nums or numbers",
+        "Nothing — averaging is too simple to contain a bug"
+      ],
+      "correct": "The empty-input case — average([]) divides by zero; clean code on the happy path tells you nothing about the boundary, which is exactly where AI output skips",
+      "explanation": "Boundaries are the comprehension priority. Happy-path fluency is no evidence about the empty, the huge, or the malformed input — go there first when you read AI output.",
+      "principle": "When you read AI code, go to the boundary first — that's where fluency hides the gap."
+    },
+    {
+      "id": "lying-comment",
+      "prompt": "An AI function carries the comment 'safely handles concurrent access', but the code uses a plain dict with no lock. The right read?",
+      "candidates": [
+        "Trust the code, not the comment — the AI generated a plausible-sounding claim the implementation doesn't back; the mismatch is a bug and a cue to scrutinize the rest",
+        "Trust the comment; the AI wrote it, so it must have ensured thread safety",
+        "Delete the comment and move on",
+        "Nothing — comments don't affect correctness"
+      ],
+      "correct": "Trust the code, not the comment — the AI generated a plausible-sounding claim the implementation doesn't back; the mismatch is a bug and a cue to scrutinize the rest",
+      "explanation": "An AI comment is generated text, not a guarantee. A comment asserting a property the code lacks is a classic plausible-but-wrong tell — and a sign the surrounding code deserves a harder read.",
+      "principle": "An AI comment is a claim, not a guarantee — verify it against the code."
+    }
+  ]
+}

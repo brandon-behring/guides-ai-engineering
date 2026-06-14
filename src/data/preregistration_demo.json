@@ -1,0 +1,45 @@
+{
+  "name": "What would you preregister?",
+  "note": "Before prompting, you commit the contract the AI's output must satisfy. Pick the thing most worth committing first — the one that guards the failure the happy path hides.",
+  "items": [
+    {
+      "id": "csv-parser",
+      "prompt": "Task: parse a CSV file into records. What's the most valuable invariant to preregister before prompting?",
+      "candidates": [
+        "Every output record has exactly the header's field count, and malformed rows are surfaced, not silently dropped — the failure the AI's happy-path parser is most likely to paper over",
+        "The function should be named parse_csv",
+        "It should use the standard library csv module",
+        "It should finish in under one second"
+      ],
+      "correct": "Every output record has exactly the header's field count, and malformed rows are surfaced, not silently dropped — the failure the AI's happy-path parser is most likely to paper over",
+      "explanation": "Invariants should target the silent-failure surface (dropped or merged rows on ragged input), which is exactly what a fluent happy-path implementation tends to skip. Naming, module choice, and speed are details, not the contract.",
+      "principle": "Preregister the invariant that guards the failure the happy path hides."
+    },
+    {
+      "id": "sync-idempotence",
+      "prompt": "Task: write a sync that pushes local changes to a server. What's the defining invariant to commit first?",
+      "candidates": [
+        "Idempotence: running the sync twice with no new local changes produces no second write — the property that separates a safe sync from one that duplicates data",
+        "It should print 'done' when it finishes",
+        "It should be implemented as a single function",
+        "It should use HTTPS for the requests"
+      ],
+      "correct": "Idempotence: running the sync twice with no new local changes produces no second write — the property that separates a safe sync from one that duplicates data",
+      "explanation": "Idempotence is the correctness property that defines a sync. Committing it before prompting steers the AI toward a safe design and hands you the test that actually matters; transport and structure are secondary.",
+      "principle": "For anything that writes, idempotence is the invariant worth committing first."
+    },
+    {
+      "id": "after-the-fact",
+      "prompt": "You wrote a test after seeing the AI's output, and it passed. Is that verification?",
+      "candidates": [
+        "Not on its own — a test written after seeing the code tends to encode what the code already does; the same test written from the spec, before prompting, would also have constrained the cases the code missed",
+        "Yes — a passing test is a passing test regardless of when it was written",
+        "No — tests are never useful for AI-generated code",
+        "Yes, as long as you have at least five of them"
+      ],
+      "correct": "Not on its own — a test written after seeing the code tends to encode what the code already does; the same test written from the spec, before prompting, would also have constrained the cases the code missed",
+      "explanation": "Timing changes what a test measures. A post-hoc test ratifies the AI's choices; a preregistered test constrains them. Write the standard from the spec, before the output exists — that's what makes 'green' mean something.",
+      "principle": "A test's value depends on whether the code could bias it — write it before the code exists."
+    }
+  ]
+}

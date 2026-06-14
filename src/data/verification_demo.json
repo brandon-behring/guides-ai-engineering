@@ -1,0 +1,45 @@
+{
+  "name": "Ran, or verified?",
+  "note": "Executing AI code on the example you were handed is the weakest possible evidence. Pick the move that turns 'it ran' into 'it's verified'.",
+  "items": [
+    {
+      "id": "one-run",
+      "prompt": "The candidate runs the AI code on the provided example; it returns the right answer. They declare it 'verified'. Accurate?",
+      "candidates": [
+        "No — one happy-path run is the case most likely to pass; verification means running the preregistered boundary and invariant cases, not the example you were handed",
+        "Yes — correct output is correct output",
+        "No — you must always hit 100% line coverage first",
+        "Yes, as long as it ran without throwing an exception"
+      ],
+      "correct": "No — one happy-path run is the case most likely to pass; verification means running the preregistered boundary and invariant cases, not the example you were handed",
+      "explanation": "A single example run is a demo, not verification. Verification is passing the gate you committed before seeing the code — boundaries, invariants, adversarial inputs.",
+      "principle": "Running the example proves the least; running the gate proves the point."
+    },
+    {
+      "id": "blind-reprompt",
+      "prompt": "The code fails a boundary test. The candidate re-prompts 'it's broken, please fix.' Better move?",
+      "candidates": [
+        "Feed the specific failure: 'fails on empty input — returns None, should return []; fix that without changing the non-empty behavior' — the verification result is the best debugging prompt",
+        "'It's broken, please fix' — let the AI rediscover the problem on its own",
+        "Regenerate from scratch with the same original prompt",
+        "Accept it; boundary failures are edge cases that rarely matter"
+      ],
+      "correct": "Feed the specific failure: 'fails on empty input — returns None, should return []; fix that without changing the non-empty behavior' — the verification result is the best debugging prompt",
+      "explanation": "A precise failure description turns the AI into a targeted debugger; a vague one is prompt-roulette. The loop is review → run → confirm, fed by exactly what the gate reported.",
+      "principle": "Debug the AI with the verification result, not with 'it's broken.'"
+    },
+    {
+      "id": "independent-standard",
+      "prompt": "Two candidates both reach green tests. One wrote the tests from the spec before prompting; the other after seeing the code. Same confidence?",
+      "candidates": [
+        "No — green on preregistered tests verifies against an independent standard; green on post-hoc tests can just confirm whatever the code already did",
+        "Yes — green is green regardless of when the tests were written",
+        "No — the second candidate is always the more thorough one",
+        "Yes, as long as both suites have the same number of tests"
+      ],
+      "correct": "No — green on preregistered tests verifies against an independent standard; green on post-hoc tests can just confirm whatever the code already did",
+      "explanation": "Verification strength depends on the independence of the standard from the code. Preregistration (Ch 3) is what makes 'the tests pass' a claim about correctness rather than a mirror of the implementation.",
+      "principle": "Green means something only when the test couldn't have been shaped by the code."
+    }
+  ]
+}
