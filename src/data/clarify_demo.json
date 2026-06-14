@@ -1,0 +1,45 @@
+{
+  "name": "Spot the missing clarification",
+  "note": "An ambiguous task, and a candidate who started coding immediately. Pick the one clarifying question that would most change the solution — not the one that's merely useful.",
+  "items": [
+    {
+      "id": "dedup-key",
+      "prompt": "Task: 'deduplicate the user list.' The candidate immediately prompts for code that removes identical rows.",
+      "candidates": [
+        "'What counts as a duplicate — identical rows, or the same person with a different email or spelling?' The dedup key IS the problem; exact-match vs fuzzy changes the entire approach",
+        "'Which programming language should I write it in?' — a surface detail that doesn't change the logic",
+        "'Roughly how many rows are there?' — useful for performance, but it doesn't change what a duplicate is",
+        "No question is needed; 'deduplicate' has one obvious meaning"
+      ],
+      "correct": "'What counts as a duplicate — identical rows, or the same person with a different email or spelling?' The dedup key IS the problem; exact-match vs fuzzy changes the entire approach",
+      "explanation": "The ambiguous word ('duplicate') hides two completely different problems with different algorithms. One question disambiguates the whole design. Scale matters for performance, but not for the definition of correctness — so it's the second question, not the first.",
+      "principle": "Clarify the word the whole solution pivots on, not the surface details."
+    },
+    {
+      "id": "cache-staleness",
+      "prompt": "Task: 'cache the API responses.' The candidate immediately writes an in-memory dict cache.",
+      "candidates": [
+        "'Can responses go stale, and for how long?' Without a freshness/eviction policy a cache is a correctness bug waiting to ship — that requirement dictates TTL, invalidation, and whether in-memory even works",
+        "'Should I use a dict or a list to store it?' — an implementation detail beneath the real question",
+        "'What variable name would you prefer for the cache?' — irrelevant to the design",
+        "No question is needed; an in-memory dict cache always works"
+      ],
+      "correct": "'Can responses go stale, and for how long?' Without a freshness/eviction policy a cache is a correctness bug waiting to ship — that requirement dictates TTL, invalidation, and whether in-memory even works",
+      "explanation": "The hard part of caching is invalidation, not storage. Without the staleness requirement the candidate is guessing at the one decision that makes a cache correct or dangerous — and the AI will happily produce a confident, stale-by-design cache.",
+      "principle": "For a cache, the staleness policy is the spec; the storage is a detail."
+    },
+    {
+      "id": "no-one-to-ask",
+      "prompt": "In a timed round with no interviewer available to answer, the task says 'sort the results by relevance.' What's the right move?",
+      "candidates": [
+        "State the assumption aloud and proceed: 'Relevance isn't defined, so I'll assume X and keep the scoring function swappable' — an un-answerable ambiguity becomes visible judgment instead of a silent guess",
+        "Pick a definition silently and implement it — asking would only waste time",
+        "Refuse to start until someone defines 'relevance' for you",
+        "Prompt the AI to decide what relevance means and accept whatever it returns"
+      ],
+      "correct": "State the assumption aloud and proceed: 'Relevance isn't defined, so I'll assume X and keep the scoring function swappable' — an un-answerable ambiguity becomes visible judgment instead of a silent guess",
+      "explanation": "Clarification isn't only questions. When you can't ask, narrating the assumption — and isolating it so it's easy to swap — shows the same judgment and protects you if the assumption was wrong. Silent guessing and uncritically delegating the definition to the AI both forfeit the signal.",
+      "principle": "When you can't ask, narrate the assumption — visible judgment beats a silent guess."
+    }
+  ]
+}
