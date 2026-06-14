@@ -12,9 +12,13 @@ candidate → planned 2026-06-14) · demand spine:
 `~/guides/docs/research/role_demand_and_interview_signals/` (esp. `_gather_new_topics_2026-06-03.md`
 §"AI-assisted-coding interviews"). Plan of record: `~/.claude/plans/what-is-the-roadmap-crystalline-sky.md`.
 
-## Status: IN PROGRESS (2026-06-14)
+## Status: CONTENT COMPLETE — independent review pending (2026-06-14)
 
-**Phase 1 + Movements B–D complete.** Ch 0–11 authored (framing + the full loop + communication/anti-patterns + scale); outline + companion
+**All 13 chapters (0–12) + the workflow-artifact companion shipped (Movements A–E).** Build green
+(58 pages, validate 53 chapters, no errors); self-verified — LOS↔anchor bijective in all 13, every demo
+`correct∈candidates`, narrative chain intact. The independent multi-agent review (the gate guides #1–3
+passed, producing a `REVIEW_FINDINGS` doc) is the recommended remaining step before marking 'reviewed'.
+Outline + companion
 shape locked; index + RESUME entries added. **Chapter count LOCKED at 13 (ch 0–12)** after the
 Movement-B draft (2026-06-14), per the content-flow steer: the merge points (clarify/preregister,
 prompting/reading, provenance) were assessed and each kept as a full chapter because each earns its
@@ -49,6 +53,11 @@ place — 13 by content, not padded to match the series.
   (`reading-doesnt-scale`/`golden-sets`/`nondeterministic`; `evaluating_ai_output_demo`; **bridge to
   `mini_eval` / Guide #1**), **Ch 11** provenance-accountability (`approval-is-ownership`/`provenance-trail`/
   `hardest-cases`; `provenance_demo`).
+- **Ch 12 + companion authored** (2026-06-14, Movement E) — **Ch 12** interview-craft-transfer capstone
+  (`mock-round`/`scoring-walkthrough`/`self-assessment`; `capstone_round_demo`; worked mock round annotated
+  vs the rubric + a self-assessment). **Companion (Option A)** in `companion/working-with-ai/`:
+  `preregistration.md`, `loop-checklist.md`, `review-rubric.md` (+ README). One MDX bare-`<` in Ch 12 was
+  caught by the build and fixed.
 
 ## Demand basis
 
