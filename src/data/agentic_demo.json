@@ -1,0 +1,45 @@
+{
+  "name": "Govern the agent",
+  "note": "When the AI runs across many files, you can't read every line — so you govern differently. Pick the move that keeps an agentic change accountable.",
+  "items": [
+    {
+      "id": "scope-migration",
+      "prompt": "You need an agent to migrate 30 call-sites to a new API. Best first move?",
+      "candidates": [
+        "Have it do one representative call-site end-to-end, review and verify that, then let it batch the rest against the verified pattern — gate the pattern before it's applied 30 times",
+        "Let it do all 30 at once and review the final diff — fastest",
+        "Do all 30 by hand; agents can't be trusted with migrations",
+        "Let it run and only check that the tests pass at the end"
+      ],
+      "correct": "Have it do one representative call-site end-to-end, review and verify that, then let it batch the rest against the verified pattern — gate the pattern before it's applied 30 times",
+      "explanation": "Gating the pattern on one unit before fanning out catches a systematic error 30x cheaper, while reviewing 30 files at once is exactly where comprehension collapses.",
+      "principle": "Verify the pattern on one unit before the agent applies it to many."
+    },
+    {
+      "id": "scope-creep",
+      "prompt": "Mid-refactor, the agent proposes to also 'clean up' unrelated code it noticed. Right move?",
+      "candidates": [
+        "Hold it to scope: 'stay within the auth refactor; list the other cleanups separately and I'll decide' — uncontrolled scope creep is where agent changes become unreviewable",
+        "Let it — more cleanup is always good",
+        "Let it, as long as the tests still pass afterward",
+        "Abandon the agent and start the whole thing over manually"
+      ],
+      "correct": "Hold it to scope: 'stay within the auth refactor; list the other cleanups separately and I'll decide' — uncontrolled scope creep is where agent changes become unreviewable",
+      "explanation": "Scope discipline at checkpoints keeps the change reviewable and the preregistration meaningful. Letting an agent expand scope is how you end with files you can't account for.",
+      "principle": "Hold the agent to the scope you committed; surface extras, don't absorb them."
+    },
+    {
+      "id": "cant-read-all",
+      "prompt": "An agent changed 14 files; you can't carefully read all of them. How do you govern it?",
+      "candidates": [
+        "Read the seams (the changed interfaces/contracts) deeply, run the preregistered gate over the whole change, and deep-read the 2–3 riskiest files while sampling the rest — govern by contract + gate + risk-weighted reading",
+        "Read all 14 files line by line, however long it takes",
+        "Trust it if the tests pass — that's what tests are for",
+        "Reject the whole change because you can't read all of it"
+      ],
+      "correct": "Read the seams (the changed interfaces/contracts) deeply, run the preregistered gate over the whole change, and deep-read the 2–3 riskiest files while sampling the rest — govern by contract + gate + risk-weighted reading",
+      "explanation": "At scale you govern by interfaces, the gate, and risk-weighted sampling — the senior real-world practice. Reading everything doesn't scale; trusting tests alone misses what they don't cover.",
+      "principle": "When you can't read every line, govern the seams, the gate, and the riskiest units."
+    }
+  ]
+}

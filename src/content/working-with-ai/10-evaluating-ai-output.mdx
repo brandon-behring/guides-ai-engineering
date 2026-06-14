@@ -1,0 +1,177 @@
+---
+title: "Evaluating AI-assisted output"
+slug: evaluating-ai-output
+description: "When AI produces output at volume — code across a repo, or generations as a feature — reading samples is the happy-path trap at scale. You need a standard you can run automatically: a golden set, properties, a gate. For deterministic code that's a test suite in CI; for non-deterministic generative output it's measured quality (metrics or an LLM judge) over samples — which is the evaluation discipline of Guide #1, pointed at the AI's output you're now responsible for. Preregistration grown up into a standing eval."
+freshness: literature-survey
+last_verified: 2026-06-14
+tags: [ai-assisted-coding, evaluation, golden-set, llm-judge, scale]
+sources: []
+draft: false
+mode: tutorial
+target: transfer
+ordering: problem-first
+commitment: long-lived
+paradigms: [default]
+research_debt_addressed: |
+  Once AI produces output at volume — many files, many generations, or a generative feature
+  serving users — per-item reading stops scaling and spot-checking becomes the happy-path trap
+  one level up. The competency is building a runnable gate: a golden set and metrics for
+  deterministic output, and measured-quality evaluation (metrics or an LLM judge over samples)
+  for non-deterministic output. This is the explicit bridge from working-with-AI to the
+  evaluation discipline of Guide #1 (and its mini_eval companion); the chapter makes that
+  connection rather than re-deriving it.
+task_classes: [evaluation, test-design]
+provenance:
+  ai_tools: ["Claude Opus 4.8 (Anthropic)"]
+  audit_history:
+    - date: 2026-06-14
+      type: authored
+      file: src/content/working-with-ai/10-evaluating-ai-output.mdx
+  citation_backstop: manual
+los:
+  - id: WAI-10.1
+    bloom: explain
+    statement: "Explain the volume threshold at which comprehension (per-item reading) must give way to evaluation (a runnable standard), and why spot-checking at scale is the happy-path trap one level up."
+    anchor: reading-doesnt-scale
+    threshold: true
+  - id: WAI-10.2
+    bloom: design
+    statement: "Build a gate for AI output at scale — a golden set of cases or properties run automatically over the whole output — connecting preregistration to a standing evaluation and bridging to the evaluation discipline of Guide #1 / mini_eval."
+    anchor: golden-sets
+    threshold: true
+  - id: WAI-10.3
+    bloom: analyze
+    statement: "Evaluate non-deterministic generative output by measured quality (metrics or an LLM judge) over a sampled set rather than exact-match, recognizing this as full LLM evaluation."
+    anchor: nondeterministic
+    threshold: false
+---
+
+import YouWillLearn from '@brandon_m_behring/book-scaffold-astro/components/YouWillLearn.astro';
+import Pitfall from '@brandon_m_behring/book-scaffold-astro/components/Pitfall.astro';
+import Practice from '@brandon_m_behring/book-scaffold-astro/components/Practice.astro';
+import ScenarioQuiz from '../../components/ScenarioQuiz.tsx';
+import evalData from '../../data/evaluating_ai_output_demo.json';
+
+# Evaluating AI-assisted output
+
+<YouWillLearn prerequisites="Chapter 9 — you leaned on 'the gate' to cover what you couldn't read. This chapter is where the gate grows into real evaluation.">
+- The **volume threshold** where reading must give way to evaluation — spot-checking is the trap at scale.
+- How to **build the gate**: golden sets and properties run automatically over AI output (bridge to `mini_eval`).
+- How to **evaluate non-deterministic output** by measured quality, not exact match.
+</YouWillLearn>
+
+## The thirty descriptions nobody read
+
+A team uses AI to generate 200 product descriptions. They spot-check five, the five look great, they
+ship all 200. Thirty of them have a subtly wrong attribute or a claim the product can't make. The five
+they read were, of course, the five most likely to be fine.
+
+Predict, before reading on: **what would have caught the thirty?** Not reading more samples — you'd
+have to read nearly all of them to be sure. The answer is a different kind of check: a standard you can
+run over *everything*, automatically.
+
+<Pitfall title="Spot-checking doesn't scale; evaluation does">
+Per-item reading (Chapter 5) is the right tool for what you can actually read. At volume — many files,
+many generations, an AI feature serving users — reading a sample is the happy-path trap one level up:
+the samples you pick are biased toward fine, and the rare bad output hides in the part you didn't read.
+The scaled tool isn't more reading; it's a runnable standard — a golden set, properties, a gate.
+</Pitfall>
+
+## When reading doesn't scale {/* anchor: reading-doesnt-scale */}
+
+There's a threshold. Below it — a function, a small change — you verify by comprehension plus a handful
+of preregistered tests. Above it — a fourteen-file refactor, 200 generations, a feature that produces
+output for every user — you cannot read your way to confidence, and trying to is both infeasible and
+biased. The shift is from **comprehension to measurement**: from "I read it and it's right" to "it
+passes a standard I can run over all of it."
+
+This is not a new idea in the series — it's the silent-failure problem from Guide #3 (the system can be
+confidently wrong while looking fine) and the evaluation discipline from Guide #1 (you measure quality,
+you don't assume it), now pointed at output *you produced with AI and are responsible for*. Working with
+AI at scale doesn't escape evaluation; it requires it.
+
+## Build the gate: golden sets for AI output {/* anchor: golden-sets */}
+
+The gate is a standard you can run automatically over the whole output. Its shape depends on the output:
+
+- **Deterministic code.** The gate is a **test suite** encoding your invariants, run in CI over the
+  whole change — your Chapter-3 preregistration grown into a standing, automated check. For a migration,
+  it's the tests that must pass at every one of the 30 call-sites.
+- **Generated artifacts (descriptions, configs, data).** Build a **golden set of properties**: the
+  things that must hold (no banned claims, correct attributes, length and format bounds) and run all
+  outputs through it, reserving human reading for what the check flags.
+
+This is the same construction Guide #1 teaches and its **`mini_eval`** companion implements: a set of
+cases, a way to score against them, a gate on the result. The bridge is exact — preregistration is a
+golden set for one unit; evaluation is a golden set for the whole output. **Predict** the right approach:
+
+<ScenarioQuiz client:visible data={evalData} />
+
+The pattern: at volume, build a gate you can run on everything, and spend scarce human reading on what
+the gate flags.
+
+## Evaluating non-deterministic output {/* anchor: nondeterministic */}
+
+The hardest case is when the AI's output isn't a fixed function but a **generative feature** — answers,
+summaries, code suggestions that vary per run. You can't assert exact equality, because there's no single
+right string. You evaluate **properties and quality** instead: groundedness, correctness, format,
+safety — measured with metrics or an **LLM judge** over a sampled set, exactly as Guide #1 teaches. One
+honest note, consistent with this series' demo policy: you evaluate over samples and report measured
+quality; you don't fabricate a single "the AI said X" output and call it verified.
+
+This is the moment working-with-AI fully becomes LLM evaluation. If your AI-assisted work *is* shipping a
+generative feature, the skill you need is the whole of Guide #1 — and the bridge runs both ways: the
+loop (clarify, preregister, verify) is how you build the feature, and evaluation is how you know it
+works at scale.
+
+<Practice id="evaluate-generated-tests" difficulty={2}>
+You used AI to generate 500 unit tests for a module. How do you evaluate whether they're any *good* — and
+what's the trap in "they all pass"?
+
+<details>
+<summary>One defensible answer</summary>
+
+- **The trap:** AI-generated tests that all pass may be testing trivialities or asserting the *current*
+  (possibly buggy) behaviour — passing tests are not the same as good tests (Chapter 3's ratification
+  trap and Chapter 6's independent-standard point, at scale).
+- **How to evaluate them:** mutation-style checking — introduce a known bug and confirm some test fails;
+  coverage of your preregistered invariants and boundaries, not just lines; a sample-read for tautological
+  assertions. A golden set of "bugs that *should* be caught" is the gate for the tests themselves.
+
+This is meta-evaluation: the evaluation discipline (Guide #1) applied to AI-generated tests. "They all
+pass" tells you the least; "they catch the bugs I planted" tells you they work.
+</details>
+</Practice>
+
+## How this is graded
+
+**Evaluation Rigor is this chapter's weighted dimension** — at scale, rigor *is* a runnable gate:
+
+- **Evaluation Rigor** *(weighted)* — you build a standard you can run over all the output, and you
+  evaluate generative output by measured quality rather than a sample or a single check.
+- **Technical Correctness** — you know why exact-match fails for non-deterministic output and what to
+  measure instead (properties, not strings).
+- **Trade-off Awareness** — you size the eval to volume and risk: a property check vs a labeled set vs a
+  judge, sample vs full.
+- **Communication** — you can say "I can't read 200, so here's the gate I'd run on all of them," which
+  reads as senior at scale.
+
+### Industry variation
+
+- **Startups** — a lightweight golden set beats no eval; build the smallest gate that catches the failure
+  you can't afford, and grow it as volume grows.
+- **Big tech** — evaluation infrastructure for AI output is a core competency; this is the eval-at-scale
+  skill that distinguishes "used AI" from "shipped AI responsibly."
+- **Regulated (fintech, health)** — the eval is also the audit: documented pass rates and the cases
+  evaluated become part of the record.
+- **Frontier labs** — evaluating model output *is* the job; rigorous eval design (and resisting metrics
+  that can be gamed) is the discipline being hired for.
+
+## Stretch: evaluation tells you it's good now — who owns it when it isn't?
+
+A gate tells you the output meets the standard *today*. It doesn't answer the question that lands in a
+postmortem six weeks later: when this AI-written code breaks, who's accountable, and how do you show what
+it was checked against? Before the next chapter: if a bug ships in code an agent wrote and you approved,
+what's the honest answer to "how did this happen?"
+
+Next: **Chapter 11 — Provenance & accountability**, where "the AI wrote it" turns out not to be an answer.

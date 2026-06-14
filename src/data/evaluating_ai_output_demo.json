@@ -1,0 +1,45 @@
+{
+  "name": "Eval, or eyeball?",
+  "note": "When AI produces output at volume — code across a repo, or generations as a feature — reading samples is the happy-path trap at scale. Pick the approach that actually verifies it.",
+  "items": [
+    {
+      "id": "volume",
+      "prompt": "AI generated 200 product descriptions. You have time to check 10. Best approach?",
+      "candidates": [
+        "Build a small golden set of properties (no banned claims, correct attributes, length bounds) and run all 200 through an automated check; spend your 10 reads on the ones it flags — eval scales, spot-reading doesn't",
+        "Read 10 at random; if they're good, ship all 200",
+        "Read all 200 — it's the only safe way",
+        "Ship all 200; the AI is reliable enough at this volume"
+      ],
+      "correct": "Build a small golden set of properties (no banned claims, correct attributes, length bounds) and run all 200 through an automated check; spend your 10 reads on the ones it flags — eval scales, spot-reading doesn't",
+      "explanation": "At volume you need an automated standard. Random spot-reading is the happy-path trap (you'll miss the rare bad one), and reading all of it doesn't scale.",
+      "principle": "At volume, build a gate you can run on everything, not a sample you can read."
+    },
+    {
+      "id": "code-at-scale",
+      "prompt": "An agent wrote code across 14 files. What's the scaled version of 'verify against the gate'?",
+      "candidates": [
+        "A test suite encoding your invariants that runs over the whole change in CI, plus property checks for what unit tests miss — the preregistered standard becomes a standing, automated gate",
+        "Manually run the happy path in each of the 14 files",
+        "Trust the agent's own claim that it tested the code",
+        "Ship it and watch production for errors"
+      ],
+      "correct": "A test suite encoding your invariants that runs over the whole change in CI, plus property checks for what unit tests miss — the preregistered standard becomes a standing, automated gate",
+      "explanation": "At scale the gate is an automated test/eval suite (CI) — preregistration grown up. Manual happy-path runs and self-reported testing don't cover a multi-file change.",
+      "principle": "At scale, the gate is an automated suite — preregistration becomes CI."
+    },
+    {
+      "id": "generative",
+      "prompt": "Your AI feature generates support answers that vary per run. How do you verify quality?",
+      "candidates": [
+        "Evaluate properties over a sampled set — groundedness, correctness, format — with metrics or an LLM judge against a labeled eval set, not exact-match; non-deterministic output needs measured quality (the discipline from Guide #1)",
+        "Assert the output equals a fixed expected string",
+        "Check it once; if it's good, it's good",
+        "Rely on user complaints to surface the bad answers"
+      ],
+      "correct": "Evaluate properties over a sampled set — groundedness, correctness, format — with metrics or an LLM judge against a labeled eval set, not exact-match; non-deterministic output needs measured quality (the discipline from Guide #1)",
+      "explanation": "Generative output requires property/quality evaluation (a judge or metrics) over samples. Exact-match fails, single checks don't generalize, and complaint-driven detection lags badly. This is where working-with-AI becomes LLM evaluation.",
+      "principle": "Non-deterministic output is verified by measured quality over samples, not exact match."
+    }
+  ]
+}

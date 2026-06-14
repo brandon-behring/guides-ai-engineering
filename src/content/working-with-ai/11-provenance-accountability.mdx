@@ -1,0 +1,186 @@
+---
+title: "Provenance & accountability"
+slug: provenance-accountability
+description: "You can delegate the typing, not the accountability. The moment you ship or approve AI output, you own it as if you'd written it — 'the AI wrote it' is not an explanation, an excuse, or an audit answer. Provenance is how you make that ownership real: what was AI-generated, what it was reviewed and tested against, who approved it. For your own work the loop itself is your provenance — the ability to explain and defend the code; for teams and regulated systems it becomes an explicit record."
+freshness: literature-survey
+last_verified: 2026-06-14
+tags: [ai-assisted-coding, accountability, provenance, audit, ownership]
+sources: []
+draft: false
+mode: explanation
+target: transfer
+ordering: problem-first
+commitment: long-lived
+paradigms: [default]
+research_debt_addressed: |
+  As AI writes more production code, "who owns the bug?" becomes a first-order question, and
+  "the AI wrote it" is a tempting non-answer that fails in postmortems, code review, and audits.
+  Regulated sectors increasingly require provenance for AI-assisted code. Public discussion
+  treats this as a tooling/labeling problem; it's really an accountability principle. This
+  chapter establishes approval-as-ownership, defines provenance for both individual and
+  institutional work, and frames it as the institutional cure for the automation-bias
+  anti-pattern from Chapter 8.
+task_classes: [accountability, communication]
+provenance:
+  ai_tools: ["Claude Opus 4.8 (Anthropic)"]
+  audit_history:
+    - date: 2026-06-14
+      type: authored
+      file: src/content/working-with-ai/11-provenance-accountability.mdx
+  citation_backstop: manual
+los:
+  - id: WAI-11.1
+    bloom: explain
+    statement: "Explain approval-as-ownership: accepting or shipping AI output makes you the engineer of record, and 'the AI wrote it' does not transfer accountability to the tool."
+    anchor: approval-is-ownership
+    threshold: true
+  - id: WAI-11.2
+    bloom: explain
+    statement: "Define provenance for AI-assisted code at two levels — for individual work, the demonstrable ability to explain and defend it (the loop); for teams/regulated systems, an explicit record of what was generated, tested against, and approved."
+    anchor: provenance-trail
+    threshold: true
+  - id: WAI-11.3
+    bloom: analyze
+    statement: "Apply accountability to the hardest cases (approved-not-written code, agentic multi-file changes, regulated systems, model-origin bugs) and contrast it with the automation-bias anti-pattern it cures."
+    anchor: hardest-cases
+    threshold: false
+---
+
+import YouWillLearn from '@brandon_m_behring/book-scaffold-astro/components/YouWillLearn.astro';
+import Pitfall from '@brandon_m_behring/book-scaffold-astro/components/Pitfall.astro';
+import Practice from '@brandon_m_behring/book-scaffold-astro/components/Practice.astro';
+import ScenarioQuiz from '../../components/ScenarioQuiz.tsx';
+import provenanceData from '../../data/provenance_demo.json';
+
+# Provenance & accountability
+
+<YouWillLearn prerequisites="Chapter 10 — you can evaluate AI output at scale. This chapter is about who owns it when it ships and later breaks.">
+- Why **approval is ownership** — accountability doesn't transfer to the tool.
+- What **provenance** means for AI-assisted code, for your own work and for teams.
+- How accountability plays out in the **hardest cases** — and how it cures the automation-bias anti-pattern.
+</YouWillLearn>
+
+## "The AI wrote that part"
+
+A bug ships in AI-generated code. In the postmortem, the engineer explains: "the AI wrote that part."
+It's true. It's also the worst thing they could say.
+
+Predict, before reading on: **why does that land so badly, and what's the version that doesn't?** The
+sentence tries to move responsibility to the tool — and everyone in the room hears it do that. The
+accountable version starts with "I approved it," and goes somewhere useful from there.
+
+<Pitfall title="You can delegate the typing, not the accountability">
+The AI is a tool; you are the engineer of record. "The AI wrote it" is not an explanation, an excuse, or
+an audit answer — accountability does not transfer to the thing that produced the keystrokes. The moment
+you ship or approve AI output, you own it exactly as if you'd typed it. That's both freeing (use the tool
+as much as you like) and demanding (the result is yours).
+</Pitfall>
+
+## Approval is ownership {/* anchor: approval-is-ownership */}
+
+The principle is one line: **accepting AI output is authoring it**, for every purpose that matters —
+correctness, review, blame, audit. The tool's involvement changes how the code was produced, not who is
+responsible for it. This is why "the AI wrote it" fails everywhere it's tried: in a postmortem it reads
+as deflection, in code review it doesn't survive a follow-up question, in an audit it isn't an acceptable
+answer.
+
+Read positively, the principle is liberating. You don't have to limit your use of AI to defend your work
+— you have to be able to *stand behind the result*. That reframes the entire guide: the loop isn't
+bureaucratic caution, it's what lets you delegate aggressively and still own the output with a straight
+face. The interview signal is simple and rare: take ownership of AI-assisted work without hedging. A
+candidate who says "I built this; here's how I know it's right" beats one who says "well, the AI generated
+most of it" every time — same code, opposite signal.
+
+## Provenance: the audit trail for AI code {/* anchor: provenance-trail */}
+
+Provenance is what makes ownership *real* rather than asserted — the evidence that you actually checked
+what you're standing behind. It has two levels:
+
+- **For your own work, provenance is the loop.** Your ability to explain the code, say what you reviewed
+  it against, and show how you verified it *is* your provenance. You don't need a label saying "AI made
+  this"; you need to be able to defend it. Comprehension (Ch 5) and verification (Ch 6) are precisely the
+  record that lets you stand behind AI-written code as your own. A chat log of your prompts is not
+  provenance; your demonstrable understanding is.
+- **For teams and regulated systems, provenance becomes explicit.** What was AI-generated, what it was
+  tested against, who reviewed and approved it — recorded, because the accountability is shared and has to
+  survive the people involved. The PR description, the gate's pass record, and the review sign-off are the
+  artifacts. "The model decided" is not an audit answer; the record is.
+
+**Predict** the accountable response in each case:
+
+<ScenarioQuiz client:visible data={provenanceData} />
+
+The pattern: own the approval, show what it was checked against, name the gap honestly, fix the process —
+never reach for the tool as the responsible party.
+
+## When accountability is hardest {/* anchor: hardest-cases */}
+
+The principle is easy to state and hard exactly where it matters:
+
+- **Code you approved but didn't write** — the default of AI-assisted work. Approval is ownership, so the
+  comprehension and verification have to be real, not rubber-stamped.
+- **An agent's multi-file change** — you governed by seams and gate (Ch 9), so your provenance is the
+  scoping, the checkpoints, and what each was verified against — not a claim to have read every line.
+- **A regulated, high-stakes system** — provenance must be documented, because accountability is external
+  and audited; the record is the deliverable.
+- **A bug whose origin is "the model"** — the hardest temptation, and the cleanest test: the accountable
+  move is to own it, show what you checked, name what you missed, and fix the process.
+
+This is also the institutional cure for the **automation-bias** anti-pattern from Chapter 8. Automation
+bias is trusting the tool over your own check; provenance is the discipline that makes trust *accountable*
+— you can rely on the AI as much as you can stand behind, and no more. The two chapters are the same idea
+from opposite ends: one names the failure, the other builds the practice that prevents it.
+
+<Practice id="stand-behind-it" difficulty={2}>
+An interviewer asks: "You used AI heavily on this project — how do you stand behind the code?" Give an
+answer that demonstrates accountability and provenance.
+
+<details>
+<summary>One defensible answer</summary>
+
+"I treat anything I ship as mine, regardless of who typed it. Concretely: I clarified and preregistered
+the spec and the tests before prompting, I read every change against that spec, and I verified against the
+gate — so I can explain any line and say what it's checked against. Where I delegated something I didn't
+deeply review — say, a broad agent change — I scoped and gated it, and I'll tell you exactly where my
+review was deep versus sampled. 'The AI wrote it' isn't a sentence I'd say in a postmortem."
+
+Why it works: it states ownership plainly, offers the loop as concrete provenance, is honest about the
+boundary between deep review and sampling (which reads as senior, not evasive), and explicitly rejects the
+non-defense.
+</details>
+</Practice>
+
+## How this is graded
+
+**Communication is this chapter's weighted dimension** — accountability is largely a matter of how you own
+the work out loud:
+
+- **Communication** *(weighted)* — you take clear ownership and articulate your provenance, with no "the AI
+  did it" hedging and no false claim to have read what you sampled.
+- **Evaluation Rigor** — your provenance is concrete (what it was checked against), not a vibe; the gate is
+  part of the record.
+- **Technical Correctness** — you can actually explain and defend the code, which is the substance beneath
+  the ownership.
+- **Trade-off Awareness** — you're honest about where you delegated versus deeply reviewed, and you gate the
+  delegated parts harder.
+
+### Industry variation
+
+- **Startups** — even without formal process, the loop is your provenance; "I can explain and defend all of
+  it" is the bar, and it's on you.
+- **Big tech** — provenance lives in PR descriptions and review records; ownership in a large team means
+  your name on the approval means something.
+- **Regulated (fintech, health)** — documented provenance is mandatory; the generation, testing, and
+  approval chain is an audit artifact, and "the AI decided" fails compliance.
+- **Frontier labs** — accountability for AI-assisted *research*: reproducibility and method provenance, so a
+  result built with AI help can still be trusted and rebuilt.
+
+## Stretch: put the whole skill in one room
+
+You now have all of it — the loop, communication, the anti-patterns, scale, and accountability. The last
+question is whether you can do it *together*, under time pressure, with someone watching: clarify and
+preregister, prompt and read and verify, narrate throughout, and own the result. Before the capstone:
+which stage do you most expect to drop when the clock is running and you're being observed?
+
+Next: **Chapter 12 — Interview craft & transfer**, the capstone, where the whole loop runs at once in a mock
+AI-assisted round and you grade yourself against the rubric.

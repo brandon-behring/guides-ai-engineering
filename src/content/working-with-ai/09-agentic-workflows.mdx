@@ -1,0 +1,180 @@
+---
+title: "Agentic workflows: governing what you can't read"
+slug: agentic-workflows
+description: "The loop scales from a single function to multi-file, agent-driven work — and an agent doesn't change the loop, it changes what you can hold in your head. You can no longer read every line, so governance shifts from per-line review to per-checkpoint review: scope the work into units small enough to preregister and verify, gate between them, and govern the seams, the gate, and the riskiest units rather than every line. This is what the un-one-shottable interview problems are built to test."
+freshness: literature-survey
+last_verified: 2026-06-14
+tags: [ai-assisted-coding, agents, multi-file, governance, scale]
+sources: []
+draft: false
+mode: tutorial
+target: transfer
+ordering: problem-first
+commitment: long-lived
+paradigms: [default]
+research_debt_addressed: |
+  Agentic coding tools that act across a whole repo are now mainstream, and the harder
+  modern rounds (Canva's "complex, ambiguous, realistic", un-one-shottable problems) probe
+  whether a candidate can govern autonomous, multi-file work — not just one function. Public
+  material is tool-demo hype. This chapter scales the loop to repo level: the plan as
+  preregistration, checkpoints as gates, and governance-by-contract for changes too large to
+  read line by line. It deliberately teaches the durable governance discipline rather than a
+  specific agent's UI.
+task_classes: [agentic-workflow, governance, scoping]
+provenance:
+  ai_tools: ["Claude Opus 4.8 (Anthropic)"]
+  audit_history:
+    - date: 2026-06-14
+      type: authored
+      file: src/content/working-with-ai/09-agentic-workflows.mdx
+  citation_backstop: manual
+los:
+  - id: WAI-9.1
+    bloom: explain
+    statement: "Explain that an agent doesn't change the loop but changes what you can hold — at repo scale the six stages apply to units of work, not lines, with the plan as preregistration and checkpoints as gates."
+    anchor: loop-at-scale
+    threshold: true
+  - id: WAI-9.2
+    bloom: design
+    statement: "Scope an agentic task into units each small enough to review and verify independently, with explicit checkpoints between them, gating a pattern on one unit before it is applied to many."
+    anchor: scope-checkpoints
+    threshold: true
+  - id: WAI-9.3
+    bloom: analyze
+    statement: "Govern a change too large to read line by line via the seams (changed contracts), the automated gate, and risk-weighted sampling of the riskiest units."
+    anchor: govern-not-read
+    threshold: false
+---
+
+import YouWillLearn from '@brandon_m_behring/book-scaffold-astro/components/YouWillLearn.astro';
+import Pitfall from '@brandon_m_behring/book-scaffold-astro/components/Pitfall.astro';
+import Practice from '@brandon_m_behring/book-scaffold-astro/components/Practice.astro';
+import ScenarioQuiz from '../../components/ScenarioQuiz.tsx';
+import agenticData from '../../data/agentic_demo.json';
+
+# Agentic workflows: governing what you can't read
+
+<YouWillLearn prerequisites="Movements B–C — you can run the loop and avoid its anti-patterns on a single unit of work. This chapter scales it to a repo.">
+- Why an agent **doesn't change the loop** — it changes what you can hold in your head.
+- How to **scope and checkpoint** an agentic task into units you can actually verify.
+- How to **govern what you can't read**: the seams, the gate, and the riskiest units.
+</YouWillLearn>
+
+## The fourteen files you didn't know were touched
+
+You hand an agent a real task: "refactor the auth module to support OAuth." You let it run. It comes
+back with fourteen changed files, and the happy path works. The interviewer (or your reviewer) points
+at a file you didn't know was in scope and asks what one change does. You can't say — you've never
+seen it.
+
+Predict, before reading on: **at what scale did the loop break?** Not at "the agent is bad" — the code
+mostly works. It broke when the work exceeded what you could preregister and review *per unit*, and
+you were still using single-function habits on a repo-sized change.
+
+<Pitfall title="An agent doesn't change the loop — it changes what you can hold">
+Everything from Movements B–C still applies: clarify, preregister, prompt, read, verify, narrate. What
+changes is capacity. You cannot read every line of a fourteen-file change or hold it all in your head,
+so the per-line habits silently stop covering the work. The failure isn't the agent; it's applying
+single-unit governance to a multi-unit task and assuming the coverage carried over. It didn't.
+</Pitfall>
+
+## The loop at repo scale {/* anchor: loop-at-scale */}
+
+The fix is not a different loop — it's the same six stages applied to **units of work instead of lines
+of code**. You clarify and preregister the *whole* task up front (the plan, the interfaces between
+parts, the invariants that span them); then you let the agent execute *one unit*; then you review and
+verify *that unit* before the next. Two stages get promoted:
+
+- **The plan becomes the preregistration.** For a single function you commit invariants and tests; for
+  a multi-file change you commit the decomposition, the interfaces between units, and the cross-cutting
+  invariants — the standard the whole change is held to.
+- **Checkpoints become the gates.** Instead of one gate at the end, you gate *between units*: a place
+  you read the diff, run the gate, and decide go/no-go before the agent continues.
+
+Same discipline, coarser grain. The skill is choosing the grain.
+
+## Scope and checkpoints {/* anchor: scope-checkpoints */}
+
+Carving the task is the move. Break an agentic job into units each small enough to review and verify on
+its own, with an explicit checkpoint between them. The highest-leverage version: when the agent will do
+something repetitive (migrate 30 call-sites, update every handler), have it do **one representative unit
+end-to-end**, review and verify that, then let it apply the verified pattern to the rest. You gate the
+pattern *before* it's stamped thirty times — catching a systematic error once instead of thirty times.
+
+The un-one-shottable problems in modern rounds (Canva's deliberately ambiguous, realistic tasks) are
+built to reward exactly this: they can't be vibe-prompted in a single shot, so they reveal whether you
+can decompose a problem into verifiable pieces and hold the line on scope. **Predict** the governing
+move in each case:
+
+<ScenarioQuiz client:visible data={agenticData} />
+
+The thread: gate the pattern on one unit, hold the agent to the committed scope, and never let a change
+grow past what your checkpoints can cover.
+
+## Governing what you can't read {/* anchor: govern-not-read */}
+
+Sometimes the change is genuinely too large to read every line — and reading all of it isn't the senior
+move anyway; it doesn't scale and it spends your attention uniformly when risk isn't uniform. Govern by
+four levers instead:
+
+- **The seams.** Read the changed *interfaces and contracts* deeply — that's where integration bugs
+  live and where one unit's correctness meets another's.
+- **The gate.** An automated test/invariant suite covers, mechanically, what you can't eyeball across
+  fourteen files (this is the next chapter — the gate has to grow up into real evaluation).
+- **Risk-weighted reading.** Deep-read the two or three riskiest units (auth, money, data-loss paths);
+  sample the rest. Attention follows risk.
+- **Plan adherence.** Did the agent do what you scoped — and only that? Scope creep is unreviewed change.
+
+This is how senior engineers actually review large AI-assisted changes, and naming it out loud is the
+interview signal for agentic competence: you govern the change, you don't pretend to have read it all.
+
+<Practice id="scope-an-agent" difficulty={2}>
+You're asked, in an interview, to use an agent to add a feature across a small codebase. Describe how
+you'd scope it into checkpoints and what you'd verify at each — and what you'd say out loud while doing it.
+
+<details>
+<summary>One defensible answer</summary>
+
+- **Scope into units, each with a checkpoint:** (1) the data-model change; (2) the business logic; (3)
+  the API surface; (4) tests and wiring. Preregister the interfaces between them and the cross-cutting
+  invariants up front.
+- **Verify at each checkpoint:** read that unit's diff, run its slice of the gate, confirm it matches its
+  piece of the spec, then proceed. The model change is gated *before* logic depends on it, because a wrong
+  shape there corrupts everything downstream.
+- **Narrate:** "I'm scoping this into four units; I'll let the agent do the model change first and gate it
+  before touching the logic, since a wrong model shape would poison the rest." That shows agentic
+  governance *and* communication in one sentence.
+</details>
+</Practice>
+
+## How this is graded
+
+**Trade-off Awareness is this chapter's weighted dimension** — scoping and checkpoint placement are
+trades against risk:
+
+- **Trade-off Awareness** *(weighted)* — you carve the work and place checkpoints by where risk and
+  architecture live, rather than running the agent unsupervised or reviewing everything uniformly.
+- **Evaluation Rigor** — the gate covers what you can't read, and you verify per-unit before proceeding.
+- **Technical Correctness** — you read the seams, where integration bugs between units actually live.
+- **Communication** — you narrate the scoping and gating, demonstrating governance of an autonomous tool.
+
+### Industry variation
+
+- **Startups** — agents are a velocity multiplier; the discipline is gating the *pattern* before it's
+  applied broadly, so one systematic mistake doesn't propagate across the codebase.
+- **Big tech** — agentic changes land in huge repos behind CI and code review; blast radius and review
+  culture make checkpointing and seam-review mandatory, not optional.
+- **Regulated (fintech, health)** — every unit needs accountability; an agent can't leave files no one
+  can explain, so per-checkpoint review is also a provenance requirement.
+- **Frontier labs** — agents on research code; checkpoint the *method* (is the experiment still valid?),
+  not only whether the code runs.
+
+## Stretch: when the gate has to grow up
+
+You leaned on "the gate" to cover what you couldn't read. But for a fourteen-file change — or for AI that
+produces output at volume — a few hand-run tests aren't a gate anymore; you need a real evaluation
+harness. Before the next chapter: if an agent generated 200 outputs (or 500 tests), how would you check
+them when reading even a fraction isn't enough?
+
+Next: **Chapter 10 — Evaluating AI-assisted output**, where verification scales into evaluation, and this
+guide meets the evaluation discipline of Guide #1.
