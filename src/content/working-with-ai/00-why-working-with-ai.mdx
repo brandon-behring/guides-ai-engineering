@@ -1,0 +1,213 @@
+---
+title: "Why working with AI is its own engineering skill"
+slug: why-working-with-ai
+description: "The AI wrote the feature, it compiles, the tests pass — and the interviewer's next question ends the loop: why is it built this way, and what breaks on the input nobody tested? Working with AI is a distinct skill from coding and from prompting: the bottleneck moved from producing code to governing, verifying, and explaining code you didn't type. This chapter frames the loop the rest of the guide builds."
+freshness: literature-survey
+last_verified: 2026-06-14
+tags: [orientation, ai-assisted-coding, judgment, communication]
+sources: []
+draft: false
+mode: explanation
+target: transfer
+ordering: problem-first
+commitment: long-lived
+paradigms: [default]
+research_debt_addressed: |
+  Public material on "using AI to code" is either tool marketing or hot takes about
+  productivity multipliers; almost none of it answers what AI-assisted-coding
+  interviews (Meta, Google, Canva — 2025–26) actually score: can you direct, verify,
+  and account for code you didn't write, out loud, under time pressure? The demand
+  evidence is blunt — "rely solely on prompting → you fail," and communication is the
+  #1 documented rejection cause (~40–45%). This chapter frames working-with-AI as a
+  distinct skill and introduces the loop — clarify, preregister, prompt, review, run,
+  explain — the rest of the guide builds stage by stage.
+task_classes: [orientation]
+provenance:
+  ai_tools: ["Claude Opus 4.8 (Anthropic)"]
+  audit_history:
+    - date: 2026-06-14
+      type: authored
+      file: src/content/working-with-ai/00-why-working-with-ai.mdx
+  citation_backstop: manual
+los:
+  - id: WAI-0.1
+    bloom: explain
+    statement: "Explain why working with AI is a distinct engineering skill from both coding and prompting — the bottleneck moved from producing code to governing, verifying, and explaining code you didn't type — and why raw output speed is not the thing being judged."
+    anchor: the-shift
+    threshold: true
+  - id: WAI-0.2
+    bloom: explain
+    statement: "Name the six stages of the working-with-AI loop (clarify, preregister, prompt, review, run, explain), what each owns, and locate a given AI-assisted failure at the stage that would have caught it."
+    anchor: the-loop
+    threshold: true
+  - id: WAI-0.3
+    bloom: analyze
+    statement: "Diagnose why three AI-productivity myths — 'it compiles and passes', 'I'm 5× faster', 'prompting is the skill' — fail, and which discipline each one outsources that the engineer still owns."
+    anchor: ai-myths
+    threshold: true
+---
+
+import YouWillLearn from '@brandon_m_behring/book-scaffold-astro/components/YouWillLearn.astro';
+import Pitfall from '@brandon_m_behring/book-scaffold-astro/components/Pitfall.astro';
+import Practice from '@brandon_m_behring/book-scaffold-astro/components/Practice.astro';
+import ScenarioQuiz from '../../components/ScenarioQuiz.tsx';
+import aiMythsData from '../../data/ai_productivity_myths_demo.json';
+
+# Why working with AI is its own engineering skill
+
+<YouWillLearn prerequisites="You can build and ship software with an AI assistant (Claude Code, Copilot, Cursor, or similar). This guide is about doing it the way interviews — and real teams — now judge.">
+- Why working with AI is a **distinct skill** from coding and from prompting — and why "faster output" isn't the thing being judged.
+- The **working-with-AI loop**: clarify, preregister, prompt, review, run, explain — and what each stage owns.
+- Why three AI-productivity myths ("it compiles and passes", "I'm 5× faster", "prompting is the skill") fail.
+</YouWillLearn>
+
+## The interview that ended on one question
+
+You're in a 2026-style coding round. You're allowed — expected — to use an AI assistant.
+The prompt is a multi-file feature: parse a messy input format, transform it, and expose it
+through a small API. You describe it to the model, it produces a clean implementation, the
+provided tests go green. Twelve minutes in, you feel great.
+
+Then the interviewer asks two questions. *"Why did you structure the transform as a
+streaming pass instead of loading it all?"* and *"What does this do on an empty input — walk
+me through it."* You didn't choose the streaming pass; the model did. You haven't read the
+empty-input path. You start to scroll back through code you've never actually read.
+
+Predict, before reading on: **what did the interviewer just learn about you — and was it the
+thing you thought the round was testing?** The code was fine. That was never the question.
+
+<Pitfall title="AI moved the bottleneck, not the bar">
+The bar is unchanged: *do you understand this system, and can you defend it?* AI removed the
+typing, not the understanding. Engineers who struggle treat the assistant as the **author** —
+they ship its output and inherit its blind spots. Engineers who thrive treat it as a fast,
+tireless **junior** whose every line they direct, review, and own. Same tool; opposite skill.
+</Pitfall>
+
+## The shift {/* anchor: the-shift */}
+
+For a decade the scarce thing was producing correct code: typing it, recalling the API,
+wiring it together. Assistants made that cheap — by 2026 a majority of new code at large
+shops is AI-generated (Google reported ~75% internally; see the callout below). When
+production gets cheap, value moves to whatever is *still* hard: deciding what to build,
+**knowing whether what came back is right**, and making both legible to other people.
+
+That relocation is why working with AI is its **own** skill, distinct on two sides:
+
+- **It is not just coding.** A strong coder who hands the wheel to the model and stops reading
+  becomes a weak *director* — fast at generating code they can't defend. The skill is steering
+  and verifying, not out-typing the machine.
+- **It is not just prompting.** Prompt fluency gets you a plausible draft. It does nothing for
+  the judgment to decide the draft is correct, the rigor to prove it, or the words to explain
+  it. "Rely solely on prompting → you fail" is a direct quote from how one frontier employer
+  describes its bar.
+
+So the work is **governance over automation**: directing a capable, fast, occasionally
+confidently-wrong collaborator, and staying accountable for the result. The rest of this guide
+is the discipline of doing that well — and the structure it follows is a loop.
+
+## The working-with-AI loop {/* anchor: the-loop */}
+
+Working with AI well is one loop with six stages. The skill — and the interview signal — is
+knowing which stage owns a given failure, and which stage's absence let it through. Five stages
+run in sequence; the sixth runs the whole time.
+
+| Stage | Owns | This guide |
+| --- | --- | --- |
+| **Clarify** | pinning the real problem before any code exists | the clarify chapter |
+| **Preregister** | committing files, invariants, and tests *before* you prompt | the preregistration chapter |
+| **Prompt** | turning the committed spec into a precise request | the prompting chapter |
+| **Review** | reading and comprehending what came back — owning every line | the reading-AI-code chapter |
+| **Run** | verifying against the tests you preregistered, not against vibes | the verification chapter |
+| **Explain** | narrating intent and trade-offs *throughout* — not a final step | the communication chapter |
+
+Run the failed interview through it. The "why streaming?" miss lives at **review** — the
+candidate never comprehended the design they shipped. The "empty input?" miss lives at
+**preregister** and **run** — no invariant or test was committed for the boundary, so nothing
+caught it. And the scrolling-in-silence lives at **explain** — the one stage that, done
+continuously, would have surfaced both gaps out loud while there was still time. None of the
+failures live at "the model wrote bad code." The model wrote *fine* code. The engineering was
+missing around it.
+
+**Explain** gets singled out because it is both the stage candidates most often skip and the
+**#1 documented reason strong candidates are rejected** (~40–45% of failures trace to
+communication). It is this guide's weighted dimension, and it is woven through every chapter
+rather than saved for the end.
+
+## Three AI-productivity myths {/* anchor: ai-myths */}
+
+Each of these is a real position a capable engineer takes in their first months of going
+all-in on an assistant — and each one quietly outsources a judgment the engineer still owns.
+**Predict** the sharpest reason each fails before you reveal it.
+
+<ScenarioQuiz client:visible data={aiMythsData} />
+
+Now *explain* the pattern. Every myth treats some other mechanism as if it were doing the
+engineer's job: the handed-down tests as if they were *your* verification ("it compiles and
+passes"), output volume as if it were *value* ("I'm 5× faster"), and prompt phrasing as if it
+were *judgment* ("prompting is the skill"). The loop above is the corrective — it puts the
+clarify, preregister, review, run, and explain back where the engineer can't outsource them.
+
+<Practice id="place-the-failure" difficulty={1}>
+Four moments from AI-assisted rounds. For each, name the loop stage that **owns the fix** (one
+sentence of justification each):
+
+1. A candidate pastes a 200-line AI implementation and, asked what one helper function does, can't say.
+2. A candidate starts prompting immediately and builds the wrong feature — they misread the requirement.
+3. The code passes the visible tests, then crashes on an empty list nobody tested for.
+4. A candidate solves it correctly but works in near-silence; the interviewer can't follow the reasoning.
+
+<details>
+<summary>One defensible answer</summary>
+
+1. **Review** — comprehension is non-negotiable; if you can't explain a line, you haven't
+   reviewed it, you've only accepted it.
+2. **Clarify** — a clarifying question (or a one-line restatement to confirm) before any prompt
+   would have caught the misread; jumping-without-understanding is a top failure mode.
+3. **Preregister** (and **run**) — committing the empty-input invariant and a test for it before
+   prompting turns the boundary into a gate the model has to satisfy.
+4. **Explain** — correctness you can't make legible reads, under time pressure, as luck;
+   narration is scored as much as the result.
+
+If you also said "explain underlies all four" — yes. Thinking aloud is how the other gaps
+surface while there's still time to fix them.
+</details>
+</Practice>
+
+## How this is graded
+
+The same four dimensions as the rest of the series — with their working-with-AI accents:
+
+- **Technical Correctness** — you can still reason about code you didn't type: you name the
+  invariant that breaks, not "it looked fine." The craft amplifies real understanding; it
+  doesn't replace it.
+- **Trade-off Awareness** — you treat the assistant as a tool with trade-offs (one-shot vs
+  decompose; speed vs defensibility), rather than a default productivity multiplier.
+- **Evaluation Rigor** — you decide what "right" means and how you'll check it *before* you
+  prompt, then verify against that — not against whether it ran.
+- **Communication** *(this guide's weighted dimension)* — you narrate intent, decisions, and
+  trade-offs while you work with the AI. "I'm committing these invariants and a test for the
+  empty case first, then asking it to implement, then reading the diff against them" is the
+  sentence that signals you govern the tool instead of trusting it.
+
+### Industry variation
+
+- **Startups** — AI velocity is prized, but the senior tell is *gating* it (a review pass and a
+  test gate) so speed compounds into leverage instead of debt.
+- **Big tech** — AI-assisted coding is now mainstream interview ground (Meta's CoderPad rounds,
+  Google's code-comprehension pilot — both 2025–26); system design assumes LLM integration with
+  cost/latency budgets, and comprehension of AI output is assessed directly.
+- **Regulated (fintech, health)** — provenance and accountability for AI-written code are
+  first-order: who reviewed it, what it was tested against, who owns the bug when it ships.
+- **Frontier labs** — some rounds *ban* AI to test raw ability; others assume it. The durable
+  skill — governing automation — transfers either way, which is why this guide anchors there.
+
+## Stretch: the one-line answer
+
+"The AI wrote it — how do you know it's right?" The junior answer is "the tests pass." Sketch
+the senior answer in three sentences that walk the loop. (Hint: you *clarified* the spec and
+*preregistered* the invariants and tests that define "right"; you *prompted*, then *reviewed*
+the diff and *ran* it against exactly those; and you were *explaining* your reasoning the whole
+time, so any gap surfaced while it was cheap to fix.)
+
+Next: **Chapter 1 — What interviewers actually test**, where the four things an AI-assisted
+round scores map directly onto the rubric every chapter grades against.

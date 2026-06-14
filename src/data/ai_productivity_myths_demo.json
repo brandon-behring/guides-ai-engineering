@@ -1,0 +1,45 @@
+{
+  "name": "Spot the AI-productivity myth",
+  "note": "Each line is something a capable engineer says in the first months of going all-in on an AI assistant. Pick the sharpest reason it fails — before an interview (or production) teaches it to you.",
+  "items": [
+    {
+      "id": "it-compiles",
+      "prompt": "The model wrote the whole feature, it compiles, and the tests I was handed pass. That's done — shipping it.",
+      "candidates": [
+        "The handed-to-you tests check the cases someone already thought of; you didn't write or read the code, so you can't say what it does on the inputs nobody tested — and 'I can't explain it' is exactly what an interviewer is probing for",
+        "Passing tests is never enough evidence to ship any code, AI-written or not",
+        "AI-written code always hides at least one bug, so it can never be trusted",
+        "You should rewrite every line the AI produced by hand before shipping it"
+      ],
+      "correct": "The handed-to-you tests check the cases someone already thought of; you didn't write or read the code, so you can't say what it does on the inputs nobody tested — and 'I can't explain it' is exactly what an interviewer is probing for",
+      "explanation": "Comprehension and verification are still the engineer's job — the AI moved the typing, not the accountability. Passing the visible tests certifies the cases you imagined, not the system. 'Failing while the code looks fine' is the signature AI-assisted failure: it feels productive and is undefendable. The fix is reading the diff and checking it against invariants you committed up front — the next chapters.",
+      "principle": "If you can't explain why it's correct, you haven't verified it — you've just watched it pass."
+    },
+    {
+      "id": "velocity",
+      "prompt": "I ship features 5× faster with AI than I used to. That makes me a more valuable engineer.",
+      "candidates": [
+        "Speed of producing code you can't defend is negative value — the bottleneck moved to judgment, review, and explanation, so 'faster output' only counts if you can still account for and gate what shipped",
+        "Measuring engineering speed is impossible, so the claim can't mean anything",
+        "AI makes every engineer exactly equally fast, so speed stopped being a differentiator",
+        "Senior engineers should never optimize for speed under any circumstances"
+      ],
+      "correct": "Speed of producing code you can't defend is negative value — the bottleneck moved to judgment, review, and explanation, so 'faster output' only counts if you can still account for and gate what shipped",
+      "explanation": "AI commoditized code production; it did not commoditize deciding what to build, the rigor to verify it, or the communication to make it legible. Velocity without governance just produces undefendable code faster — the anti-pattern, at scale. The senior move is to pair the speed with a review-and-gate discipline so it becomes leverage, not debt.",
+      "principle": "AI made output cheap; it made judgment, verification, and communication the scarce part."
+    },
+    {
+      "id": "prompt-theater",
+      "prompt": "The real skill now is prompt engineering. Get the prompt right and the AI handles the rest.",
+      "candidates": [
+        "Prompt fluency without a committed theory is 'prompt theater' — interviewers can tell someone steering toward a spec they preregistered from someone iterating prompts until something passes",
+        "Prompts don't matter at all; any reasonable phrasing produces the same result",
+        "Prompt engineering is a fad that will disappear entirely within a year",
+        "Only the choice of model matters; the wording of the prompt is irrelevant"
+      ],
+      "correct": "Prompt fluency without a committed theory is 'prompt theater' — interviewers can tell someone steering toward a spec they preregistered from someone iterating prompts until something passes",
+      "explanation": "The durable skill is governance over automation: clarify the problem, commit files / invariants / tests, then prompt. Prompting is one stage of the loop, not the whole job — and the strongest signal you can send is that you decided what 'right' means before you asked. Prompt-tuning until a failure hides is the opposite signal.",
+      "principle": "Decide what 'right' means before you prompt — otherwise you're just tuning prompts until the failure hides."
+    }
+  ]
+}
