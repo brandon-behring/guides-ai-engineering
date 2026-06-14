@@ -26,12 +26,12 @@ collections under `src/content/<guide>/`, one shared `companion/` lib, per-guide
   (`docs/REVIEW_FINDINGS_2026-06-13.md`); LOS↔anchor bijective in all 13. Build doc:
   `docs/guide-03-production-ai-systems.md`.
 - **#4 Working with AI — IN PROGRESS (2026-06-14).** Engineering *with* an AI assistant the way
-  interviews now judge it (governing/verifying/explaining code you didn't type). Ch 0–8 authored
+  interviews now judge it (governing/verifying/explaining code you didn't type). Ch 0–11 authored
   (Ch 0 `why-working-with-ai` — the shift + the working-with-AI loop clarify→preregister→prompt→review→run→explain
   + 3 AI-productivity myths via `ScenarioQuiz`). Ships **workflow artifacts, not a `mini_*` lib**
   (roadmap §6); demos hand-authored. Content-flow spine **LOCKED at 13 ch (0–12)** after the Movement-B
-  draft; Movements A–C done, remaining: D (agentic,
-  evaluating-ai-output, provenance), E (capstone + companion artifacts + completion gate). Outline + work-order: `docs/guide-04-working-with-ai.md`. Plan of record:
+  draft; Movements A–D done, remaining: E (Ch 12 capstone +
+  companion artifacts + completion gate). Outline + work-order: `docs/guide-04-working-with-ai.md`. Plan of record:
   `~/.claude/plans/what-is-the-roadmap-crystalline-sky.md`. Weighted dimension: **Communication**.
 
 ## Companion (`companion/`, stdlib-only, "for learning, not production")

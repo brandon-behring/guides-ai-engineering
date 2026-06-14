@@ -14,7 +14,7 @@ candidate → planned 2026-06-14) · demand spine:
 
 ## Status: IN PROGRESS (2026-06-14)
 
-**Phase 1 + Movements B–C complete.** Ch 0–8 authored (framing + the full loop + communication & anti-patterns); outline + companion
+**Phase 1 + Movements B–D complete.** Ch 0–11 authored (framing + the full loop + communication/anti-patterns + scale); outline + companion
 shape locked; index + RESUME entries added. **Chapter count LOCKED at 13 (ch 0–12)** after the
 Movement-B draft (2026-06-14), per the content-flow steer: the merge points (clarify/preregister,
 prompting/reading, provenance) were assessed and each kept as a full chapter because each earns its
@@ -44,6 +44,11 @@ place — 13 by content, not padded to match the series.
 - **Ch 7–8 authored** (2026-06-14, Movement C) — **Ch 7** communication-while-you-delegate (the guide's
   weighted dimension; `silence-fails`/`what-to-narrate`/`narrate-collaboration`; `communication_demo`),
   **Ch 8** anti-patterns (`four-antipatterns`/`contrasting-cases`/`short-term-reward`; `antipatterns_demo`).
+- **Ch 9–11 authored** (2026-06-14, Movement D — at scale) — **Ch 9** agentic-workflows
+  (`loop-at-scale`/`scope-checkpoints`/`govern-not-read`; `agentic_demo`), **Ch 10** evaluating-ai-output
+  (`reading-doesnt-scale`/`golden-sets`/`nondeterministic`; `evaluating_ai_output_demo`; **bridge to
+  `mini_eval` / Guide #1**), **Ch 11** provenance-accountability (`approval-is-ownership`/`provenance-trail`/
+  `hardest-cases`; `provenance_demo`).
 
 ## Demand basis
 
