@@ -26,7 +26,7 @@ collections under `src/content/<guide>/`, one shared `companion/` lib, per-guide
   (`docs/REVIEW_FINDINGS_2026-06-13.md`); LOS↔anchor bijective in all 13. Build doc:
   `docs/guide-03-production-ai-systems.md`.
 - **#4 Working with AI — IN PROGRESS (2026-06-14).** Engineering *with* an AI assistant the way
-  interviews now judge it (governing/verifying/explaining code you didn't type). Ch 0–1 authored
+  interviews now judge it (governing/verifying/explaining code you didn't type). Ch 0–2 authored
   (Ch 0 `why-working-with-ai` — the shift + the working-with-AI loop clarify→preregister→prompt→review→run→explain
   + 3 AI-productivity myths via `ScenarioQuiz`). Ships **workflow artifacts, not a `mini_*` lib**
   (roadmap §6); demos hand-authored. Content-flow spine (**~11–13 ch, emergent** — count locked after
