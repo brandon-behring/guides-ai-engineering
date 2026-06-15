@@ -19,12 +19,12 @@
       "id": "velocity",
       "prompt": "I ship features 5× faster with AI than I used to. That makes me a more valuable engineer.",
       "candidates": [
-        "Speed of producing code you can't defend is negative value — the bottleneck moved to judgment, review, and explanation, so 'faster output' only counts if you can still account for and gate what shipped",
+        "Speed of producing code you can't defend isn't value — it's deferred risk; the bottleneck moved to judgment, review, and explanation, so 'faster output' only counts if you can still account for and gate what shipped",
         "Measuring engineering speed is impossible, so the claim can't mean anything",
         "AI makes every engineer exactly equally fast, so speed stopped being a differentiator",
         "Senior engineers should never optimize for speed under any circumstances"
       ],
-      "correct": "Speed of producing code you can't defend is negative value — the bottleneck moved to judgment, review, and explanation, so 'faster output' only counts if you can still account for and gate what shipped",
+      "correct": "Speed of producing code you can't defend isn't value — it's deferred risk; the bottleneck moved to judgment, review, and explanation, so 'faster output' only counts if you can still account for and gate what shipped",
       "explanation": "AI commoditized code production; it did not commoditize deciding what to build, the rigor to verify it, or the communication to make it legible. Velocity without governance just produces undefendable code faster — the anti-pattern, at scale. The senior move is to pair the speed with a review-and-gate discipline so it becomes leverage, not debt.",
       "principle": "AI made output cheap; it made judgment, verification, and communication the scarce part."
     },

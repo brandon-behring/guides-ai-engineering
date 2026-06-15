@@ -38,7 +38,7 @@ los:
     threshold: true
   - id: WAI-12.2
     bloom: design
-    statement: "Run the whole loop on an unseen problem in a mock AI-assisted round, mapping each move (clarify, preregister, prompt, read, verify, explain) to the rubric dimension it earns."
+    statement: "Run the whole loop on an unseen problem in a mock AI-assisted round, mapping each move (clarify, preregister, prompt, review, run, explain) to the rubric dimension it earns."
     anchor: scoring-walkthrough
     threshold: true
   - id: WAI-12.3
@@ -108,10 +108,10 @@ Here is the loop run on that prompt, with each move tagged by the rubric dimensi
 - **Prompt** *(Trade-off Awareness):* hand over the spec — the signature, the invariants, "sort by start
   then sweep, merging when the next start is ≤ current end; standard library only." One-shot is fine here
   because it's one well-specified function.
-- **Read** *(Technical Correctness):* "It sorts then sweeps — good. Let me check the merge condition: it
+- **Review** *(Technical Correctness):* "It sorts then sweeps — good. Let me check the merge condition: it
   uses `<` , so *touching* ranges won't merge. That contradicts my invariant." Caught by reading against
   the spec, not by style.
-- **Verify** *(Evaluation Rigor):* run the boundary tests; the touching-ranges test fails, confirming the
+- **Run** *(Evaluation Rigor):* run the boundary tests; the touching-ranges test fails, confirming the
   read. Feed the specific failure back: "merge when next start ≤ current end — use ≤, not a strict `<`; touching ranges
   should merge."
 - **Explain** *(Communication, throughout):* every line above was said out loud, so the interviewer
@@ -134,7 +134,7 @@ the companion's `review-rubric.md` is this turned into a checklist:
 - **Communication** — could a listener reconstruct your reasoning from what you said *while* you worked?
 
 And the transfer claim, made plain: you were never memorizing solutions. The **loop is
-problem-independent** — clarify, preregister, prompt, read, verify, explain works on the merge problem,
+problem-independent** — clarify, preregister, prompt, review, run, explain works on the merge problem,
 on a problem you'll see next week, on one that doesn't exist yet. The rubric is what's scored on *any*
 AI-assisted task. That's why this skill transfers where a bank of memorized answers doesn't: you learned
 a process, and the process is the thing the interview — and the job — actually tests.
@@ -177,7 +177,7 @@ The capstone grades on all four dimensions equally, because the skill is running
 ### Industry variation
 
 - **Frontier labs** — some rounds ban the assistant to test raw reasoning; the loop minus the prompt stage
-  still applies (clarify, commit invariants, verify, explain), so it transfers even there.
+  still applies (clarify, commit invariants, review, run, explain), so it transfers even there.
 - **Big tech** — the explicit comprehension round and the system-design conversation are this capstone in
   two halves; narration carries both.
 - **Startups** — a collaborative pair or take-home; the craft is making your loop legible async, in a PR
@@ -189,7 +189,7 @@ The capstone grades on all four dimensions equally, because the skill is running
 
 The interview is a compressed, observed version of the job: a problem you haven't seen, a tool that writes
 fast, and the need to own the result out loud. Everything you practiced here — clarify, preregister, prompt,
-read, verify, explain, and own it — is not interview theater; it *is* the work, with the clock and the
+review, run, explain, and own it — is not interview theater; it *is* the work, with the clock and the
 audience turned up. So the last move isn't another chapter. It's to run the loop on your real work this
 week, where the stakes are lower and the reps are free, until governing the tool is simply how you build.
 That's when it transfers for good.

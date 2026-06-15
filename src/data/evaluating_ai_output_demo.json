@@ -17,7 +17,7 @@
     },
     {
       "id": "code-at-scale",
-      "prompt": "An agent wrote code across 14 files. What's the scaled version of 'verify against the gate'?",
+      "prompt": "An agent wrote code across many files; you've already reviewed the seams (Ch 9). What's the scaled version of 'verify against the gate'?",
       "candidates": [
         "A test suite encoding your invariants that runs over the whole change in CI, plus property checks for what unit tests miss — the preregistered standard becomes a standing, automated gate",
         "Manually run the happy path in each of the 14 files",

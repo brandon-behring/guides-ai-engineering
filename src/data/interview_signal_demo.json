@@ -4,7 +4,7 @@
   "items": [
     {
       "id": "reread-to-answer",
-      "prompt": "A candidate ships the AI's solution fast and correct. Asked 'what happens on an empty list?', they re-read the code for thirty seconds before answering.",
+      "prompt": "A candidate ships the AI's solution fast. Asked 'what happens on an empty list?', they re-read the code for thirty seconds, then answer uncertainly: 'it returns 0… no — it'd throw.'",
       "candidates": [
         "Comprehension (Technical Correctness) — they accepted code they hadn't internalized; the re-reading is the tell that they're reasoning about it for the first time, live",
         "Communication — they just need to answer more confidently next time",

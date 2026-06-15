@@ -12,13 +12,13 @@ candidate → planned 2026-06-14) · demand spine:
 `~/guides/docs/research/role_demand_and_interview_signals/` (esp. `_gather_new_topics_2026-06-03.md`
 §"AI-assisted-coding interviews"). Plan of record: `~/.claude/plans/what-is-the-roadmap-crystalline-sky.md`.
 
-## Status: CONTENT COMPLETE — independent review pending (2026-06-14)
+## Status: COMPLETE + independently reviewed (2026-06-14)
 
 **All 13 chapters (0–12) + the workflow-artifact companion shipped (Movements A–E).** Build green
 (58 pages, validate 53 chapters, no errors); self-verified — LOS↔anchor bijective in all 13, every demo
-`correct∈candidates`, narrative chain intact. The independent multi-agent review (the gate guides #1–3
-passed, producing a `REVIEW_FINDINGS` doc) is the recommended remaining step before marking 'reviewed'.
-Outline + companion
+`correct∈candidates`, narrative chain intact. Independently reviewed (3-agent: facts /
+demo-honesty / pedagogy-continuity) — `docs/REVIEW_FINDINGS_2026-06-14.md`, **0 blockers**, all MAJOR +
+MINOR findings fixed. Outline + companion
 shape locked; index + RESUME entries added. **Chapter count LOCKED at 13 (ch 0–12)** after the
 Movement-B draft (2026-06-14), per the content-flow steer: the merge points (clarify/preregister,
 prompting/reading, provenance) were assessed and each kept as a full chapter because each earns its
@@ -58,6 +58,11 @@ place — 13 by content, not padded to match the series.
   vs the rubric + a self-assessment). **Companion (Option A)** in `companion/working-with-ai/`:
   `preregistration.md`, `loop-checklist.md`, `review-rubric.md` (+ README). One MDX bare-`<` in Ch 12 was
   caught by the build and fixed.
+- **Independent review** (2026-06-14) — 3 parallel reviewers (facts / demo-honesty / pedagogy-continuity),
+  **0 blockers**; fixed all MAJOR + MINOR: Ch 0 overgeneralization + dangling callout + Meta mis-cite, loop
+  mnemonic standardized to **review/run** (source-faithful, `_gather_new_topics` L44), "Movements" prose refs
+  → chapter spans, 2 demo sharpenings, the `*(weighted)*`-tag convention note. Findings:
+  `docs/REVIEW_FINDINGS_2026-06-14.md`.
 
 ## Demand basis
 
