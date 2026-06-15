@@ -1,6 +1,8 @@
 ---
 title: "Throughput & efficiency levers — quantization, batching, speculation"
 slug: throughput-levers
+part: 3
+chapter: 3
 description: "Chapter 2's fix for a latency cliff was 'more concurrency' — but every serving slot holds a KV cache in VRAM, so batch size is memory-bound, not free. The KV-cache ceiling on batching, and the three levers that get more requests through a fixed GPU — quantization (free memory), continuous batching (kill idle slots), speculative decoding (more tokens per step) — each matched to the bottleneck it actually attacks, and the cost each one carries."
 freshness: literature-survey
 last_verified: 2026-06-13
